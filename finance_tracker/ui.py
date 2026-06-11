@@ -11,11 +11,12 @@ class Data:
     """Everything loaded fresh from disk for one page render (no caching —
     every view re-reads, so edits show up on the next refresh)."""
 
-    def __init__(self, root, config, profiles, budget, contributions, goals, income):
+    def __init__(self, root, config, profiles, budget, targets, contributions, goals, income):
         self.root = root
         self.config = config
         self.profiles = profiles
         self.budget = budget
+        self.targets = targets
         self.contributions = contributions
         self.goals = goals
         self.income = income
@@ -27,13 +28,14 @@ def load_all() -> "Data":
         config = storage.load_config(root)
         profiles = storage.load_profiles(root, config)
         budget = storage.load_budget(root, profiles)
+        targets = storage.load_targets(root, config, profiles)
         contributions = storage.load_contributions(root, config, profiles)
         goals = storage.load_goals(root, profiles)
         income = storage.load_income(root, profiles)
     except Exception as exc:
         st.error(f"Could not load data: {exc}")
         st.stop()
-    return Data(root, config, profiles, budget, contributions, goals, income)
+    return Data(root, config, profiles, budget, targets, contributions, goals, income)
 
 
 def inr(n: float) -> str:

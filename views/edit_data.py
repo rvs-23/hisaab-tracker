@@ -12,8 +12,8 @@ st.caption(
     f"`{d.root}` works just as well as this page."
 )
 
-budget_tab, contrib_tab, goals_tab, income_tab = st.tabs(
-    ["Budget", "Contributions", "Goals", "Income"]
+budget_tab, target_tab, contrib_tab, goals_tab, income_tab = st.tabs(
+    ["Budget", "Targets", "Contributions", "Goals", "Income"]
 )
 
 
@@ -44,6 +44,30 @@ with budget_tab:
         },
     )
     save_grid(edited, lambda df: storage.validate_budget(df, d.profiles), storage.save_budget, "budget")
+
+with target_tab:
+    st.caption(
+        "Per-year target overrides. Each (person, year, tier) must sum to 100. "
+        "Years with no rows here fall back to the profile's default_target."
+    )
+    edited = st.data_editor(
+        d.targets.sort_values(["profile", "year", "tier", "category"]).reset_index(drop=True)
+        if not d.targets.empty else d.targets,
+        num_rows="dynamic", hide_index=True, width="stretch", key="targets_editor",
+        column_config={
+            "profile": st.column_config.SelectboxColumn("Person", options=profile_keys, required=True),
+            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+            "tier": st.column_config.SelectboxColumn("Tier", options=["short_term", "long_term"], required=True),
+            "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
+            "pct": st.column_config.NumberColumn("Percent", required=True),
+        },
+    )
+    save_grid(
+        edited,
+        lambda df: storage.validate_targets(df, d.config, d.profiles),
+        storage.save_targets,
+        "targets",
+    )
 
 with contrib_tab:
     st.caption("What you actually invested, per person / year / category.")

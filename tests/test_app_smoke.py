@@ -11,7 +11,6 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PAGES = [
     "views/dashboard.py",
-    "views/target.py",
     "views/plan_vs_actual.py",
     "views/budget_projection.py",
     "views/income.py",
@@ -19,7 +18,7 @@ PAGES = [
 ]
 
 TARGET = (
-    "target:\n"
+    "default_target:\n"
     "  short_term: {fixed_deposit: 50, mfs: 30, us_market: 10, indian_stocks: 10}\n"
     "  long_term: {mfs: 45, gold_metals: 25, indian_stocks: 14, us_market: 10, ppf_nps: 5, bonds_gsec_aif: 1}\n"
 )

@@ -36,14 +36,17 @@ class Target(BaseModel):
 
 class Profile(BaseModel):
     """One person. Loaded from profiles/<key>.yaml; `key` is the filename stem
-    and is the value used in the `profile` column of every CSV."""
+    and is the value used in the `profile` column of every CSV.
+
+    `default_target` is the fallback allocation; per-year overrides live in
+    targets.csv and win for the years they cover."""
 
     key: str
     name: str
     birth_year: int
     forward_increment_pct: float  # assumed annual raise for projected future years
     wants_invest_pct: float       # % of wants money that gets invested (short-term tier)
-    target: Target
+    default_target: Target
 
 
 class Config(BaseModel):

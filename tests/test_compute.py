@@ -15,7 +15,7 @@ def rv():
         birth_year=1998,
         forward_increment_pct=10,
         wants_invest_pct=6,
-        target=Target(
+        default_target=Target(
             short_term={"fixed_deposit": 50, "mfs": 30, "us_market": 10, "indian_stocks": 10},
             long_term={
                 "mfs": 45, "gold_metals": 25, "indian_stocks": 14,
@@ -23,6 +23,13 @@ def rv():
             },
         ),
     )
+
+
+@pytest.fixture
+def targets():
+    """Empty per-year overrides — everything falls back to default_target."""
+    from finance_tracker import storage
+    return pd.DataFrame(columns=storage.TARGETS_COLUMNS)
 
 
 @pytest.fixture
@@ -58,9 +65,9 @@ def test_split_pct_wants_is_exactly_30(rv, budget):
     assert sum(pct.values()) == pytest.approx(100, abs=0.01)
 
 
-def test_expected_reproduces_source_sheet(rv, budget):
+def test_expected_reproduces_source_sheet(rv, budget, targets):
     """The whole reason the model exists — match the spreadsheet to the rupee."""
-    exp = compute.expected_contributions(rv, budget, 2024)
+    exp = compute.expected_contributions(rv, budget, targets, 2024)
     sheet = {
         "us_market": 40608.0, "indian_stocks": 55825.0, "mfs": 178887.7,
         "fixed_deposit": 12827.5, "ppf_nps": 19021.2, "bonds_gsec_aif": 3804.2,
@@ -70,13 +77,27 @@ def test_expected_reproduces_source_sheet(rv, budget):
         assert exp[cat] == pytest.approx(want, abs=1.0), cat
 
 
-def test_pct_goal_achieved_matches_sheet(rv, budget, contributions):
-    pva = compute.plan_vs_actual(rv, budget, contributions, 2024)
+def test_pct_goal_achieved_matches_sheet(rv, budget, targets, contributions):
+    pva = compute.plan_vs_actual(rv, budget, targets, contributions, 2024)
     assert compute.pct_goal_achieved(pva) == pytest.approx(76.78, abs=0.05)
 
 
-def test_plan_vs_actual_shortfall(rv, budget, contributions):
-    pva = compute.plan_vs_actual(rv, budget, contributions, 2024).set_index("category")
+def test_per_year_target_override_changes_expected(rv, budget, contributions):
+    """An override row for 2024 should replace the default mix for that year."""
+    override = pd.DataFrame(
+        [
+            {"profile": "rv", "year": 2024, "tier": "long_term", "category": "mfs", "pct": 100},
+            {"profile": "rv", "year": 2024, "tier": "short_term", "category": "mfs", "pct": 100},
+        ]
+    )
+    exp = compute.expected_contributions(rv, budget, override, 2024)
+    # All investment + wants-invest money now lands in mfs, nothing in us_market.
+    assert exp.get("us_market", 0) == 0
+    assert exp["mfs"] == pytest.approx(31702 * 12 + 35632 * 12 * 6 / 100, abs=1.0)
+
+
+def test_plan_vs_actual_shortfall(rv, budget, targets, contributions):
+    pva = compute.plan_vs_actual(rv, budget, targets, contributions, 2024).set_index("category")
     # us_market: actual 39345.5 - expected 40607.9 = -1262.4 (matches sheet -1262.5)
     assert pva.loc["us_market", "shortfall"] == pytest.approx(-1262.5, abs=1.0)
     # indian_stocks over-invested: 95078 - 55824.9 = +39253
@@ -91,15 +112,15 @@ def test_projection_cumulative(rv, budget):
     assert proj["cumulative_invested"].iloc[1] == 31702 * 12 + 121109 * 12
 
 
-def test_household_sums_actuals_across_people(rv, budget, contributions):
+def test_household_sums_actuals_across_people(rv, budget, targets, contributions):
     bob = Profile(
         key="bob", name="Bob", birth_year=1990, forward_increment_pct=5, wants_invest_pct=0,
-        target=rv.target,
+        default_target=rv.default_target,
     )
     budget2 = pd.concat([budget, budget.assign(profile="bob")], ignore_index=True)
     contrib2 = pd.concat([contributions, contributions.assign(profile="bob")], ignore_index=True)
-    house = compute.household_plan_vs_actual([rv, bob], budget2, contrib2, 2024)
-    solo = compute.plan_vs_actual(rv, budget, contributions, 2024)
+    house = compute.household_plan_vs_actual([rv, bob], budget2, targets, contrib2, 2024)
+    solo = compute.plan_vs_actual(rv, budget, targets, contributions, 2024)
     assert house["actual"].sum() == pytest.approx(2 * solo["actual"].sum())
 
 

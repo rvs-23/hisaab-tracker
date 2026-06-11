@@ -17,11 +17,11 @@ default = contrib_years[-1] if contrib_years else years[-1]
 year = st.selectbox("Year", years, index=years.index(default))
 
 if scope is None:
-    pva = compute.household_plan_vs_actual(d.profiles, d.budget, d.contributions, year)
+    pva = compute.household_plan_vs_actual(d.profiles, d.budget, d.targets, d.contributions, year)
     goal_rows = d.goals[d.goals["year"] == year]
 else:
     profile = next(p for p in d.profiles if p.key == scope)
-    pva = compute.plan_vs_actual(profile, d.budget, d.contributions, year)
+    pva = compute.plan_vs_actual(profile, d.budget, d.targets, d.contributions, year)
     goal_rows = d.goals[(d.goals["year"] == year) & (d.goals["profile"] == scope)]
 
 if pva.empty:

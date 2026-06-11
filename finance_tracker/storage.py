@@ -30,6 +30,8 @@ BUDGET_COLUMNS = [
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
 INCOME_COLUMNS = ["date", "profile", "source", "amount", "notes"]
+TARGETS_COLUMNS = ["profile", "year", "tier", "category", "pct"]
+TIERS = {"short_term", "long_term"}
 
 
 def data_dir() -> Path:
@@ -61,14 +63,44 @@ def load_profiles(root: Path, config: Config) -> list[Profile]:
     for file in files:
         with open(file) as f:
             profile = Profile(key=file.stem, **yaml.safe_load(f))
-        for tier in (profile.target.short_term, profile.target.long_term):
+        for tier in (profile.default_target.short_term, profile.default_target.long_term):
             unknown = set(tier) - set(config.categories)
             if unknown:
                 raise ValueError(
-                    f"{file.name}: target uses categories not in config.yaml: {sorted(unknown)}"
+                    f"{file.name}: default_target uses categories not in config.yaml: {sorted(unknown)}"
                 )
         profiles.append(profile)
     return profiles
+
+
+# --- targets (per-year overrides) -----------------------------------------
+
+def load_targets(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
+    path = root / "targets.csv"
+    if not path.exists():
+        return pd.DataFrame(columns=TARGETS_COLUMNS)
+    df = pd.read_csv(path)
+    validate_targets(df, config, profiles)
+    return df
+
+
+def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) -> None:
+    _check_columns(df, TARGETS_COLUMNS, "targets.csv")
+    if df.empty:
+        return
+    _check_profiles(df, profiles, "targets.csv")
+    bad_tier = set(df["tier"].dropna()) - TIERS
+    if bad_tier:
+        raise ValueError(f"targets.csv has unknown tiers: {sorted(bad_tier)} (use short_term/long_term)")
+    bad_cat = set(df["category"].dropna()) - set(config.categories)
+    if bad_cat:
+        raise ValueError(f"targets.csv uses categories not in config.yaml: {sorted(bad_cat)}")
+    for (profile, year, tier), g in df.groupby(["profile", "year", "tier"]):
+        total = g["pct"].sum()
+        if abs(total - 100) > 0.01:
+            raise ValueError(
+                f"targets.csv {profile} {int(year)} {tier}: pct must sum to 100, got {total}"
+            )
 
 
 # --- budget ---------------------------------------------------------------
@@ -152,6 +184,10 @@ def save_contributions(root: Path, df: pd.DataFrame) -> None:
 
 def save_goals(root: Path, df: pd.DataFrame) -> None:
     df.sort_values(["year", "profile"]).to_csv(root / "goals.csv", index=False)
+
+
+def save_targets(root: Path, df: pd.DataFrame) -> None:
+    df.sort_values(["profile", "year", "tier", "category"]).to_csv(root / "targets.csv", index=False)
 
 
 def save_income(root: Path, df: pd.DataFrame) -> None:

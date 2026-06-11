@@ -60,7 +60,24 @@ def projection(profile: Profile, budget: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(out)
 
 
-def expected_contributions(profile: Profile, budget: pd.DataFrame, year: int) -> dict[str, float]:
+def resolve_target(profile: Profile, targets: pd.DataFrame, year: int) -> dict[str, dict[str, float]]:
+    """The allocation in force for a person/year: per-year override rows from
+    targets.csv if present, otherwise the profile's default_target."""
+    rows = targets[(targets["profile"] == profile.key) & (targets["year"] == year)] if not targets.empty else targets
+    if rows.empty:
+        return {
+            "short_term": dict(profile.default_target.short_term),
+            "long_term": dict(profile.default_target.long_term),
+        }
+    out: dict[str, dict[str, float]] = {"short_term": {}, "long_term": {}}
+    for _, r in rows.iterrows():
+        out[r["tier"]][r["category"]] = r["pct"]
+    return out
+
+
+def expected_contributions(
+    profile: Profile, budget: pd.DataFrame, targets: pd.DataFrame, year: int
+) -> dict[str, float]:
     """Planned rupee amount per category for one person/year — the target mix
     applied to that year's investment pool and (wants-derived) short-term pool."""
     row = budget[(budget["profile"] == profile.key) & (budget["year"] == year)]
@@ -69,21 +86,23 @@ def expected_contributions(profile: Profile, budget: pd.DataFrame, year: int) ->
     r = row.iloc[0]
     investment_pool = r["monthly_investment"] * 12
     wants_pool = r["monthly_wants"] * 12 * profile.wants_invest_pct / 100
+    target = resolve_target(profile, targets, year)
 
     expected: dict[str, float] = {}
-    for cat, pct in profile.target.long_term.items():
+    for cat, pct in target["long_term"].items():
         expected[cat] = expected.get(cat, 0.0) + investment_pool * pct / 100
-    for cat, pct in profile.target.short_term.items():
+    for cat, pct in target["short_term"].items():
         expected[cat] = expected.get(cat, 0.0) + wants_pool * pct / 100
     return expected
 
 
 def plan_vs_actual(
-    profile: Profile, budget: pd.DataFrame, contributions: pd.DataFrame, year: int
+    profile: Profile, budget: pd.DataFrame, targets: pd.DataFrame,
+    contributions: pd.DataFrame, year: int,
 ) -> pd.DataFrame:
     """Expected vs actual contribution per category for one person/year.
     shortfall = actual − expected (negative = under-invested)."""
-    expected = expected_contributions(profile, budget, year)
+    expected = expected_contributions(profile, budget, targets, year)
     actual_rows = contributions[
         (contributions["profile"] == profile.key) & (contributions["year"] == year)
     ]
@@ -99,10 +118,11 @@ def plan_vs_actual(
 
 
 def household_plan_vs_actual(
-    profiles: list[Profile], budget: pd.DataFrame, contributions: pd.DataFrame, year: int
+    profiles: list[Profile], budget: pd.DataFrame, targets: pd.DataFrame,
+    contributions: pd.DataFrame, year: int,
 ) -> pd.DataFrame:
     """Plan vs actual summed across everyone for a year."""
-    parts = [plan_vs_actual(p, budget, contributions, year) for p in profiles]
+    parts = [plan_vs_actual(p, budget, targets, contributions, year) for p in profiles]
     parts = [p for p in parts if not p.empty]
     if not parts:
         return pd.DataFrame(columns=["category", "expected", "actual", "shortfall"])

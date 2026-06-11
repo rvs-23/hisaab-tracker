@@ -19,9 +19,9 @@ year = contrib_years[-1] if contrib_years else years[-1]
 
 def pva_for(key):
     if key is None:
-        return compute.household_plan_vs_actual(d.profiles, d.budget, d.contributions, year)
+        return compute.household_plan_vs_actual(d.profiles, d.budget, d.targets, d.contributions, year)
     profile = next(p for p in d.profiles if p.key == key)
-    return compute.plan_vs_actual(profile, d.budget, d.contributions, year)
+    return compute.plan_vs_actual(profile, d.budget, d.targets, d.contributions, year)
 
 
 st.caption(f"Investment plan vs actual — {year}")
