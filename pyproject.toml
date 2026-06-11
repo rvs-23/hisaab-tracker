@@ -1,5 +1,5 @@
 [project]
-name = "rv-finance-tracker"
+name = "hisaab-tracker"
 version = "0.1.0"
 description = "Minimal local personal financial planner for two people, file-based, no server/DB/auth."
 requires-python = ">=3.14"

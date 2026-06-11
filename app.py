@@ -1,6 +1,6 @@
 import streamlit as st
 
-st.set_page_config(page_title="Rv Finance Tracker", page_icon="₹", layout="wide")
+st.set_page_config(page_title="Hisaab", page_icon="₹", layout="wide")
 
 st.navigation(
     [

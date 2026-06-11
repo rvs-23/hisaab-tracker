@@ -1,6 +1,6 @@
-# rv-finance-tracker
+# hisaab-tracker
 
-Minimal, local, file-based personal financial planner for two people. Runs on one Mac via Streamlit. No server, no database, no auth, no live market data.
+*Hisaab* — the household accounts. Minimal, local, file-based personal financial planner for two people. Runs on one Mac via Streamlit. No server, no database, no auth, no live market data.
 
 ## Run
 
