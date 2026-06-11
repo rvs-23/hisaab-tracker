@@ -1,95 +1,94 @@
-import datetime as dt
-
-import pandas as pd
 import streamlit as st
 
-from finance_tracker import compute, storage
+from finance_tracker import storage
 from finance_tracker.ui import load_all
 
-root, config, profiles, holdings, income = load_all()
+d = load_all()
+profile_keys = [p.key for p in d.profiles]
 
 st.title("Update data")
 st.caption(
     "Everything is a plain file — editing the CSVs/YAMLs directly in "
-    f"`{root}` works just as well as this page."
+    f"`{d.root}` works just as well as this page."
 )
 
-holdings_tab, income_tab = st.tabs(["Holdings", "Income"])
+budget_tab, contrib_tab, goals_tab, income_tab = st.tabs(
+    ["Budget", "Contributions", "Goals", "Income"]
+)
 
-with holdings_tab:
-    with st.expander("Start a new snapshot (copies latest values, dated today)"):
-        st.write(
-            "Appends a copy of the selected person's most recent holdings with "
-            "today's date — then edit the new rows' values below and save."
-        )
-        person = st.selectbox("Person", profiles, format_func=lambda p: p.name, key="snap_person")
-        if st.button("Create snapshot rows"):
-            latest = compute.current_holdings(holdings)
-            new = latest[latest["profile"] == person.key].copy()
-            if new.empty:
-                st.warning(f"No existing rows for {person.name} to copy.")
-            else:
-                new["date"] = pd.Timestamp(dt.date.today())
-                storage.save_holdings(root, pd.concat([holdings, new], ignore_index=True))
-                st.rerun()
 
-    edited = st.data_editor(
-        holdings.sort_values(
-            ["date", "profile", "category"], ascending=[False, True, True]
-        ).reset_index(drop=True),
-        num_rows="dynamic",
-        hide_index=True,
-        width="stretch",
-        column_config={
-            "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD", required=True),
-            "profile": st.column_config.SelectboxColumn(
-                "Person", options=[p.key for p in profiles], required=True
-            ),
-            "instrument": st.column_config.TextColumn("Instrument", required=True),
-            "category": st.column_config.SelectboxColumn(
-                "Category", options=config.categories, required=True
-            ),
-            "currency": st.column_config.SelectboxColumn(
-                "Currency", options=sorted(storage.CURRENCIES), required=True
-            ),
-            "value": st.column_config.NumberColumn("Value", required=True),
-            "notes": "Notes",
-        },
-        key="holdings_editor",
-    )
-    if st.button("Save holdings"):
+def save_grid(edited, validate, save, label):
+    if st.button(f"Save {label}", key=f"save_{label}"):
         try:
-            df = edited.copy()
-            df["date"] = pd.to_datetime(df["date"])
-            storage.validate_holdings(df, config, profiles)
-            storage.save_holdings(root, df)
-            st.success("Saved holdings.csv")
+            validate(edited)
+            save(d.root, edited)
+            st.success(f"Saved {label}")
         except Exception as exc:
             st.error(f"Not saved: {exc}")
 
+
+with budget_tab:
+    st.caption("Monthly needs + wants + investment must equal gross salary ÷ 12.")
+    edited = st.data_editor(
+        d.budget.sort_values(["profile", "year"]).reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch", key="budget_editor",
+        column_config={
+            "profile": st.column_config.SelectboxColumn("Person", options=profile_keys, required=True),
+            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+            "starting_salary": st.column_config.NumberColumn("Starting salary (₹)"),
+            "job_change": st.column_config.SelectboxColumn("Job change?", options=["No", "Yes"]),
+            "ending_salary": st.column_config.NumberColumn("Gross salary (₹)", required=True),
+            "monthly_needs": st.column_config.NumberColumn("Needs /mo (₹)", required=True),
+            "monthly_wants": st.column_config.NumberColumn("Wants /mo (₹)", required=True),
+            "monthly_investment": st.column_config.NumberColumn("Invest /mo (₹)", required=True),
+        },
+    )
+    save_grid(edited, lambda df: storage.validate_budget(df, d.profiles), storage.save_budget, "budget")
+
+with contrib_tab:
+    st.caption("What you actually invested, per person / year / category.")
+    edited = st.data_editor(
+        d.contributions.sort_values(["year", "profile", "category"]).reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch", key="contrib_editor",
+        column_config={
+            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+            "profile": st.column_config.SelectboxColumn("Person", options=profile_keys, required=True),
+            "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
+            "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
+            "notes": "Notes",
+        },
+    )
+    save_grid(
+        edited,
+        lambda df: storage.validate_contributions(df, d.config, d.profiles),
+        storage.save_contributions,
+        "contributions",
+    )
+
+with goals_tab:
+    st.caption("Emergency-fund goal, per person / year.")
+    edited = st.data_editor(
+        d.goals.sort_values(["year", "profile"]).reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch", key="goals_editor",
+        column_config={
+            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+            "profile": st.column_config.SelectboxColumn("Person", options=profile_keys, required=True),
+            "emergency_fund_goal": st.column_config.NumberColumn("Emergency-fund goal (₹)", required=True),
+        },
+    )
+    save_grid(edited, lambda df: storage.validate_goals(df, d.profiles), storage.save_goals, "goals")
+
 with income_tab:
-    edited_income = st.data_editor(
-        income.sort_values("date", ascending=False).reset_index(drop=True),
-        num_rows="dynamic",
-        hide_index=True,
-        width="stretch",
+    st.caption("Non-salary income (bonus / other).")
+    edited = st.data_editor(
+        d.income.sort_values("date", ascending=False).reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch", key="income_editor",
         column_config={
             "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD", required=True),
-            "profile": st.column_config.SelectboxColumn(
-                "Person", options=[p.key for p in profiles], required=True
-            ),
+            "profile": st.column_config.SelectboxColumn("Person", options=profile_keys, required=True),
             "source": st.column_config.TextColumn("Source", required=True),
             "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
             "notes": "Notes",
         },
-        key="income_editor",
     )
-    if st.button("Save income"):
-        try:
-            df = edited_income.copy()
-            df["date"] = pd.to_datetime(df["date"])
-            storage.validate_income(df, profiles)
-            storage.save_income(root, df)
-            st.success("Saved income.csv")
-        except Exception as exc:
-            st.error(f"Not saved: {exc}")
+    save_grid(edited, lambda df: storage.validate_income(df, d.profiles), storage.save_income, "income")

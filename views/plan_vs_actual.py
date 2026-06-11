@@ -1,33 +1,51 @@
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import load_all, sidebar_scope
+from finance_tracker.ui import inr, load_all, sidebar_scope
 
-root, config, profiles, holdings, income = load_all()
-profile_key = sidebar_scope(profiles)
+d = load_all()
+scope = sidebar_scope(d.profiles)
 
 st.title("Plan vs actual")
-st.caption("Target mix comes from `target_mix` in config.yaml. Positive diff = surplus, negative = shortfall.")
+st.caption("Planned contribution per category (target × budget) vs what you actually invested. Negative shortfall = under-invested.")
 
-pva = compute.plan_vs_actual(holdings, config, profile_key)
+years = compute.available_years(d.budget, d.contributions)
+if not years:
+    st.info("No data yet — add budget rows and contributions on the Update Data page.")
+    st.stop()
+
+contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
+default = contrib_years[-1] if contrib_years else years[-1]
+year = st.selectbox("Year", years, index=years.index(default))
+
+if scope is None:
+    pva = compute.household_plan_vs_actual(d.profiles, d.budget, d.contributions, year)
+    goal_rows = d.goals[d.goals["year"] == year]
+else:
+    profile = next(p for p in d.profiles if p.key == scope)
+    pva = compute.plan_vs_actual(profile, d.budget, d.contributions, year)
+    goal_rows = d.goals[(d.goals["year"] == year) & (d.goals["profile"] == scope)]
 
 if pva.empty:
-    st.info("No holdings for this scope yet — add rows on the Update Data page.")
+    st.info("No plan for this scope/year yet.")
     st.stop()
+
+cols = st.columns(2)
+cols[0].metric("Goal achieved", f"{compute.pct_goal_achieved(pva):.1f}%")
+if not goal_rows.empty:
+    cols[1].metric("Emergency-fund goal", inr(goal_rows["emergency_fund_goal"].sum()))
 
 st.dataframe(
     pva,
     column_config={
         "category": "Category",
-        "target_pct": st.column_config.NumberColumn("Target %", format="%.1f%%"),
-        "actual_pct": st.column_config.NumberColumn("Actual %", format="%.1f%%"),
-        "target_inr": st.column_config.NumberColumn("Target (₹)", format="%.0f"),
-        "actual_inr": st.column_config.NumberColumn("Actual (₹)", format="%.0f"),
-        "diff_inr": st.column_config.NumberColumn("Surplus / shortfall (₹)", format="%.0f"),
+        "expected": st.column_config.NumberColumn("Planned (₹)", format="%.0f"),
+        "actual": st.column_config.NumberColumn("Actual (₹)", format="%.0f"),
+        "shortfall": st.column_config.NumberColumn("Shortfall / surplus (₹)", format="%.0f"),
     },
     hide_index=True,
     width="stretch",
 )
 
-st.subheader("Surplus / shortfall by category")
-st.bar_chart(pva.set_index("category")["diff_inr"], horizontal=True, color="#2b2b2b")
+st.subheader("Drawdown — shortfall by category")
+st.bar_chart(pva.set_index("category")["shortfall"], color="#2b2b2b")
