@@ -33,7 +33,13 @@ def split_pct(row) -> dict[str, float]:
 def projection(profile: Profile, budget: pd.DataFrame) -> pd.DataFrame:
     """Year-by-year salary, yearly investment budget and running cumulative
     invested, from this person's budget rows — reflecting what's in budget.csv."""
+    cols = [
+        "year", "age", "ending_salary", "monthly_needs", "monthly_wants",
+        "monthly_investment", "invested_this_year", "cumulative_invested",
+    ]
     rows = budget[budget["profile"] == profile.key].sort_values("year")
+    if rows.empty:
+        return pd.DataFrame(columns=cols)
     out = []
     cumulative = 0.0
     for _, r in rows.iterrows():

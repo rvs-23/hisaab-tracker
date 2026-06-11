@@ -1,32 +1,32 @@
-import pandas as pd
 import streamlit as st
 
-from finance_tracker.ui import grays, load_all, sidebar_scope
+from finance_tracker.ui import load_all, sidebar_scope
 
-root, config, profiles, holdings, income = load_all()
-scope = sidebar_scope(profiles)
+d = load_all()
+scope = sidebar_scope(d.profiles)
 
 st.title("Income")
+st.caption("Non-salary income (bonus / other). Salary lives in the budget plan.")
 
-if income.empty:
-    st.info("No income recorded yet — add rows on the Update Data page.")
-    st.stop()
-
-names = {p.key: p.name for p in profiles}
+income = d.income
 if scope is not None:
     income = income[income["profile"] == scope]
 
-st.subheader("Monthly totals")
-monthly = (
-    income.assign(month=income["date"].dt.to_period("M").dt.to_timestamp())
-    .groupby(["month", "profile"])["amount"]
+if income.empty:
+    st.info("No income recorded for this scope yet — add rows on the Update Data page.")
+    st.stop()
+
+names = {p.key: p.name for p in d.profiles}
+
+st.subheader("By year")
+yearly = (
+    income.assign(year=income["date"].dt.year)
+    .groupby(["year", "profile"])["amount"]
     .sum()
     .unstack("profile")
     .rename(columns=names)
 )
-if scope is None:
-    monthly["Household"] = monthly.sum(axis=1)
-st.bar_chart(monthly, color=grays(monthly.shape[1]))
+st.bar_chart(yearly, color="#2b2b2b" if yearly.shape[1] == 1 else None)
 
 st.subheader("All entries")
 st.dataframe(
