@@ -1,0 +1,10 @@
+# Data never lives in the repo — only in the folder referenced by .env
+.env
+data/
+
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.streamlit/secrets.toml
+.DS_Store
