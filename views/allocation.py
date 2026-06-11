@@ -1,13 +1,13 @@
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, scope_picker
+from finance_tracker.ui import inr, load_all, sidebar_scope
 
 root, config, profiles, holdings, income = load_all()
+profile_key = sidebar_scope(profiles)
 
 st.title("Current allocation")
 
-profile_key = scope_picker(profiles)
 alloc = compute.allocation(holdings, config, profile_key)
 
 if alloc.empty:
@@ -26,7 +26,7 @@ with left:
             "pct": st.column_config.NumberColumn("% of portfolio", format="%.1f%%"),
         },
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
     )
 with right:
-    st.bar_chart(alloc.set_index("category")["pct"], horizontal=True)
+    st.bar_chart(alloc.set_index("category")["pct"], horizontal=True, color="#2b2b2b")

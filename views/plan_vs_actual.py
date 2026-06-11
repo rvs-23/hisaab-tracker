@@ -1,14 +1,14 @@
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import load_all, scope_picker
+from finance_tracker.ui import load_all, sidebar_scope
 
 root, config, profiles, holdings, income = load_all()
+profile_key = sidebar_scope(profiles)
 
 st.title("Plan vs actual")
 st.caption("Target mix comes from `target_mix` in config.yaml. Positive diff = surplus, negative = shortfall.")
 
-profile_key = scope_picker(profiles)
 pva = compute.plan_vs_actual(holdings, config, profile_key)
 
 if pva.empty:
@@ -26,8 +26,8 @@ st.dataframe(
         "diff_inr": st.column_config.NumberColumn("Surplus / shortfall (₹)", format="%.0f"),
     },
     hide_index=True,
-    use_container_width=True,
+    width="stretch",
 )
 
 st.subheader("Surplus / shortfall by category")
-st.bar_chart(pva.set_index("category")["diff_inr"], horizontal=True)
+st.bar_chart(pva.set_index("category")["diff_inr"], horizontal=True, color="#2b2b2b")

@@ -1,7 +1,13 @@
 """Read/write the plain-file data store (YAML + CSV).
 
-The data folder is the database: it lives outside the repo (path in .env)
-and every loader re-reads from disk — no caching anywhere.
+The data folder is the database: it lives outside the repo (path in .env) and
+every loader re-reads from disk — no caching anywhere. The numeric history is
+three tidy CSVs, all keyed by (year, profile):
+
+  budget.csv         one row per person per year — salary + needs/wants/invest %
+  contributions.csv  what was actually invested, per person/year/category
+  goals.csv          emergency-fund goal, per person/year
+  income.csv         dated non-salary income (bonus / other), optional
 """
 
 from __future__ import annotations
@@ -15,9 +21,13 @@ from finance_tracker.models import Config, Profile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-HOLDINGS_COLUMNS = ["date", "profile", "instrument", "category", "currency", "value", "notes"]
+BUDGET_COLUMNS = [
+    "profile", "year", "starting_salary", "job_change",
+    "ending_salary", "needs_pct", "wants_pct", "investment_pct",
+]
+CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
+GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
 INCOME_COLUMNS = ["date", "profile", "source", "amount", "notes"]
-CURRENCIES = {"INR", "USD"}
 
 
 def data_dir() -> Path:
@@ -41,50 +51,78 @@ def load_config(root: Path) -> Config:
         return Config(**yaml.safe_load(f))
 
 
-def load_profiles(root: Path) -> list[Profile]:
+def load_profiles(root: Path, config: Config) -> list[Profile]:
     files = sorted((root / "profiles").glob("*.yaml"))
     if not files:
         raise FileNotFoundError(f"no profile YAMLs found in {root / 'profiles'}")
     profiles = []
     for file in files:
         with open(file) as f:
-            profiles.append(Profile(key=file.stem, **yaml.safe_load(f)))
+            profile = Profile(key=file.stem, **yaml.safe_load(f))
+        for tier in (profile.target.short_term, profile.target.long_term):
+            unknown = set(tier) - set(config.categories)
+            if unknown:
+                raise ValueError(
+                    f"{file.name}: target uses categories not in config.yaml: {sorted(unknown)}"
+                )
+        profiles.append(profile)
     return profiles
 
 
-def validate_holdings(df: pd.DataFrame, config: Config, profiles: list[Profile]) -> None:
-    _check_columns(df, HOLDINGS_COLUMNS, "holdings.csv")
-    if df["date"].isna().any():
-        raise ValueError("holdings.csv has rows with a missing/invalid date")
-    if df["value"].isna().any():
-        raise ValueError("holdings.csv has rows with a missing value")
-    bad = set(df["category"].dropna()) - set(config.categories)
-    if bad:
-        raise ValueError(f"holdings.csv uses categories not in config.yaml: {sorted(bad)}")
-    bad = set(df["currency"].dropna()) - CURRENCIES
-    if bad:
-        raise ValueError(f"holdings.csv has unsupported currencies: {sorted(bad)}")
-    bad = set(df["profile"].dropna()) - {p.key for p in profiles}
-    if bad:
-        raise ValueError(f"holdings.csv has unknown profiles: {sorted(bad)}")
+# --- budget ---------------------------------------------------------------
+
+def load_budget(root: Path, profiles: list[Profile]) -> pd.DataFrame:
+    df = pd.read_csv(root / "budget.csv")
+    validate_budget(df, profiles)
+    return df.sort_values(["profile", "year"]).reset_index(drop=True)
 
 
-def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
-    _check_columns(df, INCOME_COLUMNS, "income.csv")
-    if df["date"].isna().any():
-        raise ValueError("income.csv has rows with a missing/invalid date")
-    if df["amount"].isna().any():
-        raise ValueError("income.csv has rows with a missing amount")
-    bad = set(df["profile"].dropna()) - {p.key for p in profiles}
-    if bad:
-        raise ValueError(f"income.csv has unknown profiles: {sorted(bad)}")
+def validate_budget(df: pd.DataFrame, profiles: list[Profile]) -> None:
+    _check_columns(df, BUDGET_COLUMNS, "budget.csv")
+    _check_profiles(df, profiles, "budget.csv")
+    if df["year"].isna().any() or df["ending_salary"].isna().any():
+        raise ValueError("budget.csv has rows with a missing year or ending_salary")
+    for _, row in df.iterrows():
+        total = row["needs_pct"] + row["wants_pct"] + row["investment_pct"]
+        if abs(total - 100) > 0.01:
+            raise ValueError(
+                f"budget.csv {row['profile']} {int(row['year'])}: "
+                f"needs+wants+investment must sum to 100, got {total}"
+            )
 
 
-def load_holdings(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
-    df = pd.read_csv(root / "holdings.csv", parse_dates=["date"])
-    validate_holdings(df, config, profiles)
+# --- contributions --------------------------------------------------------
+
+def load_contributions(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
+    df = pd.read_csv(root / "contributions.csv")
+    validate_contributions(df, config, profiles)
     return df
 
+
+def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Profile]) -> None:
+    _check_columns(df, CONTRIB_COLUMNS, "contributions.csv")
+    _check_profiles(df, profiles, "contributions.csv")
+    if df["year"].isna().any() or df["amount"].isna().any():
+        raise ValueError("contributions.csv has rows with a missing year or amount")
+    bad = set(df["category"].dropna()) - set(config.categories)
+    if bad:
+        raise ValueError(f"contributions.csv uses categories not in config.yaml: {sorted(bad)}")
+
+
+# --- goals ----------------------------------------------------------------
+
+def load_goals(root: Path, profiles: list[Profile]) -> pd.DataFrame:
+    df = pd.read_csv(root / "goals.csv")
+    validate_goals(df, profiles)
+    return df
+
+
+def validate_goals(df: pd.DataFrame, profiles: list[Profile]) -> None:
+    _check_columns(df, GOALS_COLUMNS, "goals.csv")
+    _check_profiles(df, profiles, "goals.csv")
+
+
+# --- income ---------------------------------------------------------------
 
 def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
     df = pd.read_csv(root / "income.csv", parse_dates=["date"])
@@ -92,21 +130,42 @@ def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
     return df
 
 
-def save_holdings(root: Path, df: pd.DataFrame) -> None:
-    _write_csv(df, root / "holdings.csv", sort_by=["date", "profile", "category"])
+def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
+    _check_columns(df, INCOME_COLUMNS, "income.csv")
+    _check_profiles(df, profiles, "income.csv")
+    if df["date"].isna().any() or df["amount"].isna().any():
+        raise ValueError("income.csv has rows with a missing date or amount")
+
+
+# --- savers ---------------------------------------------------------------
+
+def save_budget(root: Path, df: pd.DataFrame) -> None:
+    df.sort_values(["profile", "year"]).to_csv(root / "budget.csv", index=False)
+
+
+def save_contributions(root: Path, df: pd.DataFrame) -> None:
+    df.sort_values(["year", "profile", "category"]).to_csv(root / "contributions.csv", index=False)
+
+
+def save_goals(root: Path, df: pd.DataFrame) -> None:
+    df.sort_values(["year", "profile"]).to_csv(root / "goals.csv", index=False)
 
 
 def save_income(root: Path, df: pd.DataFrame) -> None:
-    _write_csv(df, root / "income.csv", sort_by=["date", "profile"])
-
-
-def _write_csv(df: pd.DataFrame, path: Path, sort_by: list[str]) -> None:
-    out = df.sort_values(sort_by).copy()
+    out = df.sort_values(["date", "profile"]).copy()
     out["date"] = pd.to_datetime(out["date"]).dt.strftime("%Y-%m-%d")
-    out.to_csv(path, index=False)
+    out.to_csv(root / "income.csv", index=False)
 
+
+# --- helpers --------------------------------------------------------------
 
 def _check_columns(df: pd.DataFrame, expected: list[str], filename: str) -> None:
     missing = [c for c in expected if c not in df.columns]
     if missing:
         raise ValueError(f"{filename} is missing columns: {missing}")
+
+
+def _check_profiles(df: pd.DataFrame, profiles: list[Profile], filename: str) -> None:
+    bad = set(df["profile"].dropna()) - {p.key for p in profiles}
+    if bad:
+        raise ValueError(f"{filename} has unknown profiles: {sorted(bad)}")

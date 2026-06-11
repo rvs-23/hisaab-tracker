@@ -1,0 +1,8 @@
+# Minimal grayscale theme — no accent colors, monochrome charts.
+[theme]
+base = "light"
+primaryColor = "#2b2b2b"
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f4f4f4"
+textColor = "#1f1f1f"
+font = "sans-serif"

@@ -1,123 +1,118 @@
-"""The spreadsheet-model computations, as pure functions over the loaded data.
+"""The financial model, as pure functions over the loaded data.
 
-1. budget_split      — monthly salary -> needs/wants/investment amounts
-2. projection        — multi-year salary growth + cumulative invested
-3. allocation        — current holdings aggregated by category (INR, %)
-4. plan_vs_actual    — target mix vs actual allocation, surplus/shortfall
-plus net-worth history derived from the dated holdings rows.
+The app tracks *contributions against a plan*, not market value. For a given
+person and year:
+
+  expected[category] = investment_pool × long_term%  +  wants_pool × short_term%
+      investment_pool = monthly_investment × 12
+      wants_pool      = monthly_wants × 12 × wants_invest_pct
+
+This reproduces the source spreadsheet's "Amount Expected" column exactly.
+"actual" comes from contributions.csv; the gap is the shortfall.
 """
 
 from __future__ import annotations
 
 import pandas as pd
 
-from finance_tracker.models import Config, Profile
+from finance_tracker.models import Profile
 
 
-def budget_split(profile: Profile) -> dict[str, float]:
-    s = profile.split
-    salary = profile.monthly_salary
+def monthly_budget(
+    ending_salary: float, needs_pct: float, wants_pct: float, investment_pct: float
+) -> dict[str, float]:
+    """Split a year's gross salary into monthly needs/wants/investment amounts."""
+    monthly = ending_salary / 12
     return {
-        "needs": salary * s.needs / 100,
-        "wants": salary * s.wants / 100,
-        "investment": salary * s.investment / 100,
+        "needs": monthly * needs_pct / 100,
+        "wants": monthly * wants_pct / 100,
+        "investment": monthly * investment_pct / 100,
     }
 
 
-def projection(profile: Profile) -> pd.DataFrame:
-    """Year-by-year: salary grows by increment_pct annually, the monthly
-    investment contribution accumulates into a running cumulative invested.
-    No return assumptions — contributions only, as in the spreadsheet."""
-    rows = []
-    salary = profile.monthly_salary
+def projection(profile: Profile, budget: pd.DataFrame) -> pd.DataFrame:
+    """Year-by-year salary, yearly investment budget and running cumulative
+    invested, from this person's budget rows — reflecting what's in budget.csv."""
+    rows = budget[budget["profile"] == profile.key].sort_values("year")
+    out = []
     cumulative = 0.0
-    for i in range(profile.projection_years):
-        year = profile.projection_start_year + i
-        monthly_investment = salary * profile.split.investment / 100
-        cumulative += monthly_investment * 12
-        rows.append(
+    for _, r in rows.iterrows():
+        mb = monthly_budget(r["ending_salary"], r["needs_pct"], r["wants_pct"], r["investment_pct"])
+        invested_this_year = mb["investment"] * 12
+        cumulative += invested_this_year
+        out.append(
             {
-                "year": year,
-                "age": year - profile.birth_year,
-                "monthly_salary": round(salary),
-                "monthly_investment": round(monthly_investment),
-                "invested_this_year": round(monthly_investment * 12),
+                "year": int(r["year"]),
+                "age": int(r["year"]) - profile.birth_year,
+                "ending_salary": round(r["ending_salary"]),
+                "monthly_needs": round(mb["needs"]),
+                "monthly_wants": round(mb["wants"]),
+                "monthly_investment": round(mb["investment"]),
+                "invested_this_year": round(invested_this_year),
                 "cumulative_invested": round(cumulative),
             }
         )
-        salary *= 1 + profile.salary_increment_pct / 100
-    return pd.DataFrame(rows)
+    return pd.DataFrame(out)
 
 
-def to_inr(holdings: pd.DataFrame, config: Config) -> pd.DataFrame:
-    """Add a value_inr column; USD rows convert at the user-stated rate."""
-    df = holdings.copy()
-    rates = {"INR": 1.0, "USD": config.usd_inr_rate}
-    df["value_inr"] = df["value"] * df["currency"].map(rates)
-    return df
+def expected_contributions(profile: Profile, budget: pd.DataFrame, year: int) -> dict[str, float]:
+    """Planned rupee amount per category for one person/year — the target mix
+    applied to that year's investment pool and (wants-derived) short-term pool."""
+    row = budget[(budget["profile"] == profile.key) & (budget["year"] == year)]
+    if row.empty:
+        return {}
+    r = row.iloc[0]
+    mb = monthly_budget(r["ending_salary"], r["needs_pct"], r["wants_pct"], r["investment_pct"])
+    investment_pool = mb["investment"] * 12
+    wants_pool = mb["wants"] * 12 * profile.wants_invest_pct / 100
 
-
-def current_holdings(holdings: pd.DataFrame) -> pd.DataFrame:
-    """The latest snapshot per profile. Profiles may update on different
-    dates, so 'current' is each profile's rows at its own max date."""
-    if holdings.empty:
-        return holdings
-    latest = holdings.groupby("profile")["date"].transform("max")
-    return holdings[holdings["date"] == latest]
-
-
-def allocation(
-    holdings: pd.DataFrame, config: Config, profile_key: str | None = None
-) -> pd.DataFrame:
-    """Current value and % of portfolio by category, for one profile or
-    (profile_key=None) the combined household."""
-    df = to_inr(current_holdings(holdings), config)
-    if profile_key is not None:
-        df = df[df["profile"] == profile_key]
-    by_cat = df.groupby("category", as_index=False)["value_inr"].sum()
-    total = by_cat["value_inr"].sum()
-    by_cat["pct"] = 100 * by_cat["value_inr"] / total if total else 0.0
-    return by_cat.sort_values("value_inr", ascending=False).reset_index(drop=True)
+    expected: dict[str, float] = {}
+    for cat, pct in profile.target.long_term.items():
+        expected[cat] = expected.get(cat, 0.0) + investment_pool * pct / 100
+    for cat, pct in profile.target.short_term.items():
+        expected[cat] = expected.get(cat, 0.0) + wants_pool * pct / 100
+    return expected
 
 
 def plan_vs_actual(
-    holdings: pd.DataFrame, config: Config, profile_key: str | None = None
+    profile: Profile, budget: pd.DataFrame, contributions: pd.DataFrame, year: int
 ) -> pd.DataFrame:
-    """Target % (config.target_mix) vs actual allocation. diff_inr > 0 means
-    surplus in that category, < 0 means shortfall."""
-    alloc = allocation(holdings, config, profile_key)
-    total = alloc["value_inr"].sum()
-    actual = dict(zip(alloc["category"], alloc["value_inr"]))
-    categories = [c for c in config.categories if c in config.target_mix or c in actual]
+    """Expected vs actual contribution per category for one person/year.
+    shortfall = actual − expected (negative = under-invested)."""
+    expected = expected_contributions(profile, budget, year)
+    actual_rows = contributions[
+        (contributions["profile"] == profile.key) & (contributions["year"] == year)
+    ]
+    actual = actual_rows.groupby("category")["amount"].sum().to_dict()
+
+    categories = list(expected) + [c for c in actual if c not in expected]
     rows = []
     for cat in categories:
-        target_pct = config.target_mix.get(cat, 0.0)
-        actual_inr = actual.get(cat, 0.0)
-        target_inr = total * target_pct / 100
-        rows.append(
-            {
-                "category": cat,
-                "target_pct": target_pct,
-                "actual_pct": 100 * actual_inr / total if total else 0.0,
-                "target_inr": target_inr,
-                "actual_inr": actual_inr,
-                "diff_inr": actual_inr - target_inr,
-            }
-        )
+        exp = expected.get(cat, 0.0)
+        act = actual.get(cat, 0.0)
+        rows.append({"category": cat, "expected": exp, "actual": act, "shortfall": act - exp})
     return pd.DataFrame(rows)
 
 
-def networth_history(
-    holdings: pd.DataFrame, config: Config, profiles: list[Profile]
+def household_plan_vs_actual(
+    profiles: list[Profile], budget: pd.DataFrame, contributions: pd.DataFrame, year: int
 ) -> pd.DataFrame:
-    """Net worth per snapshot date, one column per person plus Household.
-    Between a profile's snapshots its last known value carries forward, so
-    staggered update dates still produce a sensible household line."""
-    df = to_inr(holdings, config)
-    pivot = (
-        df.groupby(["date", "profile"])["value_inr"].sum().unstack("profile").sort_index().ffill()
-    )
-    names = {p.key: p.name for p in profiles}
-    pivot = pivot.rename(columns=names)
-    pivot["Household"] = pivot.sum(axis=1)
-    return pivot
+    """Plan vs actual summed across everyone for a year."""
+    parts = [plan_vs_actual(p, budget, contributions, year) for p in profiles]
+    parts = [p for p in parts if not p.empty]
+    if not parts:
+        return pd.DataFrame(columns=["category", "expected", "actual", "shortfall"])
+    return pd.concat(parts).groupby("category", as_index=False)[
+        ["expected", "actual", "shortfall"]
+    ].sum()
+
+
+def pct_goal_achieved(pva: pd.DataFrame) -> float:
+    """Total actual ÷ total expected, as a percent (the sheet's '%goal achieved')."""
+    expected = pva["expected"].sum()
+    return 100 * pva["actual"].sum() / expected if expected else 0.0
+
+
+def available_years(budget: pd.DataFrame, contributions: pd.DataFrame) -> list[int]:
+    years = pd.concat([budget["year"], contributions["year"]]).dropna().astype(int)
+    return sorted(years.unique().tolist())

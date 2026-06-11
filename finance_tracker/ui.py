@@ -7,20 +7,33 @@ import streamlit as st
 from finance_tracker import storage
 
 
-def load_all():
-    """Fresh read of every data file, called at the top of each view — the
-    spec requires recomputing from current files on every load, so nothing
-    here is cached."""
+class Data:
+    """Everything loaded fresh from disk for one page render (no caching —
+    every view re-reads, so edits show up on the next refresh)."""
+
+    def __init__(self, root, config, profiles, budget, contributions, goals, income):
+        self.root = root
+        self.config = config
+        self.profiles = profiles
+        self.budget = budget
+        self.contributions = contributions
+        self.goals = goals
+        self.income = income
+
+
+def load_all() -> "Data":
     try:
         root = storage.data_dir()
         config = storage.load_config(root)
-        profiles = storage.load_profiles(root)
-        holdings = storage.load_holdings(root, config, profiles)
+        profiles = storage.load_profiles(root, config)
+        budget = storage.load_budget(root, profiles)
+        contributions = storage.load_contributions(root, config, profiles)
+        goals = storage.load_goals(root, profiles)
         income = storage.load_income(root, profiles)
     except Exception as exc:
         st.error(f"Could not load data: {exc}")
         st.stop()
-    return root, config, profiles, holdings, income
+    return Data(root, config, profiles, budget, contributions, goals, income)
 
 
 def inr(n: float) -> str:
@@ -38,8 +51,23 @@ def inr(n: float) -> str:
     return f"{sign}₹{s}"
 
 
-def scope_picker(profiles, label: str = "Scope") -> str | None:
-    """Household / per-person selector. Returns a profile key or None for household."""
-    options = {"Household (combined)": None} | {p.name: p.key for p in profiles}
-    choice = st.selectbox(label, list(options))
-    return options[choice]
+# Grayscale ramp for charts — dark first (household / primary series).
+GRAYS = ["#2b2b2b", "#7a7a7a", "#a8a8a8", "#c9c9c9", "#e0e0e0"]
+
+
+def grays(n: int) -> list[str]:
+    """n monochrome shades, darkest first."""
+    return GRAYS[:n] if n <= len(GRAYS) else GRAYS + GRAYS[: n - len(GRAYS)]
+
+
+def sidebar_scope(profiles, household: bool = True) -> str | None:
+    """Global Rv / wife / household selector, pinned to the sidebar and shared
+    across every page (same widget key, so the choice sticks on navigation).
+    Returns a profile key, or None for the combined household."""
+    options: dict[str, str | None] = {}
+    if household:
+        options["Household"] = None
+    for p in profiles:
+        options[p.name] = p.key
+    choice = st.sidebar.radio("View", list(options), key="scope")
+    return options.get(choice)

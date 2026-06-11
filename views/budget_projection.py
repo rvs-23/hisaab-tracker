@@ -1,13 +1,17 @@
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import inr, load_all
+from finance_tracker.ui import inr, load_all, sidebar_scope
 
 root, config, profiles, holdings, income = load_all()
+scope = sidebar_scope(profiles)
 
 st.title("Budget & projection")
 
-profile = st.selectbox("Person", profiles, format_func=lambda p: p.name)
+# Per-person by nature — if "Household" is selected, fall back to the first person.
+profile = next((p for p in profiles if p.key == scope), None) or profiles[0]
+if scope is None:
+    st.caption(f"Per-person view — showing {profile.name}. Pick a person in the sidebar to switch.")
 
 st.subheader("Monthly budget split")
 split = compute.budget_split(profile)
@@ -23,7 +27,7 @@ st.caption(
     "contributions only (no return assumptions), as in the spreadsheet model."
 )
 proj = compute.projection(profile)
-st.line_chart(proj.set_index("year")["cumulative_invested"])
+st.line_chart(proj.set_index("year")["cumulative_invested"], color="#2b2b2b")
 st.dataframe(
     proj,
     column_config={
@@ -35,5 +39,5 @@ st.dataframe(
         "cumulative_invested": st.column_config.NumberColumn("Cumulative (₹)", format="%.0f"),
     },
     hide_index=True,
-    use_container_width=True,
+    width="stretch",
 )

@@ -34,10 +34,12 @@ with holdings_tab:
                 st.rerun()
 
     edited = st.data_editor(
-        holdings.sort_values(["date", "profile", "category"], ascending=[False, True, True]),
+        holdings.sort_values(
+            ["date", "profile", "category"], ascending=[False, True, True]
+        ).reset_index(drop=True),
         num_rows="dynamic",
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={
             "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD", required=True),
             "profile": st.column_config.SelectboxColumn(
@@ -67,10 +69,10 @@ with holdings_tab:
 
 with income_tab:
     edited_income = st.data_editor(
-        income.sort_values("date", ascending=False),
+        income.sort_values("date", ascending=False).reset_index(drop=True),
         num_rows="dynamic",
         hide_index=True,
-        use_container_width=True,
+        width="stretch",
         column_config={
             "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD", required=True),
             "profile": st.column_config.SelectboxColumn(
