@@ -21,9 +21,11 @@ from finance_tracker.models import Config, Profile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
+# Monthly amounts are stored directly (not rounded %s) so the model reproduces
+# the source sheet's rupee figures exactly; %s are derived for display.
 BUDGET_COLUMNS = [
     "profile", "year", "starting_salary", "job_change",
-    "ending_salary", "needs_pct", "wants_pct", "investment_pct",
+    "ending_salary", "monthly_needs", "monthly_wants", "monthly_investment",
 ]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
@@ -83,11 +85,12 @@ def validate_budget(df: pd.DataFrame, profiles: list[Profile]) -> None:
     if df["year"].isna().any() or df["ending_salary"].isna().any():
         raise ValueError("budget.csv has rows with a missing year or ending_salary")
     for _, row in df.iterrows():
-        total = row["needs_pct"] + row["wants_pct"] + row["investment_pct"]
-        if abs(total - 100) > 0.01:
+        monthly = row["monthly_needs"] + row["monthly_wants"] + row["monthly_investment"]
+        if abs(monthly - row["ending_salary"] / 12) > 2:  # allow rupee rounding
             raise ValueError(
-                f"budget.csv {row['profile']} {int(row['year'])}: "
-                f"needs+wants+investment must sum to 100, got {total}"
+                f"budget.csv {row['profile']} {int(row['year'])}: monthly needs+wants+"
+                f"investment ({monthly:.0f}) must equal ending_salary/12 "
+                f"({row['ending_salary'] / 12:.0f})"
             )
 
 

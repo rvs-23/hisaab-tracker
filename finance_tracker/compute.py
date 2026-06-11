@@ -18,15 +18,15 @@ import pandas as pd
 from finance_tracker.models import Profile
 
 
-def monthly_budget(
-    ending_salary: float, needs_pct: float, wants_pct: float, investment_pct: float
-) -> dict[str, float]:
-    """Split a year's gross salary into monthly needs/wants/investment amounts."""
-    monthly = ending_salary / 12
+def split_pct(row) -> dict[str, float]:
+    """Derive the needs/wants/investment percentages of salary for display."""
+    monthly = row["ending_salary"] / 12
+    if not monthly:
+        return {"needs": 0.0, "wants": 0.0, "investment": 0.0}
     return {
-        "needs": monthly * needs_pct / 100,
-        "wants": monthly * wants_pct / 100,
-        "investment": monthly * investment_pct / 100,
+        "needs": 100 * row["monthly_needs"] / monthly,
+        "wants": 100 * row["monthly_wants"] / monthly,
+        "investment": 100 * row["monthly_investment"] / monthly,
     }
 
 
@@ -37,17 +37,16 @@ def projection(profile: Profile, budget: pd.DataFrame) -> pd.DataFrame:
     out = []
     cumulative = 0.0
     for _, r in rows.iterrows():
-        mb = monthly_budget(r["ending_salary"], r["needs_pct"], r["wants_pct"], r["investment_pct"])
-        invested_this_year = mb["investment"] * 12
+        invested_this_year = r["monthly_investment"] * 12
         cumulative += invested_this_year
         out.append(
             {
                 "year": int(r["year"]),
                 "age": int(r["year"]) - profile.birth_year,
                 "ending_salary": round(r["ending_salary"]),
-                "monthly_needs": round(mb["needs"]),
-                "monthly_wants": round(mb["wants"]),
-                "monthly_investment": round(mb["investment"]),
+                "monthly_needs": round(r["monthly_needs"]),
+                "monthly_wants": round(r["monthly_wants"]),
+                "monthly_investment": round(r["monthly_investment"]),
                 "invested_this_year": round(invested_this_year),
                 "cumulative_invested": round(cumulative),
             }
@@ -62,9 +61,8 @@ def expected_contributions(profile: Profile, budget: pd.DataFrame, year: int) ->
     if row.empty:
         return {}
     r = row.iloc[0]
-    mb = monthly_budget(r["ending_salary"], r["needs_pct"], r["wants_pct"], r["investment_pct"])
-    investment_pool = mb["investment"] * 12
-    wants_pool = mb["wants"] * 12 * profile.wants_invest_pct / 100
+    investment_pool = r["monthly_investment"] * 12
+    wants_pool = r["monthly_wants"] * 12 * profile.wants_invest_pct / 100
 
     expected: dict[str, float] = {}
     for cat, pct in profile.target.long_term.items():
