@@ -1,10 +1,25 @@
 import streamlit as st
 
-from finance_tracker.ui import load_all, page_header
+from finance_tracker import storage
+from finance_tracker.ui import edit_grid, load_all, page_header
 
 d = load_all()
 scope = page_header("Income", d.profiles)
 st.caption("Non-salary income (bonus / other). Salary lives in the budget plan.")
+
+edit_grid(
+    d.income,
+    {
+        "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD", required=True),
+        "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
+        "source": st.column_config.TextColumn("Source", required=True),
+        "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
+        "notes": "Notes",
+    },
+    lambda df: storage.validate_income(df, d.profiles),
+    storage.save_income,
+    d.root, key="income_editor", label="income",
+)
 
 income = d.income
 if scope is not None:

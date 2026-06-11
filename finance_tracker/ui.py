@@ -62,6 +62,25 @@ def grays(n: int) -> list[str]:
     return GRAYS[:n] if n <= len(GRAYS) else GRAYS + GRAYS[: n - len(GRAYS)]
 
 
+def edit_grid(df, column_config, validate, save, root, key, label, sort=None) -> None:
+    """A collapsed 'Edit …' expander holding an editable grid + Save button.
+    Edits the whole underlying file; validates before writing so a bad edit is
+    rejected with a message rather than corrupting the data."""
+    data = df.sort_values(sort).reset_index(drop=True) if sort else df.reset_index(drop=True)
+    with st.expander(f"✎ Edit {label}"):
+        edited = st.data_editor(
+            data, num_rows="dynamic", hide_index=True, width="stretch",
+            column_config=column_config, key=key,
+        )
+        if st.button(f"Save {label}", key=f"save_{key}"):
+            try:
+                validate(edited)
+                save(root, edited)
+                st.success(f"Saved {label}")
+            except Exception as exc:
+                st.error(f"Not saved: {exc}")
+
+
 def page_header(title: str, profiles) -> str | None:
     """Render the page title with a top-right View selector (Household / per
     person). Shared widget key, so the choice sticks across navigation. Returns

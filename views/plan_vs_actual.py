@@ -1,11 +1,51 @@
 import streamlit as st
 
-from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, page_header
+from finance_tracker import compute, storage
+from finance_tracker.ui import edit_grid, inr, load_all, page_header
 
 d = load_all()
 scope = page_header("Plan vs actual", d.profiles)
 st.caption("Planned contribution per category (target × budget) vs what you actually invested. Negative shortfall = under-invested.")
+
+_keys = [p.key for p in d.profiles]
+_cats = d.config.categories
+edit_grid(
+    d.contributions,
+    {
+        "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+        "profile": st.column_config.SelectboxColumn("Person", options=_keys, required=True),
+        "category": st.column_config.SelectboxColumn("Category", options=_cats, required=True),
+        "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
+        "notes": "Notes",
+    },
+    lambda df: storage.validate_contributions(df, d.config, d.profiles),
+    storage.save_contributions,
+    d.root, key="contrib_editor", label="contributions", sort=["year", "profile", "category"],
+)
+edit_grid(
+    d.targets,
+    {
+        "profile": st.column_config.SelectboxColumn("Person", options=_keys, required=True),
+        "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+        "tier": st.column_config.SelectboxColumn("Tier", options=["short_term", "long_term"], required=True),
+        "category": st.column_config.SelectboxColumn("Category", options=_cats, required=True),
+        "pct": st.column_config.NumberColumn("Percent", required=True),
+    },
+    lambda df: storage.validate_targets(df, d.config, d.profiles),
+    storage.save_targets,
+    d.root, key="targets_editor", label="targets (per-year overrides)",
+)
+edit_grid(
+    d.goals,
+    {
+        "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+        "profile": st.column_config.SelectboxColumn("Person", options=_keys, required=True),
+        "emergency_fund_goal": st.column_config.NumberColumn("Emergency-fund goal (₹)", required=True),
+    },
+    lambda df: storage.validate_goals(df, d.profiles),
+    storage.save_goals,
+    d.root, key="goals_editor", label="emergency-fund goals", sort=["year", "profile"],
+)
 
 years = compute.available_years(d.budget, d.contributions)
 if not years:

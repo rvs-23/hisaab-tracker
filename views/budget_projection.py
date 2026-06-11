@@ -1,10 +1,27 @@
 import streamlit as st
 
-from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, page_header
+from finance_tracker import compute, storage
+from finance_tracker.ui import edit_grid, inr, load_all, page_header
 
 d = load_all()
 scope = page_header("Budget & projection", d.profiles)
+
+edit_grid(
+    d.budget,
+    {
+        "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
+        "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+        "starting_salary": st.column_config.NumberColumn("Starting salary (₹)"),
+        "job_change": st.column_config.SelectboxColumn("Job change?", options=["No", "Yes"]),
+        "ending_salary": st.column_config.NumberColumn("Gross salary (₹)", required=True),
+        "monthly_needs": st.column_config.NumberColumn("Needs /mo (₹)", required=True),
+        "monthly_wants": st.column_config.NumberColumn("Wants /mo (₹)", required=True),
+        "monthly_investment": st.column_config.NumberColumn("Invest /mo (₹)", required=True),
+    },
+    lambda df: storage.validate_budget(df, d.profiles),
+    storage.save_budget,
+    d.root, key="budget_editor", label="budget", sort=["profile", "year"],
+)
 
 # Per-person by nature — if "Household" is selected, fall back to the first person.
 profile = next((p for p in d.profiles if p.key == scope), None) or d.profiles[0]

@@ -14,7 +14,6 @@ PAGES = [
     "views/plan_vs_actual.py",
     "views/budget_projection.py",
     "views/income.py",
-    "views/edit_data.py",
 ]
 
 TARGET = (
