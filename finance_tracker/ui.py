@@ -60,14 +60,14 @@ def grays(n: int) -> list[str]:
     return GRAYS[:n] if n <= len(GRAYS) else GRAYS + GRAYS[: n - len(GRAYS)]
 
 
-def sidebar_scope(profiles, household: bool = True) -> str | None:
-    """Global Rv / wife / household selector, pinned to the sidebar and shared
-    across every page (same widget key, so the choice sticks on navigation).
-    Returns a profile key, or None for the combined household."""
-    options: dict[str, str | None] = {}
-    if household:
-        options["Household"] = None
+def page_header(title: str, profiles) -> str | None:
+    """Render the page title with a top-right View selector (Household / per
+    person). Shared widget key, so the choice sticks across navigation. Returns
+    a profile key, or None for the combined household."""
+    options: dict[str, str | None] = {"Household": None}
     for p in profiles:
         options[p.name] = p.key
-    choice = st.sidebar.radio("View", list(options), key="scope")
+    left, right = st.columns([3, 1], vertical_alignment="bottom")
+    left.title(title)
+    choice = right.selectbox("View", list(options), key="scope")
     return options.get(choice)

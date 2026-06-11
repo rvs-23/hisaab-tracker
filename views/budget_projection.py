@@ -1,12 +1,10 @@
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, sidebar_scope
+from finance_tracker.ui import inr, load_all, page_header
 
 d = load_all()
-scope = sidebar_scope(d.profiles)
-
-st.title("Budget & projection")
+scope = page_header("Budget & projection", d.profiles)
 
 # Per-person by nature — if "Household" is selected, fall back to the first person.
 profile = next((p for p in d.profiles if p.key == scope), None) or d.profiles[0]

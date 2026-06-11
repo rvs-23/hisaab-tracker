@@ -1,12 +1,10 @@
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, sidebar_scope
+from finance_tracker.ui import inr, load_all, page_header
 
 d = load_all()
-scope = sidebar_scope(d.profiles)
-
-st.title("Plan vs actual")
+scope = page_header("Plan vs actual", d.profiles)
 st.caption("Planned contribution per category (target × budget) vs what you actually invested. Negative shortfall = under-invested.")
 
 years = compute.available_years(d.budget, d.contributions)

@@ -2,12 +2,10 @@ import pandas as pd
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, sidebar_scope
+from finance_tracker.ui import inr, load_all, page_header
 
 d = load_all()
-scope = sidebar_scope(d.profiles)
-
-st.title("Target allocation")
+scope = page_header("Target allocation", d.profiles)
 st.caption("Your target mix, constant across years. Two tiers: short-term for the invested slice of *wants* money, long-term for *investment* money.")
 
 # Per-person by nature — household falls back to the first person.

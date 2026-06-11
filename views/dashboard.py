@@ -2,12 +2,10 @@ import pandas as pd
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import inr, load_all, sidebar_scope
+from finance_tracker.ui import inr, load_all, page_header
 
 d = load_all()
-scope = sidebar_scope(d.profiles)
-
-st.title("Hisaab")
+scope = page_header("CBSE Finances", d.profiles)
 
 years = compute.available_years(d.budget, d.contributions)
 if not years:
@@ -56,5 +54,3 @@ else:
     proj = compute.projection(profile, d.budget)
     series = proj.set_index("year")["cumulative_invested"] if not proj.empty else pd.Series(dtype=float)
 st.line_chart(series, color="#2b2b2b")
-
-st.caption(f"data folder: {d.root}")
