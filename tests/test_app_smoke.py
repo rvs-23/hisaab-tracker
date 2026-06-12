@@ -11,10 +11,11 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PAGES = [
     "views/dashboard.py",
-    "views/plan_vs_actual.py",
-    "views/budget_projection.py",
     "views/income.py",
-    "views/edit_data.py",
+    "views/budget_projection.py",
+    "views/target.py",
+    "views/monthly_plan.py",
+    "views/plan_vs_actual.py",
 ]
 
 TARGET = (

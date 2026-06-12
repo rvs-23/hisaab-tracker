@@ -41,13 +41,16 @@ The budget (needs/wants/investment) is **derived from income**, not stored. Cate
 
 ## Pages
 
-- **Income** — annual salary + bonus per person (the source of everything)
-- **Dashboard** — % goal achieved per selected person + combined, emergency-fund goal, planned cumulative-investment curve
-- **Budget & Projection** — derived needs/wants/investment split + projection
-- **Plan vs Actual** — planned vs actual per category for a year, shortfall, % goal, drawdown
-- **Update Data** — tabbed editor (Income / Targets / Contributions / Goals) with a target → planned-amounts preview
+The nav reads as the money pipeline; **each page edits its own data in place** (no separate edit page):
 
-The top-right **View** multiselect filters every page to the selected people (combined total when 2+).
+- **Dashboard** *(landing)* — where do we stand this year: % goal, invested vs planned, cumulative curve
+- **Income** — what came in: editable grid per person/year
+- **Budget** — how it splits: all years at once (2023 → current+3 projected at 5%), derived, read-only
+- **Target** — where investment should go: editable % per year with auto-calculated ₹ (carry-forward)
+- **Monthly Plan** — what to do this month: ₹/month per instrument
+- **Plan vs Actual** — did we do it: planned vs actual, shortfall, % goal; actuals edited here
+
+Visuals: grayscale + two accents — **teal** (what happened) and **mulberry** (what's planned/projected). The top-right **View** multiselect filters every page (combined when 2+).
 
 ## Decisions
 
