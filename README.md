@@ -1,56 +1,67 @@
-# hisaab-tracker
+# CBSE Finances
 
-*Hisaab* — the household accounts. Minimal, local, file-based personal financial planner for two people. Runs on one Mac via Streamlit. No server, no database, no auth, no live market data.
+Minimal, local, file-based financial planner for two people. Runs on one Mac via Streamlit. No server, no database, no auth, no live market data.
+
+It is a **contributions-vs-goal** tracker (a port of the household's spreadsheet model), *not* a market-value/net-worth tracker: it answers "did we invest what the plan says we should this year?" — not "what is the portfolio worth today?"
 
 ## Run
 
 ```sh
 uv sync
-uv run streamlit run app.py
+uv run streamlit run app.py     # opens http://localhost:8501
+uv run pytest                   # tests
 ```
 
-Tests: `uv run pytest`
+## The model
+
+Everything derives from **income**:
+
+1. **Budget split** — each person's income splits into needs / wants / investment. The anchor year (earliest) splits **50/30/20**; every year after, only the income *increment* splits **20/30/50** (invest more as you earn more). Fully derived — you only enter income.
+2. **Target allocation** — each person has a two-tier target (constant by default, editable per year): `long_term` for investment money, `short_term` for the invested slice of wants money (`wants_invest_pct`).
+3. **Planned (expected) contributions** — `investment × long_term%  +  (wants × wants_invest_pct) × short_term%`, per category. Reproduces the source sheet to the rupee.
+4. **Plan vs actual** — planned vs what was actually invested (`contributions.csv`): shortfall, % goal achieved, drawdown chart, emergency-fund goal.
 
 ## Data
 
-The data folder is the database. It lives **outside the repo** (iCloud Drive, so it's backed up automatically) and is referenced by `DATA_DIR` in `.env` (copy `.env.example`). All values are user-stated as-of a date; USD converts at the rate you set in `config.yaml`.
+The data folder is the database. It lives **outside the repo** (iCloud Drive, auto-backed-up) and is referenced by `DATA_DIR` in `.env` (copy `.env.example`). The app re-reads files on every refresh and never caches. Everything is editable in-app (Update Data page) or directly in any editor / Numbers.
 
 ```
 FinanceData/
-  config.yaml        # usd_inr_rate, categories, target_mix
+  config.yaml        # usd_inr_rate, categories (asset classes)
   profiles/
-    rv.yaml          # salary, split %, projection params (filename = profile key)
-    partner.yaml
-  holdings.csv       # date,profile,instrument,category,currency,value,notes
-  income.csv         # date,profile,source,amount,notes
+    rv.yaml          # birth_year, forward_increment_pct, wants_invest_pct, default_target
+    partner.yaml     # (filename stem = the `profile` key used in every CSV)
+  income.csv         # profile,year,salary,bonus,other          ← drives everything
+  targets.csv        # profile,year,tier,category,pct            ← per-year overrides (optional)
+  contributions.csv  # year,profile,category,amount,notes        ← actuals invested
+  goals.csv          # year,profile,emergency_fund_goal
 ```
 
-`holdings.csv` is **append-only history**: each update adds rows with a new date (the "Start a new snapshot" button on the Update Data page copies the latest rows forward). "Current" state is each profile's rows at its own most recent date; the full file drives the net-worth-over-time chart. Backfilling old data (e.g. from the 2023+ Excel) is just adding rows with old dates.
-
-Everything is editable in-app (Update Data page) or directly in any text editor / Numbers — the app re-reads files on every refresh and never caches.
+The budget (needs/wants/investment) is **derived from income**, not stored. Categories are asset classes: `us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_aif, gold_metals`. Pydantic validates the YAML; `storage.py` validates each CSV against the config on load and fails fast on bad hand-edits.
 
 ## Pages
 
-- **Dashboard** — net worth now (per person + household), growth over time
-- **Allocation** — current value and % by category, per person or combined
-- **Plan vs Actual** — target mix (config) vs holdings, surplus/shortfall per category
-- **Budget & Projection** — salary split (needs/wants/investment) and multi-year cumulative-invested projection
-- **Income** — income log and monthly totals
-- **Update Data** — edit holdings/income in a grid, start new snapshots
+- **Income** — annual salary + bonus per person (the source of everything)
+- **Dashboard** — % goal achieved per selected person + combined, emergency-fund goal, planned cumulative-investment curve
+- **Budget & Projection** — derived needs/wants/investment split + projection
+- **Plan vs Actual** — planned vs actual per category for a year, shortfall, % goal, drawdown
+- **Update Data** — tabbed editor (Income / Targets / Contributions / Goals) with a target → planned-amounts preview
 
-## Decisions (2026-06-11)
+The top-right **View** multiselect filters every page to the selected people (combined total when 2+).
 
-- Single Mac, no LAN/server setup — both users share the laptop
-- Data folder in iCloud Drive (not Google Drive as the original spec said) — already syncing on this Mac, backup is the only need
-- Fully historical from day one (Excel data since 2023 to be backfilled later)
-- Fresh schema, not a port of the Excel layout
-- Categories: zerodha_equity, zerodha_mf, us_equity, ppf, nps, fd, crypto, emergency_fund, cash
+## Decisions
+
+- **Contributions-vs-goal, not net worth** (2026-06-12) — the app deliberately tracks invested-vs-planned cash flow, mirroring the household spreadsheet. The earlier holdings/market-value design in the Obsidian spec was superseded before build.
+- Single Mac, both users share the laptop; data in iCloud Drive.
+- Separate per person, with a combined view.
+- App name: **CBSE Finances**.
 
 ## Roadmap (not built yet)
 
-1. Zerodha Console holdings-export importer (needs one sample CSV)
-2. Backfill 2023+ history from the old Excel
+1. Zerodha Console export → auto-fill `contributions.csv`
+2. Auto-project income/budget forward to a horizon (currently reflects entered years only)
+3. Backfill the full 2023+ history from the old workbook
 
 ## Non-goals
 
-Live prices/FX, broker APIs, auth, multi-device sync, mobile, expense tracking, notifications, cloud hosting.
+Live prices/FX, broker APIs, market-value/net-worth tracking, auth, multi-device sync, mobile, expense tracking, cloud hosting.
