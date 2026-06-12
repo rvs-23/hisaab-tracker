@@ -38,10 +38,11 @@ def fake_data_dir(tmp_path, monkeypatch):
     (profiles / "partner.yaml").write_text(
         "name: Partner\nbirth_year: 1998\nforward_increment_pct: 10\nwants_invest_pct: 6\n" + TARGET
     )
-    (tmp_path / "budget.csv").write_text(
-        "profile,year,starting_salary,job_change,ending_salary,monthly_needs,monthly_wants,monthly_investment\n"
-        "rv,2024,1107389,No,1425283,51439,35632,31702\n"
-        "rv,2025,1425283,Yes,3571045,87202,89276,121109\n"
+    (tmp_path / "income.csv").write_text(
+        "profile,year,salary,bonus,other\n"
+        "rv,2023,1107389,0,0\n"
+        "rv,2024,1425283,0,0\n"
+        "rv,2025,3571045,0,0\n"
     )
     (tmp_path / "contributions.csv").write_text(
         "year,profile,category,amount,notes\n"
@@ -50,9 +51,6 @@ def fake_data_dir(tmp_path, monkeypatch):
     )
     (tmp_path / "goals.csv").write_text(
         "year,profile,emergency_fund_goal\n2024,rv,196689\n"
-    )
-    (tmp_path / "income.csv").write_text(
-        "date,profile,source,amount,notes\n2026-03-31,rv,bonus,500000,\n"
     )
     monkeypatch.setattr(storage, "data_dir", lambda: tmp_path)
     return tmp_path

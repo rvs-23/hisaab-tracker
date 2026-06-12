@@ -4,10 +4,12 @@ The data folder is the database: it lives outside the repo (path in .env) and
 every loader re-reads from disk — no caching anywhere. The numeric history is
 three tidy CSVs, all keyed by (year, profile):
 
-  budget.csv         one row per person per year — salary + needs/wants/invest %
+  income.csv         one row per person per year — salary + bonus + other
   contributions.csv  what was actually invested, per person/year/category
   goals.csv          emergency-fund goal, per person/year
-  income.csv         dated non-salary income (bonus / other), optional
+  targets.csv        per-year target-allocation overrides (optional)
+
+The budget (needs/wants/investment) is *derived* from income, not stored.
 """
 
 from __future__ import annotations
@@ -21,15 +23,10 @@ from finance_tracker.models import Config, Profile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Monthly amounts are stored directly (not rounded %s) so the model reproduces
-# the source sheet's rupee figures exactly; %s are derived for display.
-BUDGET_COLUMNS = [
-    "profile", "year", "starting_salary", "job_change",
-    "ending_salary", "monthly_needs", "monthly_wants", "monthly_investment",
-]
+# Income drives everything; the budget split is derived (see compute.py).
+INCOME_COLUMNS = ["profile", "year", "salary", "bonus", "other"]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
-INCOME_COLUMNS = ["date", "profile", "source", "amount", "notes"]
 TARGETS_COLUMNS = ["profile", "year", "tier", "category", "pct"]
 TIERS = {"short_term", "long_term"}
 
@@ -103,27 +100,19 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
             )
 
 
-# --- budget ---------------------------------------------------------------
+# --- income ---------------------------------------------------------------
 
-def load_budget(root: Path, profiles: list[Profile]) -> pd.DataFrame:
-    df = pd.read_csv(root / "budget.csv")
-    validate_budget(df, profiles)
+def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
+    df = pd.read_csv(root / "income.csv")
+    validate_income(df, profiles)
     return df.sort_values(["profile", "year"]).reset_index(drop=True)
 
 
-def validate_budget(df: pd.DataFrame, profiles: list[Profile]) -> None:
-    _check_columns(df, BUDGET_COLUMNS, "budget.csv")
-    _check_profiles(df, profiles, "budget.csv")
-    if df["year"].isna().any() or df["ending_salary"].isna().any():
-        raise ValueError("budget.csv has rows with a missing year or ending_salary")
-    for _, row in df.iterrows():
-        monthly = row["monthly_needs"] + row["monthly_wants"] + row["monthly_investment"]
-        if abs(monthly - row["ending_salary"] / 12) > 2:  # allow rupee rounding
-            raise ValueError(
-                f"budget.csv {row['profile']} {int(row['year'])}: monthly needs+wants+"
-                f"investment ({monthly:.0f}) must equal ending_salary/12 "
-                f"({row['ending_salary'] / 12:.0f})"
-            )
+def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
+    _check_columns(df, INCOME_COLUMNS, "income.csv")
+    _check_profiles(df, profiles, "income.csv")
+    if df["year"].isna().any() or df["salary"].isna().any():
+        raise ValueError("income.csv has rows with a missing year or salary")
 
 
 # --- contributions --------------------------------------------------------
@@ -157,25 +146,10 @@ def validate_goals(df: pd.DataFrame, profiles: list[Profile]) -> None:
     _check_profiles(df, profiles, "goals.csv")
 
 
-# --- income ---------------------------------------------------------------
-
-def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
-    df = pd.read_csv(root / "income.csv", parse_dates=["date"])
-    validate_income(df, profiles)
-    return df
-
-
-def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
-    _check_columns(df, INCOME_COLUMNS, "income.csv")
-    _check_profiles(df, profiles, "income.csv")
-    if df["date"].isna().any() or df["amount"].isna().any():
-        raise ValueError("income.csv has rows with a missing date or amount")
-
-
 # --- savers ---------------------------------------------------------------
 
-def save_budget(root: Path, df: pd.DataFrame) -> None:
-    df.sort_values(["profile", "year"]).to_csv(root / "budget.csv", index=False)
+def save_income(root: Path, df: pd.DataFrame) -> None:
+    df.sort_values(["profile", "year"]).to_csv(root / "income.csv", index=False)
 
 
 def save_contributions(root: Path, df: pd.DataFrame) -> None:
@@ -188,12 +162,6 @@ def save_goals(root: Path, df: pd.DataFrame) -> None:
 
 def save_targets(root: Path, df: pd.DataFrame) -> None:
     df.sort_values(["profile", "year", "tier", "category"]).to_csv(root / "targets.csv", index=False)
-
-
-def save_income(root: Path, df: pd.DataFrame) -> None:
-    out = df.sort_values(["date", "profile"]).copy()
-    out["date"] = pd.to_datetime(out["date"]).dt.strftime("%Y-%m-%d")
-    out.to_csv(root / "income.csv", index=False)
 
 
 # --- helpers --------------------------------------------------------------

@@ -7,9 +7,9 @@ from finance_tracker.ui import inr, load_all, page_header
 d = load_all()
 scope = page_header("CBSE Finances", d.profiles)
 
-years = compute.available_years(d.budget, d.contributions)
+years = compute.available_years(d.income, d.contributions)
 if not years:
-    st.info("No data yet — add budget rows and contributions on the Update Data page.")
+    st.info("No data yet — add income and contributions on the Update Data page.")
     st.stop()
 
 # Headline on the latest year that actually has contributions recorded.
@@ -19,9 +19,9 @@ year = contrib_years[-1] if contrib_years else years[-1]
 
 def pva_for(key):
     if key is None:
-        return compute.household_plan_vs_actual(d.profiles, d.budget, d.targets, d.contributions, year)
+        return compute.household_plan_vs_actual(d.profiles, d.income, d.targets, d.contributions, year)
     profile = next(p for p in d.profiles if p.key == key)
-    return compute.plan_vs_actual(profile, d.budget, d.targets, d.contributions, year)
+    return compute.plan_vs_actual(profile, d.income, d.targets, d.contributions, year)
 
 
 st.caption(f"Investment plan vs actual — {year}")
@@ -44,13 +44,13 @@ if not goals.empty:
 st.subheader("Planned cumulative investment")
 if scope is None:
     frames = [
-        compute.projection(p, d.budget).set_index("year")["cumulative_invested"]
-        for p in d.profiles
-        if not compute.projection(p, d.budget).empty
+        proj.set_index("year")["cumulative_invested"]
+        for proj in (compute.projection(p, d.income) for p in d.profiles)
+        if not proj.empty
     ]
     series = pd.concat(frames, axis=1).sum(axis=1) if frames else pd.Series(dtype=float)
 else:
     profile = next(p for p in d.profiles if p.key == scope)
-    proj = compute.projection(profile, d.budget)
+    proj = compute.projection(profile, d.income)
     series = proj.set_index("year")["cumulative_invested"] if not proj.empty else pd.Series(dtype=float)
 st.line_chart(series, color="#2b2b2b")

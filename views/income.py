@@ -1,55 +1,41 @@
 import streamlit as st
 
-from finance_tracker import storage
-from finance_tracker.ui import edit_grid, load_all, page_header
+from finance_tracker import compute
+from finance_tracker.ui import inr, load_all, page_header
 
 d = load_all()
 scope = page_header("Income", d.profiles)
-st.caption("Non-salary income (bonus / other). Salary lives in the budget plan.")
+st.caption("Annual income per person — salary + bonus + other. Everything else (budget, plan) derives from this.")
 
-edit_grid(
-    d.income,
-    {
-        "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD", required=True),
-        "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
-        "source": st.column_config.TextColumn("Source", required=True),
-        "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
-        "notes": "Notes",
-    },
-    lambda df: storage.validate_income(df, d.profiles),
-    storage.save_income,
-    d.root, key="income_editor", label="income",
-)
-
-income = d.income
+income = d.income.copy()
 if scope is not None:
     income = income[income["profile"] == scope]
 
 if income.empty:
-    st.info("No income recorded for this scope yet — add rows on the Update Data page.")
+    st.info("No income for this scope yet — add rows on the Update Data page.")
     st.stop()
 
+income["total"] = income["salary"] + income["bonus"] + income["other"]
 names = {p.key: p.name for p in d.profiles}
 
-st.subheader("By year")
-yearly = (
-    income.assign(year=income["date"].dt.year)
-    .groupby(["year", "profile"])["amount"]
-    .sum()
-    .unstack("profile")
-    .rename(columns=names)
-)
-st.bar_chart(yearly, color="#2b2b2b" if yearly.shape[1] == 1 else None)
+st.subheader("Total income by year")
+by_year = income.groupby(["year", "profile"])["total"].sum().unstack("profile").rename(columns=names)
+st.bar_chart(by_year, color="#2b2b2b" if by_year.shape[1] == 1 else None)
+
+latest = income.loc[income["year"].idxmax()]
+st.metric(f"Latest income ({int(latest['year'])})", inr(income[income['year'] == latest['year']]['total'].sum()))
 
 st.subheader("All entries")
 st.dataframe(
-    income.sort_values("date", ascending=False),
+    income.assign(person=income["profile"].map(names)).sort_values(["year", "profile"], ascending=[False, True]),
     column_config={
-        "date": st.column_config.DateColumn("Date", format="YYYY-MM-DD"),
-        "profile": "Person",
-        "source": "Source",
-        "amount": st.column_config.NumberColumn("Amount (₹)", format="%.0f"),
-        "notes": "Notes",
+        "year": st.column_config.NumberColumn("Year", format="%d"),
+        "person": "Person",
+        "salary": st.column_config.NumberColumn("Salary (₹)", format="%.0f"),
+        "bonus": st.column_config.NumberColumn("Bonus (₹)", format="%.0f"),
+        "other": st.column_config.NumberColumn("Other (₹)", format="%.0f"),
+        "total": st.column_config.NumberColumn("Total (₹)", format="%.0f"),
+        "profile": None,
     },
     hide_index=True,
     width="stretch",
