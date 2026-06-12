@@ -7,12 +7,10 @@ d = load_all()
 scope = page_header("Income", d.profiles)
 st.caption("Annual income per person — salary + bonus + other. Everything else (budget, plan) derives from this.")
 
-income = d.income.copy()
-if scope is not None:
-    income = income[income["profile"] == scope]
+income = d.income[d.income["profile"].isin(scope)].copy()
 
 if income.empty:
-    st.info("No income for this scope yet — add rows on the Update Data page.")
+    st.info("No income for this selection yet — add rows on the Update Data page.")
     st.stop()
 
 income["total"] = income["salary"] + income["bonus"] + income["other"]

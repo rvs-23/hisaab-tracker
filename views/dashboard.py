@@ -6,6 +6,7 @@ from finance_tracker.ui import inr, load_all, page_header
 
 d = load_all()
 scope = page_header("CBSE Finances", d.profiles)
+selected = [p for p in d.profiles if p.key in scope]
 
 years = compute.available_years(d.income, d.contributions)
 if not years:
@@ -16,41 +17,32 @@ if not years:
 contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
 year = contrib_years[-1] if contrib_years else years[-1]
 
-
-def pva_for(key):
-    if key is None:
-        return compute.household_plan_vs_actual(d.profiles, d.income, d.targets, d.contributions, year)
-    profile = next(p for p in d.profiles if p.key == key)
-    return compute.plan_vs_actual(profile, d.income, d.targets, d.contributions, year)
-
-
 st.caption(f"Investment plan vs actual — {year}")
-cols = st.columns(len(d.profiles) + 1)
-house = pva_for(None)
-cols[0].metric("Household — goal achieved", f"{compute.pct_goal_achieved(house):.0f}%")
-for col, p in zip(cols[1:], d.profiles):
-    pva = pva_for(p.key)
-    val = f"{compute.pct_goal_achieved(pva):.0f}%" if not pva.empty else "—"
-    col.metric(f"{p.name} — goal achieved", val)
 
-# Emergency-fund goal for the scope/year.
-goals = d.goals[d.goals["year"] == year]
-if scope is not None:
-    goals = goals[goals["profile"] == scope]
+combined = len(selected) > 1
+cols = st.columns(len(selected) + (1 if combined else 0))
+i = 0
+if combined:
+    house = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
+    cols[0].metric("Combined — goal achieved", f"{compute.pct_goal_achieved(house):.0f}%")
+    i = 1
+for p in selected:
+    pva = compute.plan_vs_actual(p, d.income, d.targets, d.contributions, year)
+    val = f"{compute.pct_goal_achieved(pva):.0f}%" if not pva.empty else "—"
+    cols[i].metric(f"{p.name} — goal achieved", val)
+    i += 1
+
+goals = d.goals[(d.goals["year"] == year) & (d.goals["profile"].isin(scope))]
 if not goals.empty:
     st.metric(f"Emergency-fund goal ({year})", inr(goals["emergency_fund_goal"].sum()))
 
-# Cumulative-invested trajectory from the budget plan.
 st.subheader("Planned cumulative investment")
-if scope is None:
-    frames = [
-        proj.set_index("year")["cumulative_invested"]
-        for proj in (compute.projection(p, d.income) for p in d.profiles)
-        if not proj.empty
-    ]
-    series = pd.concat(frames, axis=1).sum(axis=1) if frames else pd.Series(dtype=float)
-else:
-    profile = next(p for p in d.profiles if p.key == scope)
-    proj = compute.projection(profile, d.income)
-    series = proj.set_index("year")["cumulative_invested"] if not proj.empty else pd.Series(dtype=float)
-st.line_chart(series, color="#2b2b2b")
+series = {}
+for p in selected:
+    proj = compute.projection(p, d.income)
+    if not proj.empty:
+        series[p.name] = proj.set_index("year")["cumulative_invested"]
+chart = pd.DataFrame(series)
+if combined and not chart.empty:
+    chart["Combined"] = chart.sum(axis=1)
+st.line_chart(chart, color="#2b2b2b" if chart.shape[1] == 1 else None)

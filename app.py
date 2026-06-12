@@ -1,6 +1,9 @@
+from pathlib import Path
+
 import streamlit as st
 
 st.set_page_config(page_title="CBSE Finances", page_icon=":material/savings:", layout="wide")
+st.logo(str(Path(__file__).parent / "assets" / "logo.svg"), size="large")
 
 st.navigation(
     [

@@ -79,14 +79,14 @@ def edit_grid(df, column_config, validate, save, root, key, label, sort=None) ->
                 st.error(f"Not saved: {exc}")
 
 
-def page_header(title: str, profiles) -> str | None:
-    """Render the page title with a top-right View selector (Household / per
-    person). Shared widget key, so the choice sticks across navigation. Returns
-    a profile key, or None for the combined household."""
-    options: dict[str, str | None] = {"Household": None}
-    for p in profiles:
-        options[p.name] = p.key
+def page_header(title: str, profiles) -> list[str]:
+    """Render the page title with a top-right multi-select View. Shared widget
+    key, so the choice sticks across navigation. Returns the selected profile
+    keys (empty selection is treated as everyone). When 2+ are selected, pages
+    also show a combined total."""
     left, right = st.columns([3, 1], vertical_alignment="bottom")
     left.title(title)
-    choice = right.selectbox("View", list(options), key="scope")
-    return options.get(choice)
+    names = [p.name for p in profiles]
+    selected = right.multiselect("View", names, default=names, key="scope")
+    keys = [p.key for p in profiles if p.name in selected]
+    return keys or [p.key for p in profiles]

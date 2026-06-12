@@ -16,16 +16,12 @@ contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
 default = contrib_years[-1] if contrib_years else years[-1]
 year = st.selectbox("Year", years, index=years.index(default))
 
-if scope is None:
-    pva = compute.household_plan_vs_actual(d.profiles, d.income, d.targets, d.contributions, year)
-    goal_rows = d.goals[d.goals["year"] == year]
-else:
-    profile = next(p for p in d.profiles if p.key == scope)
-    pva = compute.plan_vs_actual(profile, d.income, d.targets, d.contributions, year)
-    goal_rows = d.goals[(d.goals["year"] == year) & (d.goals["profile"] == scope)]
+selected = [p for p in d.profiles if p.key in scope]
+pva = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
+goal_rows = d.goals[(d.goals["year"] == year) & (d.goals["profile"].isin(scope))]
 
 if pva.empty:
-    st.info("No plan for this scope/year yet.")
+    st.info("No plan for this selection/year yet.")
     st.stop()
 
 cols = st.columns(2)
