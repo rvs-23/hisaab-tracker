@@ -19,17 +19,20 @@ Then, for contributions tracking:
 
 from __future__ import annotations
 
+import datetime as dt
+
 import pandas as pd
 
 from finance_tracker.models import Profile
 
 BASE_SPLIT = {"needs": 50, "wants": 30, "investment": 20}        # anchor-year split
 INCREMENT_SPLIT = {"needs": 20, "wants": 30, "investment": 50}   # split of each raise
+PROJECTION_YEARS_AHEAD = 3  # budget extends to current year + 3
 
 BUDGET_COLUMNS = [
     "year", "age", "total_income", "needs", "wants", "investment",
     "monthly_needs", "monthly_wants", "monthly_investment",
-    "invested_this_year", "cumulative_invested",
+    "invested_this_year", "cumulative_invested", "is_projected",
 ]
 
 
@@ -37,10 +40,14 @@ def total_income(row) -> float:
     return float(row["salary"]) + float(row["bonus"]) + float(row["other"])
 
 
-def budget_series(profile: Profile, income: pd.DataFrame) -> pd.DataFrame:
+def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None = None) -> pd.DataFrame:
     """Per-year derived budget for one person: total income split into annual +
     monthly needs/wants/investment via the anchor + increment philosophy, with a
-    running cumulative invested."""
+    running cumulative invested.
+
+    Beyond the entered years, projects forward to current year + 3: income grows
+    by forward_increment_pct and each projected raise splits 20/30/50 like any
+    other increment. Projected rows carry is_projected=True."""
     rows = income[income["profile"] == profile.key].sort_values("year")
     if rows.empty:
         return pd.DataFrame(columns=BUDGET_COLUMNS)
@@ -49,8 +56,9 @@ def budget_series(profile: Profile, income: pd.DataFrame) -> pd.DataFrame:
     prev_total = None
     prev = {"needs": 0.0, "wants": 0.0, "investment": 0.0}
     cumulative = 0.0
-    for _, r in rows.iterrows():
-        total = total_income(r)
+
+    def add_year(year: int, total: float, projected: bool) -> None:
+        nonlocal prev_total, prev, cumulative
         if prev_total is None:  # anchor year
             amt = {k: total * BASE_SPLIT[k] / 100 for k in BASE_SPLIT}
         else:
@@ -59,8 +67,8 @@ def budget_series(profile: Profile, income: pd.DataFrame) -> pd.DataFrame:
         cumulative += amt["investment"]
         out.append(
             {
-                "year": int(r["year"]),
-                "age": int(r["year"]) - profile.birth_year,
+                "year": year,
+                "age": year - profile.birth_year,
                 "total_income": round(total),
                 "needs": round(amt["needs"]),
                 "wants": round(amt["wants"]),
@@ -70,9 +78,21 @@ def budget_series(profile: Profile, income: pd.DataFrame) -> pd.DataFrame:
                 "monthly_investment": round(amt["investment"] / 12),
                 "invested_this_year": round(amt["investment"]),
                 "cumulative_invested": round(cumulative),
+                "is_projected": projected,
             }
         )
         prev_total, prev = total, amt
+
+    for _, r in rows.iterrows():
+        add_year(int(r["year"]), total_income(r), projected=False)
+
+    horizon = (today or dt.date.today()).year + PROJECTION_YEARS_AHEAD
+    year, total = int(rows["year"].max()), prev_total
+    while year < horizon:
+        year += 1
+        total = total * (1 + profile.forward_increment_pct / 100)
+        add_year(year, total, projected=True)
+
     return pd.DataFrame(out)
 
 
@@ -89,17 +109,26 @@ def split_pct(row) -> dict[str, float]:
 
 
 def resolve_target(profile: Profile, targets: pd.DataFrame, year: int) -> dict[str, dict[str, float]]:
-    """The allocation in force for a person/year: per-year override rows from
-    targets.csv if present, otherwise the profile's default_target."""
-    rows = targets[(targets["profile"] == profile.key) & (targets["year"] == year)] if not targets.empty else targets
-    if rows.empty:
-        return {
-            "short_term": dict(profile.default_target.short_term),
-            "long_term": dict(profile.default_target.long_term),
-        }
+    """The allocation in force for a person/year. Target rows carry forward: the
+    most recent override year ≤ the asked year wins; with no override yet, the
+    profile's default_target applies. A tier missing from the override falls
+    back to the default for that tier."""
+    default = {
+        "short_term": dict(profile.default_target.short_term),
+        "long_term": dict(profile.default_target.long_term),
+    }
+    if targets.empty:
+        return default
+    mine = targets[(targets["profile"] == profile.key) & (targets["year"] <= year)]
+    if mine.empty:
+        return default
+    rows = mine[mine["year"] == mine["year"].max()]
     out: dict[str, dict[str, float]] = {"short_term": {}, "long_term": {}}
     for _, r in rows.iterrows():
         out[r["tier"]][r["category"]] = r["pct"]
+    for tier in out:
+        if not out[tier]:
+            out[tier] = default[tier]
     return out
 
 

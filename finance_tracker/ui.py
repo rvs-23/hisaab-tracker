@@ -51,6 +51,13 @@ def inr(n: float) -> str:
     return f"{sign}₹{s}"
 
 
+# Visual language (design.md): grayscale base + exactly two accents.
+# Teal marks what happened (actuals, the current year); mulberry marks what's
+# intended (planned, projected, targets). No traffic-light semantics.
+TEAL = "#0F766E"
+MULBERRY = "#86198F"
+INK = "#2b2b2b"
+
 # Grayscale ramp for charts — dark first (household / primary series).
 GRAYS = ["#2b2b2b", "#7a7a7a", "#a8a8a8", "#c9c9c9", "#e0e0e0"]
 

@@ -1,3 +1,5 @@
+import datetime as dt
+
 import pandas as pd
 import pytest
 
@@ -5,11 +7,13 @@ from finance_tracker import compute, storage
 from finance_tracker.models import Profile, Target
 from finance_tracker.ui import inr
 
+TODAY = dt.date(2026, 6, 12)
+
 
 @pytest.fixture
 def rv():
     return Profile(
-        key="rv", name="Rv", birth_year=1998, forward_increment_pct=10, wants_invest_pct=6,
+        key="rv", name="Rv", birth_year=1998, forward_increment_pct=5, wants_invest_pct=6,
         default_target=Target(
             short_term={"fixed_deposit": 50, "mfs": 30, "us_market": 10, "indian_stocks": 10},
             long_term={"mfs": 45, "gold_metals": 25, "indian_stocks": 14,
@@ -50,13 +54,39 @@ def contributions():
 
 def test_budget_derives_from_income_philosophy(rv, income):
     """Anchor 50/30/20, then increment 20/30/50 — must match the source sheet."""
-    bs = compute.budget_series(rv, income).set_index("year")
+    bs = compute.budget_series(rv, income, today=TODAY).set_index("year")
     assert bs.loc[2023, "monthly_investment"] == 18456   # 1107389*20%/12
     assert bs.loc[2024, "monthly_investment"] == 31702
     assert bs.loc[2025, "monthly_investment"] == 121109
     assert bs.loc[2026, "monthly_investment"] == 204687
     # wants is a flat 30% in every year under this philosophy
     assert compute.split_pct(bs.loc[2024])["wants"] == pytest.approx(30, abs=0.1)
+
+
+def test_budget_projects_to_current_plus_three(rv, income):
+    """Entered 2023–26, current year 2026 → projected 2027–29 at 5% growth."""
+    bs = compute.budget_series(rv, income, today=TODAY).set_index("year")
+    assert list(bs.index) == [2023, 2024, 2025, 2026, 2027, 2028, 2029]
+    assert not bs.loc[2026, "is_projected"]
+    assert bs.loc[2027, "is_projected"]
+    # 2027 income = 5576912 * 1.05; the raise splits 20/30/50
+    assert bs.loc[2027, "total_income"] == round(5576912 * 1.05)
+    raise_ = 5576912 * 0.05
+    assert bs.loc[2027, "investment"] == pytest.approx(
+        bs.loc[2026, "investment"] + raise_ * 0.5, abs=2
+    )
+
+
+def test_targets_carry_forward(rv, income):
+    """A 2025 override applies to 2026+ until replaced; missing tier falls back."""
+    override = pd.DataFrame(
+        [{"profile": "rv", "year": 2025, "tier": "long_term", "category": "mfs", "pct": 100}]
+    )
+    t2026 = compute.resolve_target(rv, override, 2026)
+    assert t2026["long_term"] == {"mfs": 100}
+    assert t2026["short_term"] == rv.default_target.short_term  # tier fallback
+    t2024 = compute.resolve_target(rv, override, 2024)  # before the override
+    assert t2024["long_term"] == rv.default_target.long_term
 
 
 def test_expected_reproduces_source_sheet(rv, income, targets):

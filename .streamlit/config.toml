@@ -1,7 +1,8 @@
-# Minimal grayscale theme — no accent colors, monochrome charts.
+# Grayscale base + two accents (see design.md): teal = actuals/current,
+# mulberry = planned/projected. No other colors.
 [theme]
 base = "light"
-primaryColor = "#2b2b2b"
+primaryColor = "#0F766E"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f4f4f4"
 textColor = "#1f1f1f"
