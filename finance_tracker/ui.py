@@ -51,6 +51,19 @@ def inr(n: float) -> str:
     return f"{sign}₹{s}"
 
 
+def inr_short(n: float) -> str:
+    """Compact ₹ for metric cards — lakh/crore so big numbers fit at 100% zoom.
+    ₹55,76,912 → ₹55.8L ; ₹3,40,00,000 → ₹3.40Cr ; small values stay grouped."""
+    n = round(n)
+    a = abs(n)
+    sign = "-" if n < 0 else ""
+    if a >= 1_00_00_000:
+        return f"{sign}₹{a / 1_00_00_000:.2f}Cr"
+    if a >= 1_00_000:
+        return f"{sign}₹{a / 1_00_000:.1f}L"
+    return inr(n)
+
+
 # Visual language (design.md): grayscale base + exactly two accents.
 # Teal marks what happened (actuals, the current year); mulberry marks what's
 # intended (planned, projected, targets). No traffic-light semantics.
