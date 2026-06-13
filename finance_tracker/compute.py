@@ -40,6 +40,13 @@ def total_income(row) -> float:
     return float(row["salary"]) + float(row["bonus"]) + float(row["other"])
 
 
+def annual_income(income: pd.DataFrame) -> pd.DataFrame:
+    """Collapse the monthly income rows to one row per (profile, year)."""
+    if income.empty:
+        return pd.DataFrame(columns=["profile", "year", "salary", "bonus", "other"])
+    return income.groupby(["profile", "year"], as_index=False)[["salary", "bonus", "other"]].sum()
+
+
 def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None = None) -> pd.DataFrame:
     """Per-year derived budget for one person: total income split into annual +
     monthly needs/wants/investment via the anchor + increment philosophy, with a
@@ -48,7 +55,8 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     Beyond the entered years, projects forward to current year + 3: income grows
     by forward_increment_pct and each projected raise splits 20/30/50 like any
     other increment. Projected rows carry is_projected=True."""
-    rows = income[income["profile"] == profile.key].sort_values("year")
+    yearly = annual_income(income)
+    rows = yearly[yearly["profile"] == profile.key].sort_values("year")
     if rows.empty:
         return pd.DataFrame(columns=BUDGET_COLUMNS)
 
