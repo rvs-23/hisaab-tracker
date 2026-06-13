@@ -3,10 +3,11 @@ import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    MULBERRY, inr, inr_short, load_all, page_header, pretty_category,
+    INK, MULBERRY, TEAL, inr, inr_short, load_all, page_header, pretty_category,
 )
 
 ON_TRACK = 75  # % of goal that counts a year as "on track"
+GRAY = "#8a8a8a"
 
 d = load_all()
 scope = page_header("Dashboard", d.profiles)
@@ -14,19 +15,30 @@ selected = [p for p in d.profiles if p.key in scope]
 
 years = compute.available_years(d.income, d.contributions)
 if not years:
-    st.info("Start on the Income page — everything derives from it.")
+    st.info("Start on the Income page. Everything grows from there.")
     st.stop()
 
-# Headline on the latest year that actually has contributions (meaningful), not a
-# possibly-empty calendar year.
 contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
 year = contrib_years[-1] if contrib_years else years[-1]
+names = {p.key: p.name for p in d.profiles}
+
+
+def card(col, label, value, sub="", color=INK, big=False, tip=""):
+    size = "2.1rem" if big else "1.55rem"
+    lab = f"<span title='{tip}'>{label} ⓘ</span>" if tip else label
+    col.markdown(
+        f"<div style='line-height:1.2;margin-bottom:.4rem'>"
+        f"<div style='font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:{GRAY}'>{lab}</div>"
+        f"<div style='font-size:{size};font-weight:700;color:{color}'>{value}</div>"
+        f"<div style='font-size:.78rem;color:{GRAY}'>{sub}</div>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
 
 
 def stats(profiles):
     pva = compute.household_plan_vs_actual(profiles, d.income, d.targets, d.contributions, year)
-    target = pva["expected"].sum()
-    invested = pva["actual"].sum()
+    target, invested = pva["expected"].sum(), pva["actual"].sum()
     income_yr = invest_yr = 0.0
     for p in profiles:
         bs = compute.budget_series(p, d.income)
@@ -35,88 +47,76 @@ def stats(profiles):
             income_yr += row.iloc[0]["total_income"]
             invest_yr += row.iloc[0]["investment"]
     return {
-        "target": target,
-        "invested": invested,
-        "remaining": max(target - invested, 0.0),
+        "target": target, "invested": invested, "remaining": max(target - invested, 0.0),
         "progress": compute.pct_goal_achieved(pva) if not pva.empty else 0.0,
         "rate": 100 * invest_yr / income_yr if income_yr else 0.0,
     }
 
 
-# Goal progress — one card per selected person, plus Household when 2+ are picked.
-st.subheader(
-    f"Goal progress · {year}",
-    help="Share of this year's investment target that's actually been invested so far "
-    "(actual contributions ÷ planned). 100% = exactly on plan.",
-)
+# Goal progress, one card per selected person, plus the household when both are in.
+st.markdown(f"##### Goal progress · {year}")
 entities = [(p.name, [p]) for p in selected]
 if len(selected) > 1:
     entities.append(("Household", selected))
-
-cols = st.columns(len(entities))
-for col, (name, profs) in zip(cols, entities):
+for col, (name, profs) in zip(st.columns(len(entities)), entities):
     s = stats(profs)
-    col.metric(name, f"{s['progress']:.0f}%")
-    col.caption(f"{inr_short(s['invested'])} of {inr_short(s['target'])}")
+    color = TEAL if s["progress"] >= ON_TRACK else MULBERRY
+    card(col, name, f"{s['progress']:.0f}%", f"{inr_short(s['invested'])} of {inr_short(s['target'])}",
+         color=color, big=True, tip="Share of this year's target actually invested. 100% is right on plan.")
 
-# Years on track + the category we're most behind on, for the selection.
-hh_year = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
+# Headline footnote: consistency and the weakest spot.
+hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
 on_track = sum(
-    1
-    for cy in contrib_years
+    1 for cy in contrib_years
     if compute.pct_goal_achieved(
         compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, cy)
-    )
-    >= ON_TRACK
+    ) >= ON_TRACK
 )
-bits = [f"On track: **{on_track} of {len(contrib_years)}** years ≥ {ON_TRACK}% of goal"]
-if not hh_year.empty:
-    worst = hh_year.loc[hh_year["shortfall"].idxmin()]
+line = f"On track in **{on_track} of {len(contrib_years)}** years (75%+ of goal)."
+if not hh.empty:
+    worst = hh.loc[hh["shortfall"].idxmin()]
     if worst["shortfall"] < 0:
-        bits.append(f"most behind: **{pretty_category(worst['category'])}** ({inr_short(worst['shortfall'])})")
-st.caption(" · ".join(bits))
+        line += f" Biggest gap right now: :violet[**{pretty_category(worst['category'])}**] ({inr_short(worst['shortfall'])})."
+st.markdown(line)
 
-# This year's actionable numbers, for the whole selection.
+st.divider()
+
+# This year's numbers for the whole selection.
 agg = stats(selected)
-invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
 ai = compute.annual_income(d.income)
 ai = ai[ai["profile"].isin(scope)]
+inc_now = ai[ai["year"] == year][["salary", "bonus", "other"]].sum().sum()
+inc_prev = ai[ai["year"] == year - 1][["salary", "bonus", "other"]].sum().sum()
+yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else "first year"
+left = f"{agg['remaining'] / agg['target'] * 100:.0f}% of target left" if agg["target"] else ""
 
+st.markdown(f"##### This year · {year}")
+c = st.columns(4)
+card(c[0], "Income", inr_short(inc_now), yoy)
+card(c[1], "Target", inr_short(agg["target"]), "to invest this year",
+     tip="Planned investment for the year (target % times budget).")
+card(c[2], "Still to go", inr_short(agg["remaining"]), left, color=MULBERRY)
+card(c[3], "Per month", inr_short(agg["target"] / 12), "see Monthly Plan")
+invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
+st.caption(f"Investing **{agg['rate']:.0f}%** of income this year. **{inr(invested_to_date)}** invested so far, all years counted.")
 
-def income_for(yr):
-    return ai[ai["year"] == yr][["salary", "bonus", "other"]].sum().sum()
-
-
-inc_now, inc_prev = income_for(year), income_for(year - 1)
-yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else None
-
-st.subheader(f"This year · {year}")
-m = st.columns(4)
-m[0].metric("Income", inr_short(inc_now), delta=yoy, delta_color="off")
-m[1].metric("Target amount", inr_short(agg["target"]), help=f"Planned investment for {year} (target % × budget).")
-m[2].metric("Still to invest", inr_short(agg["remaining"]), help="Target minus what's gone in so far.")
-m[3].metric("Monthly target", inr_short(agg["target"] / 12), help="Target amount ÷ 12 — see the Monthly Plan page for the per-instrument split.")
-st.caption(
-    f"Investing **{agg['rate']:.0f}%** of income this year · "
-    f"**{inr(invested_to_date)}** invested to date across all years."
-)
-
-# Cumulative planned investment over time.
-st.subheader(
-    "Cumulative planned investment",
-    help="Running total of how much the budget says to invest, year over year "
-    "(including projected years). This is the plan — not market value or portfolio worth.",
-)
-series = {}
-for p in selected:
-    bs = compute.budget_series(p, d.income)
-    if not bs.empty:
-        series[p.name] = bs.set_index("year")["cumulative_invested"]
-chart = pd.DataFrame(series)
-if len(series) > 1:
-    chart["Combined"] = chart.sum(axis=1)
-st.line_chart(chart, color=MULBERRY if chart.shape[1] == 1 else None)
+# Actual invested, year by year, a line per selected person (combined when both).
+st.markdown("##### Actual invested by year")
+contrib = d.contributions[d.contributions["profile"].isin(scope)]
+if contrib.empty:
+    st.caption("Nothing recorded yet. Add contributions on the Plan vs Actual page.")
+else:
+    piv = contrib.groupby(["year", "profile"])["amount"].sum().unstack("profile").rename(columns=names)
+    order = [p.name for p in selected if p.name in piv.columns]
+    piv = piv[order]
+    accents = [TEAL, MULBERRY]
+    colors = [accents[i % 2] for i in range(len(order))]
+    if len(order) > 1:
+        piv["Combined"] = piv.sum(axis=1)
+        colors.append(INK)
+    st.line_chart(piv, color=colors if len(piv.columns) > 1 else colors[0])
+    st.caption("What actually went in each year. No projections here, only real money.")
 
 goals = d.goals[(d.goals["year"] == year) & (d.goals["profile"].isin(scope))]
 if not goals.empty:
-    st.caption(f"Emergency-fund goal ({year}): {inr(goals['emergency_fund_goal'].sum())}")
+    st.caption(f"Emergency fund goal for {year}: {inr(goals['emergency_fund_goal'].sum())}")
