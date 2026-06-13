@@ -36,15 +36,18 @@ BUDGET_COLUMNS = [
 ]
 
 
+COMPONENTS = ["salary", "bonus", "rsu", "other"]
+
+
 def total_income(row) -> float:
-    return float(row["salary"]) + float(row["bonus"]) + float(row["other"])
+    return sum(float(row[c]) for c in COMPONENTS)
 
 
 def annual_income(income: pd.DataFrame) -> pd.DataFrame:
     """Collapse the monthly income rows to one row per (profile, year)."""
     if income.empty:
-        return pd.DataFrame(columns=["profile", "year", "salary", "bonus", "other"])
-    return income.groupby(["profile", "year"], as_index=False)[["salary", "bonus", "other"]].sum()
+        return pd.DataFrame(columns=["profile", "year", *COMPONENTS])
+    return income.groupby(["profile", "year"], as_index=False)[COMPONENTS].sum()
 
 
 def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None = None) -> pd.DataFrame:

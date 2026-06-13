@@ -41,10 +41,10 @@ def fake_data_dir(tmp_path, monkeypatch):
         "name: Partner\nbirth_year: 1998\nforward_increment_pct: 10\nwants_invest_pct: 6\n" + TARGET
     )
     (tmp_path / "income.csv").write_text(
-        "profile,year,month,salary,bonus,other\n"
-        "rv,2023,1,1107389,0,0\n"
-        "rv,2024,1,1425283,0,0\n"
-        "rv,2025,1,3571045,0,0\n"
+        "profile,year,month,salary,bonus,rsu,other\n"
+        "rv,2023,1,1107389,0,0,0\n"
+        "rv,2024,1,1425283,0,0,0\n"
+        "rv,2025,1,3571045,0,0,0\n"
     )
     (tmp_path / "contributions.csv").write_text(
         "year,profile,category,amount,notes\n"

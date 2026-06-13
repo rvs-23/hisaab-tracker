@@ -28,10 +28,10 @@ def income():
     for the math; compute aggregates monthly→yearly anyway."""
     return pd.DataFrame(
         [
-            {"profile": "rv", "year": 2023, "month": 1, "salary": 1107389, "bonus": 0, "other": 0},
-            {"profile": "rv", "year": 2024, "month": 1, "salary": 1425283, "bonus": 0, "other": 0},
-            {"profile": "rv", "year": 2025, "month": 1, "salary": 3571045, "bonus": 0, "other": 0},
-            {"profile": "rv", "year": 2026, "month": 1, "salary": 5076912, "bonus": 500000, "other": 0},
+            {"profile": "rv", "year": 2023, "month": 1, "salary": 1107389, "bonus": 0, "rsu": 0, "other": 0},
+            {"profile": "rv", "year": 2024, "month": 1, "salary": 1425283, "bonus": 0, "rsu": 0, "other": 0},
+            {"profile": "rv", "year": 2025, "month": 1, "salary": 3571045, "bonus": 0, "rsu": 0, "other": 0},
+            {"profile": "rv", "year": 2026, "month": 1, "salary": 5076912, "bonus": 500000, "rsu": 0, "other": 0},
         ]
     )
 
@@ -133,11 +133,17 @@ def test_bonus_counts_toward_income_split(rv, income):
 def test_monthly_rows_aggregate_to_yearly(rv):
     """12 monthly rows must sum to the same annual total as one lump row."""
     monthly = pd.DataFrame(
-        [{"profile": "rv", "year": 2024, "month": m, "salary": 100000, "bonus": 0, "other": 0}
+        [{"profile": "rv", "year": 2024, "month": m, "salary": 100000, "bonus": 0, "rsu": 0, "other": 0}
          for m in range(1, 13)]
     )
     bs = compute.budget_series(rv, monthly).set_index("year")
     assert bs.loc[2024, "total_income"] == 1200000
+
+
+def test_rsu_and_other_count_as_income(rv):
+    row = {"profile": "rv", "year": 2024, "month": 1, "salary": 1000000, "bonus": 100000, "rsu": 200000, "other": 50000}
+    bs = compute.budget_series(rv, pd.DataFrame([row])).set_index("year")
+    assert bs.loc[2024, "total_income"] == 1350000
 
 
 def test_household_sums_actuals_across_people(rv, income, targets, contributions):
