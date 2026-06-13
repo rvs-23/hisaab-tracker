@@ -91,7 +91,39 @@ def grays(n: int) -> list[str]:
     return GRAYS[:n] if n <= len(GRAYS) else GRAYS + GRAYS[: n - len(GRAYS)]
 
 
+def inject_theme() -> None:
+    """Load Inter (the modern-dashboard typeface) and a few polish tweaks. Runs
+    once per page via page_header."""
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+        html, body, .stApp, [class*="css"], button, input, textarea, select,
+        [data-testid="stMetricValue"], [data-testid="stDataFrame"] {
+            font-family: 'Inter', -apple-system, sans-serif !important;
+        }
+        h1, h2, h3 { letter-spacing: -0.01em; }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def metric_tile(col, label_text: str, value: str, sub: str = "", color: str = INK, big: bool = False) -> None:
+    """A bordered dashboard tile: small uppercase label, bold value, gray sub."""
+    size = "1.9rem" if big else "1.35rem"
+    col.markdown(
+        f"<div style='border:1px solid #eceff1;border-radius:12px;padding:14px 16px;"
+        f"background:#fff;height:100%'>"
+        f"<div style='font-size:.7rem;color:#8a8a8a;text-transform:uppercase;letter-spacing:.05em'>{label_text}</div>"
+        f"<div style='font-size:{size};font-weight:700;color:{color};margin-top:3px;line-height:1.1'>{value}</div>"
+        f"<div style='font-size:.76rem;color:#8a8a8a;margin-top:3px'>{sub}</div></div>",
+        unsafe_allow_html=True,
+    )
+
+
 def page_header(title: str, profiles) -> list[str]:
+    inject_theme()
     """Render the page title with a top-right multi-select View. Shared widget
     key, so the choice sticks across navigation. Returns the selected profile
     keys (empty selection is treated as everyone). When 2+ are selected, pages

@@ -4,7 +4,7 @@ import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    INK, MULBERRY, TEAL, inr, inr_short, load_all, page_header, pretty_category,
+    INK, MULBERRY, TEAL, inr, inr_short, load_all, metric_tile, page_header, pretty_category,
 )
 
 ON_TRACK = 75  # % of goal that counts a year as "on track"
@@ -28,18 +28,6 @@ def label(text):
     st.markdown(
         f"<div style='font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;"
         f"color:{GRAY};margin:.5rem 0 .1rem'>{text}</div>",
-        unsafe_allow_html=True,
-    )
-
-
-def card(col, lab, value, sub="", color=INK, big=False):
-    size = "2rem" if big else "1.4rem"
-    weight = 700 if big else 600
-    col.markdown(
-        f"<div style='line-height:1.25;margin-bottom:.3rem'>"
-        f"<div style='font-size:.72rem;color:{GRAY}'>{lab}</div>"
-        f"<div style='font-size:{size};font-weight:{weight};color:{color}'>{value}</div>"
-        f"<div style='font-size:.76rem;color:{GRAY}'>{sub}</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -68,8 +56,8 @@ if len(selected) > 1:
 for col, (name, profs) in zip(st.columns(len(entities)), entities):
     s = stats(profs)
     color = TEAL if s["progress"] >= ON_TRACK else MULBERRY
-    card(col, name, f"{s['progress']:.0f}%", f"{inr_short(s['invested'])} of {inr_short(s['target'])}",
-         color=color, big=True)
+    metric_tile(col, name, f"{s['progress']:.0f}%", f"{inr_short(s['invested'])} of {inr_short(s['target'])}",
+                color=color, big=True)
 
 # --- This year's numbers -----------------------------------------------------
 agg = stats(selected)
@@ -82,10 +70,10 @@ left = f"{agg['remaining'] / agg['target'] * 100:.0f}% of target left" if agg["t
 
 label(f"This year · {year}")
 c = st.columns(4)
-card(c[0], "Income", inr_short(inc_now), yoy)
-card(c[1], "Target", inr_short(agg["target"]), "to invest this year")
-card(c[2], "Still to go", inr_short(agg["remaining"]), left, color=MULBERRY)
-card(c[3], "Per month", inr_short(agg["target"] / 12), "see Monthly Plan")
+metric_tile(c[0], "Income", inr_short(inc_now), yoy)
+metric_tile(c[1], "Target", inr_short(agg["target"]), "to invest this year")
+metric_tile(c[2], "Still to go", inr_short(agg["remaining"]), left, color=MULBERRY)
+metric_tile(c[3], "Per month", inr_short(agg["target"] / 12), "see Monthly Plan")
 
 # --- Actual invested by year (the main graph) --------------------------------
 label("Actual invested by year")
@@ -130,18 +118,18 @@ if frames:
     agg_y["inv_g"] = agg_y["investment"].pct_change() * 100
     agg_y["rate"] = 100 * agg_y["investment"] / agg_y["total_income"]
     label("Year on year")
-    st.dataframe(
-        agg_y,
-        column_config={
-            "year": st.column_config.NumberColumn("Year", format="%d"),
-            "total_income": st.column_config.NumberColumn("Income (₹)", format="%.0f"),
-            "sal_g": st.column_config.NumberColumn("Income +%", format="%+.0f%%"),
-            "investment": st.column_config.NumberColumn("Investment (₹)", format="%.0f"),
-            "inv_g": st.column_config.NumberColumn("Investment +%", format="%+.0f%%"),
-            "rate": st.column_config.NumberColumn("Invest rate", format="%.0f%%"),
-        },
-        hide_index=True, width="stretch",
-    )
+    disp = pd.DataFrame({
+        "Year": agg_y["year"].astype(int).astype(str),
+        "Income": agg_y["total_income"].map(inr),
+        "Income +%": agg_y["sal_g"].map(lambda v: "—" if pd.isna(v) else f"{v:+.0f}%"),
+        "Investment": agg_y["investment"].map(inr),
+        "Investment +%": agg_y["inv_g"].map(lambda v: "—" if pd.isna(v) else f"{v:+.0f}%"),
+        "Invest rate": agg_y["rate"].map(lambda v: f"{v:.0f}%"),
+    })
+    sty = disp.style.set_properties(**{"text-align": "right"}).set_table_styles(
+        [{"selector": "th", "props": [("text-align", "right")]}]
+    ).hide(axis="index")
+    st.dataframe(sty, width="stretch", hide_index=True)
 
 # --- Notes, at the end -------------------------------------------------------
 hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
