@@ -2,7 +2,11 @@ import pandas as pd
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import MULBERRY, inr, inr_short, load_all, page_header
+from finance_tracker.ui import (
+    MULBERRY, inr, inr_short, load_all, page_header, pretty_category,
+)
+
+ON_TRACK = 75  # % of goal that counts a year as "on track"
 
 d = load_all()
 scope = page_header("Dashboard", d.profiles)
@@ -55,15 +59,43 @@ for col, (name, profs) in zip(cols, entities):
     col.metric(name, f"{s['progress']:.0f}%")
     col.caption(f"{inr_short(s['invested'])} of {inr_short(s['target'])}")
 
+# Years on track + the category we're most behind on, for the selection.
+hh_year = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
+on_track = sum(
+    1
+    for cy in contrib_years
+    if compute.pct_goal_achieved(
+        compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, cy)
+    )
+    >= ON_TRACK
+)
+bits = [f"On track: **{on_track} of {len(contrib_years)}** years ≥ {ON_TRACK}% of goal"]
+if not hh_year.empty:
+    worst = hh_year.loc[hh_year["shortfall"].idxmin()]
+    if worst["shortfall"] < 0:
+        bits.append(f"most behind: **{pretty_category(worst['category'])}** ({inr_short(worst['shortfall'])})")
+st.caption(" · ".join(bits))
+
 # This year's actionable numbers, for the whole selection.
 agg = stats(selected)
 invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
+ai = compute.annual_income(d.income)
+ai = ai[ai["profile"].isin(scope)]
+
+
+def income_for(yr):
+    return ai[ai["year"] == yr][["salary", "bonus", "other"]].sum().sum()
+
+
+inc_now, inc_prev = income_for(year), income_for(year - 1)
+yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else None
 
 st.subheader(f"This year · {year}")
-m = st.columns(3)
-m[0].metric("Target amount", inr_short(agg["target"]), help=f"Planned investment for {year} (target % × budget).")
-m[1].metric("Still to invest", inr_short(agg["remaining"]), help="Target minus what's gone in so far.")
-m[2].metric("Monthly target", inr_short(agg["target"] / 12), help="Target amount ÷ 12 — see the Monthly Plan page for the per-instrument split.")
+m = st.columns(4)
+m[0].metric("Income", inr_short(inc_now), delta=yoy, delta_color="off")
+m[1].metric("Target amount", inr_short(agg["target"]), help=f"Planned investment for {year} (target % × budget).")
+m[2].metric("Still to invest", inr_short(agg["remaining"]), help="Target minus what's gone in so far.")
+m[3].metric("Monthly target", inr_short(agg["target"] / 12), help="Target amount ÷ 12 — see the Monthly Plan page for the per-instrument split.")
 st.caption(
     f"Investing **{agg['rate']:.0f}%** of income this year · "
     f"**{inr(invested_to_date)}** invested to date across all years."

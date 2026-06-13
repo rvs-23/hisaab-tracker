@@ -51,6 +51,17 @@ def inr(n: float) -> str:
     return f"{sign}₹{s}"
 
 
+CATEGORY_LABELS = {
+    "us_market": "US market", "indian_stocks": "Indian stocks", "mfs": "Mutual funds",
+    "fixed_deposit": "Fixed deposit", "ppf_nps": "PPF / NPS",
+    "bonds_gsec_aif": "Bonds / Gsec / AIF", "gold_metals": "Gold / metals",
+}
+
+
+def pretty_category(c: str) -> str:
+    return CATEGORY_LABELS.get(c, c.replace("_", " ").capitalize())
+
+
 def inr_short(n: float) -> str:
     """Compact ₹ for metric cards — lakh/crore so big numbers fit at 100% zoom.
     ₹55,76,912 → ₹55.8L ; ₹3,40,00,000 → ₹3.40Cr ; small values stay grouped."""
