@@ -1,3 +1,4 @@
+import altair as alt
 import pandas as pd
 import streamlit as st
 
@@ -23,15 +24,22 @@ year = contrib_years[-1] if contrib_years else years[-1]
 names = {p.key: p.name for p in d.profiles}
 
 
-def card(col, label, value, sub="", color=INK, big=False, tip=""):
-    size = "2.1rem" if big else "1.55rem"
-    lab = f"<span title='{tip}'>{label} ⓘ</span>" if tip else label
+def label(text):
+    st.markdown(
+        f"<div style='font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;"
+        f"color:{GRAY};margin:.5rem 0 .1rem'>{text}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def card(col, lab, value, sub="", color=INK, big=False):
+    size = "2rem" if big else "1.4rem"
+    weight = 700 if big else 600
     col.markdown(
-        f"<div style='line-height:1.2;margin-bottom:.4rem'>"
-        f"<div style='font-size:.72rem;letter-spacing:.04em;text-transform:uppercase;color:{GRAY}'>{lab}</div>"
-        f"<div style='font-size:{size};font-weight:700;color:{color}'>{value}</div>"
-        f"<div style='font-size:.78rem;color:{GRAY}'>{sub}</div>"
-        f"</div>",
+        f"<div style='line-height:1.25;margin-bottom:.3rem'>"
+        f"<div style='font-size:.72rem;color:{GRAY}'>{lab}</div>"
+        f"<div style='font-size:{size};font-weight:{weight};color:{color}'>{value}</div>"
+        f"<div style='font-size:.76rem;color:{GRAY}'>{sub}</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -41,8 +49,7 @@ def stats(profiles):
     target, invested = pva["expected"].sum(), pva["actual"].sum()
     income_yr = invest_yr = 0.0
     for p in profiles:
-        bs = compute.budget_series(p, d.income)
-        row = bs[bs["year"] == year]
+        row = compute.budget_series(p, d.income).query("year == @year")
         if not row.empty:
             income_yr += row.iloc[0]["total_income"]
             invest_yr += row.iloc[0]["investment"]
@@ -53,8 +60,8 @@ def stats(profiles):
     }
 
 
-# Goal progress, one card per selected person, plus the household when both are in.
-st.markdown(f"##### Goal progress · {year}")
+# --- Goal progress, one card per selected person + household when both --------
+label(f"Goal progress · {year}")
 entities = [(p.name, [p]) for p in selected]
 if len(selected) > 1:
     entities.append(("Household", selected))
@@ -62,46 +69,26 @@ for col, (name, profs) in zip(st.columns(len(entities)), entities):
     s = stats(profs)
     color = TEAL if s["progress"] >= ON_TRACK else MULBERRY
     card(col, name, f"{s['progress']:.0f}%", f"{inr_short(s['invested'])} of {inr_short(s['target'])}",
-         color=color, big=True, tip="Share of this year's target actually invested. 100% is right on plan.")
+         color=color, big=True)
 
-# Headline footnote: consistency and the weakest spot.
-hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
-on_track = sum(
-    1 for cy in contrib_years
-    if compute.pct_goal_achieved(
-        compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, cy)
-    ) >= ON_TRACK
-)
-line = f"On track in **{on_track} of {len(contrib_years)}** years (75%+ of goal)."
-if not hh.empty:
-    worst = hh.loc[hh["shortfall"].idxmin()]
-    if worst["shortfall"] < 0:
-        line += f" Biggest gap right now: :violet[**{pretty_category(worst['category'])}**] ({inr_short(worst['shortfall'])})."
-st.markdown(line)
-
-st.divider()
-
-# This year's numbers for the whole selection.
+# --- This year's numbers -----------------------------------------------------
 agg = stats(selected)
 ai = compute.annual_income(d.income)
 ai = ai[ai["profile"].isin(scope)]
-inc_now = ai[ai["year"] == year][["salary", "bonus", "other"]].sum().sum()
-inc_prev = ai[ai["year"] == year - 1][["salary", "bonus", "other"]].sum().sum()
+inc_now = ai.query("year == @year")[compute.COMPONENTS].sum().sum()
+inc_prev = ai.query("year == @year - 1")[compute.COMPONENTS].sum().sum()
 yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else "first year"
 left = f"{agg['remaining'] / agg['target'] * 100:.0f}% of target left" if agg["target"] else ""
 
-st.markdown(f"##### This year · {year}")
+label(f"This year · {year}")
 c = st.columns(4)
 card(c[0], "Income", inr_short(inc_now), yoy)
-card(c[1], "Target", inr_short(agg["target"]), "to invest this year",
-     tip="Planned investment for the year (target % times budget).")
+card(c[1], "Target", inr_short(agg["target"]), "to invest this year")
 card(c[2], "Still to go", inr_short(agg["remaining"]), left, color=MULBERRY)
 card(c[3], "Per month", inr_short(agg["target"] / 12), "see Monthly Plan")
-invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
-st.caption(f"Investing **{agg['rate']:.0f}%** of income this year. **{inr(invested_to_date)}** invested so far, all years counted.")
 
-# Actual invested, year by year, a line per selected person (combined when both).
-st.markdown("##### Actual invested by year")
+# --- Actual invested by year (the main graph) --------------------------------
+label("Actual invested by year")
 contrib = d.contributions[d.contributions["profile"].isin(scope)]
 if contrib.empty:
     st.caption("Nothing recorded yet. Add contributions on the Plan vs Actual page.")
@@ -109,14 +96,72 @@ else:
     piv = contrib.groupby(["year", "profile"])["amount"].sum().unstack("profile").rename(columns=names)
     order = [p.name for p in selected if p.name in piv.columns]
     piv = piv[order]
-    accents = [TEAL, MULBERRY]
-    colors = [accents[i % 2] for i in range(len(order))]
     if len(order) > 1:
         piv["Combined"] = piv.sum(axis=1)
-        colors.append(INK)
-    st.line_chart(piv, color=colors if len(piv.columns) > 1 else colors[0])
-    st.caption("What actually went in each year. No projections here, only real money.")
+    long = piv.reset_index().melt("year", var_name="Who", value_name="amount").dropna()
+    series = order + (["Combined"] if len(order) > 1 else [])
+    palette = ([TEAL, MULBERRY] * 3)[: len(order)] + ([INK] if len(order) > 1 else [])
+    chart = (
+        alt.Chart(long)
+        .mark_line(point=True, strokeWidth=2.5)
+        .encode(
+            x=alt.X("year:O", title=None),
+            y=alt.Y("amount:Q", title="Invested (₹)", axis=alt.Axis(format="~s")),
+            color=alt.Color("Who:N", title=None,
+                            scale=alt.Scale(domain=series, range=palette),
+                            legend=alt.Legend(orient="top")),
+            tooltip=["year", "Who", alt.Tooltip("amount:Q", format=",.0f")],
+        )
+        .properties(height=300)
+        .configure_axis(grid=True, gridColor="#ececec")
+        .configure_view(strokeWidth=0)
+    )
+    st.altair_chart(chart, use_container_width=True)
 
+# --- Year on year: salary, investment, savings rate --------------------------
+frames = []
+for p in selected:
+    bs = compute.budget_series(p, d.income)
+    if not bs.empty:
+        frames.append(bs[~bs["is_projected"]][["year", "total_income", "investment"]])
+if frames:
+    agg_y = pd.concat(frames).groupby("year", as_index=False)[["total_income", "investment"]].sum().sort_values("year")
+    agg_y["sal_g"] = agg_y["total_income"].pct_change() * 100
+    agg_y["inv_g"] = agg_y["investment"].pct_change() * 100
+    agg_y["rate"] = 100 * agg_y["investment"] / agg_y["total_income"]
+    label("Year on year")
+    st.dataframe(
+        agg_y,
+        column_config={
+            "year": st.column_config.NumberColumn("Year", format="%d"),
+            "total_income": st.column_config.NumberColumn("Income (₹)", format="%.0f"),
+            "sal_g": st.column_config.NumberColumn("Income +%", format="%+.0f%%"),
+            "investment": st.column_config.NumberColumn("Investment (₹)", format="%.0f"),
+            "inv_g": st.column_config.NumberColumn("Investment +%", format="%+.0f%%"),
+            "rate": st.column_config.NumberColumn("Invest rate", format="%.0f%%"),
+        },
+        hide_index=True, width="stretch",
+    )
+
+# --- Notes, at the end -------------------------------------------------------
+hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
+on_track = sum(
+    1 for cy in contrib_years
+    if compute.pct_goal_achieved(
+        compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, cy)
+    ) >= ON_TRACK
+)
+notes = [f"On track in {on_track} of {len(contrib_years)} years (75%+ of goal)."]
+if not hh.empty:
+    worst = hh.loc[hh["shortfall"].idxmin()]
+    if worst["shortfall"] < 0:
+        notes.append(f"Biggest gap right now is {pretty_category(worst['category'])} ({inr_short(worst['shortfall'])}).")
 goals = d.goals[(d.goals["year"] == year) & (d.goals["profile"].isin(scope))]
 if not goals.empty:
-    st.caption(f"Emergency fund goal for {year}: {inr(goals['emergency_fund_goal'].sum())}")
+    notes.append(f"Emergency fund goal for {year} is {inr(goals['emergency_fund_goal'].sum())}.")
+invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
+notes.append(f"Investing {agg['rate']:.0f}% of income this year, {inr(invested_to_date)} in so far across all years.")
+
+label("Notes")
+for n in notes:
+    st.caption(n)
