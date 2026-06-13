@@ -1,14 +1,15 @@
-import altair as alt
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    INK, MULBERRY, TEAL, inr, inr_short, load_all, metric_tile, page_header, pretty_category,
+    INK, MULBERRY, TEAL, inr, inr_short, load_all, metric_tile, page_header,
+    pretty_category, style_fig,
 )
 
-ON_TRACK = 75  # % of goal that counts a year as "on track"
-GRAY = "#8a8a8a"
+ON_TRACK = 75
+SAND = "#dfe4e8"  # neutral bar for income
 
 d = load_all()
 scope = page_header("Dashboard", d.profiles)
@@ -21,135 +22,105 @@ if not years:
 
 contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
 year = contrib_years[-1] if contrib_years else years[-1]
-names = {p.key: p.name for p in d.profiles}
 
-
-def label(text):
-    st.markdown(
-        f"<div style='font-size:.75rem;text-transform:uppercase;letter-spacing:.05em;"
-        f"color:{GRAY};margin:.5rem 0 .1rem'>{text}</div>",
-        unsafe_allow_html=True,
-    )
-
-
-def stats(profiles):
-    pva = compute.household_plan_vs_actual(profiles, d.income, d.targets, d.contributions, year)
-    target, invested = pva["expected"].sum(), pva["actual"].sum()
-    income_yr = invest_yr = 0.0
-    for p in profiles:
-        row = compute.budget_series(p, d.income).query("year == @year")
-        if not row.empty:
-            income_yr += row.iloc[0]["total_income"]
-            invest_yr += row.iloc[0]["investment"]
-    return {
-        "target": target, "invested": invested, "remaining": max(target - invested, 0.0),
-        "progress": compute.pct_goal_achieved(pva) if not pva.empty else 0.0,
-        "rate": 100 * invest_yr / income_yr if income_yr else 0.0,
-    }
-
-
-# --- Goal progress, one card per selected person + household when both --------
-label(f"Goal progress · {year}")
-entities = [(p.name, [p]) for p in selected]
-if len(selected) > 1:
-    entities.append(("Household", selected))
-for col, (name, profs) in zip(st.columns(len(entities)), entities):
-    s = stats(profs)
-    color = TEAL if s["progress"] >= ON_TRACK else MULBERRY
-    metric_tile(col, name, f"{s['progress']:.0f}%", f"{inr_short(s['invested'])} of {inr_short(s['target'])}",
-                color=color, big=True)
-
-# --- This year's numbers -----------------------------------------------------
-agg = stats(selected)
-ai = compute.annual_income(d.income)
-ai = ai[ai["profile"].isin(scope)]
-inc_now = ai.query("year == @year")[compute.COMPONENTS].sum().sum()
-inc_prev = ai.query("year == @year - 1")[compute.COMPONENTS].sum().sum()
-yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else "first year"
-left = f"{agg['remaining'] / agg['target'] * 100:.0f}% of target left" if agg["target"] else ""
-
-label(f"This year · {year}")
-c = st.columns(4)
-metric_tile(c[0], "Income", inr_short(inc_now), yoy)
-metric_tile(c[1], "Target", inr_short(agg["target"]), "to invest this year")
-metric_tile(c[2], "Still to go", inr_short(agg["remaining"]), left, color=MULBERRY)
-metric_tile(c[3], "Per month", inr_short(agg["target"] / 12), "see Monthly Plan")
-
-# --- Actual invested by year (the main graph) --------------------------------
-label("Actual invested by year")
-contrib = d.contributions[d.contributions["profile"].isin(scope)]
-if contrib.empty:
-    st.caption("Nothing recorded yet. Add contributions on the Plan vs Actual page.")
-else:
-    piv = contrib.groupby(["year", "profile"])["amount"].sum().unstack("profile").rename(columns=names)
-    order = [p.name for p in selected if p.name in piv.columns]
-    piv = piv[order]
-    if len(order) > 1:
-        piv["Combined"] = piv.sum(axis=1)
-    long = piv.reset_index().melt("year", var_name="Who", value_name="amount").dropna()
-    series = order + (["Combined"] if len(order) > 1 else [])
-    palette = ([TEAL, MULBERRY] * 3)[: len(order)] + ([INK] if len(order) > 1 else [])
-    chart = (
-        alt.Chart(long)
-        .mark_line(point=True, strokeWidth=2.5)
-        .encode(
-            x=alt.X("year:O", title=None),
-            y=alt.Y("amount:Q", title="Invested (₹)", axis=alt.Axis(format="~s")),
-            color=alt.Color("Who:N", title=None,
-                            scale=alt.Scale(domain=series, range=palette),
-                            legend=alt.Legend(orient="top")),
-            tooltip=["year", "Who", alt.Tooltip("amount:Q", format=",.0f")],
-        )
-        .properties(height=300)
-        .configure_axis(grid=True, gridColor="#ececec")
-        .configure_view(strokeWidth=0)
-    )
-    st.altair_chart(chart, use_container_width=True)
-
-# --- Year on year: salary, investment, savings rate --------------------------
-frames = []
-for p in selected:
-    bs = compute.budget_series(p, d.income)
-    if not bs.empty:
-        frames.append(bs[~bs["is_projected"]][["year", "total_income", "investment"]])
-if frames:
-    agg_y = pd.concat(frames).groupby("year", as_index=False)[["total_income", "investment"]].sum().sort_values("year")
-    agg_y["sal_g"] = agg_y["total_income"].pct_change() * 100
-    agg_y["inv_g"] = agg_y["investment"].pct_change() * 100
-    agg_y["rate"] = 100 * agg_y["investment"] / agg_y["total_income"]
-    label("Year on year")
-    disp = pd.DataFrame({
-        "Year": agg_y["year"].astype(int).astype(str),
-        "Income": agg_y["total_income"].map(inr),
-        "Income +%": agg_y["sal_g"].map(lambda v: "—" if pd.isna(v) else f"{v:+.0f}%"),
-        "Investment": agg_y["investment"].map(inr),
-        "Investment +%": agg_y["inv_g"].map(lambda v: "—" if pd.isna(v) else f"{v:+.0f}%"),
-        "Invest rate": agg_y["rate"].map(lambda v: f"{v:.0f}%"),
-    })
-    sty = disp.style.set_properties(**{"text-align": "right"}).set_table_styles(
-        [{"selector": "th", "props": [("text-align", "right")]}]
-    ).hide(axis="index")
-    st.dataframe(sty, width="stretch", hide_index=True)
-
-# --- Notes, at the end -------------------------------------------------------
+# --- numbers -----------------------------------------------------------------
 hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
+target, invested = hh["expected"].sum(), hh["actual"].sum()
+progress = compute.pct_goal_achieved(hh) if not hh.empty else 0.0
+
+frames = [
+    compute.budget_series(p, d.income).query("is_projected == False")[["year", "total_income", "investment"]]
+    for p in selected
+    if not compute.budget_series(p, d.income).empty
+]
+trend = (
+    pd.concat(frames).groupby("year", as_index=False)[["total_income", "investment"]].sum().sort_values("year")
+    if frames else pd.DataFrame(columns=["year", "total_income", "investment"])
+)
+inc_now = float(trend.loc[trend["year"] == year, "total_income"].sum())
+inc_prev = float(trend.loc[trend["year"] == year - 1, "total_income"].sum())
+yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else "first year"
+rate_now = 100 * trend.loc[trend["year"] == year, "investment"].sum() / inc_now if inc_now else 0.0
+invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
 on_track = sum(
     1 for cy in contrib_years
     if compute.pct_goal_achieved(
         compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, cy)
     ) >= ON_TRACK
 )
-notes = [f"On track in {on_track} of {len(contrib_years)} years (75%+ of goal)."]
+
+# --- KPI strip: 8 tiles, two rows of four ------------------------------------
+st.markdown(f"<div style='color:#8a8a8a;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em'>Snapshot · {year}</div>", unsafe_allow_html=True)
+r1 = st.columns(4)
+metric_tile(r1[0], "Goal progress", f"{progress:.0f}%", "of this year's target",
+            color=TEAL if progress >= ON_TRACK else MULBERRY, big=True)
+metric_tile(r1[1], "Invested", inr_short(invested), "actual, this year", big=True)
+metric_tile(r1[2], "Target", inr_short(target), "planned for the year", big=True)
+metric_tile(r1[3], "Still to go", inr_short(max(target - invested, 0)), "to hit the target",
+            color=MULBERRY, big=True)
+r2 = st.columns(4)
+metric_tile(r2[0], "Income", inr_short(inc_now), yoy)
+metric_tile(r2[1], "Savings rate", f"{rate_now:.0f}%", "of income invested")
+metric_tile(r2[2], "Invested to date", inr_short(invested_to_date), "all years")
+metric_tile(r2[3], "Years on track", f"{on_track} / {len(contrib_years)}", f"{ON_TRACK}%+ of goal")
+
+st.write("")
+
+# --- two charts --------------------------------------------------------------
+g1, g2 = st.columns(2)
+
+with g1:
+    if trend.empty:
+        st.caption("Add income to see the trajectory.")
+    else:
+        yr = trend["year"].astype(int).astype(str)
+        rate = (100 * trend["investment"] / trend["total_income"]).round(0)
+        f = go.Figure()
+        f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND)
+        f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=TEAL)
+        f.add_trace(go.Scatter(
+            x=yr, y=rate, name="Invest rate", yaxis="y2", mode="lines+markers",
+            line=dict(color=MULBERRY, width=3), marker=dict(size=8),
+        ))
+        f.update_layout(
+            barmode="group", title="Earning more, investing a bigger slice",
+            yaxis=dict(tickprefix="₹", tickformat="~s"),
+            yaxis2=dict(overlaying="y", side="right", range=[0, 100], ticksuffix="%", showgrid=False),
+        )
+        style_fig(f)
+        st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+
+with g2:
+    if hh.empty:
+        st.caption("Add contributions to see where you stand against plan.")
+    else:
+        gap = hh.sort_values("shortfall")
+        cats = [pretty_category(c) for c in gap["category"]]
+        colors = [TEAL if s >= 0 else MULBERRY for s in gap["shortfall"]]
+        f = go.Figure(go.Bar(
+            y=cats, x=gap["shortfall"], orientation="h", marker_color=colors,
+            hovertemplate="%{y}: ₹%{x:,.0f}<extra></extra>",
+        ))
+        f.update_layout(title=f"Ahead and behind, by bucket · {year}",
+                        xaxis=dict(tickprefix="₹", tickformat="~s"))
+        style_fig(f)
+        f.update_xaxes(showgrid=True, gridcolor="#eef1f3")
+        f.update_yaxes(showgrid=False)
+        st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+
+# --- a few takeaways ---------------------------------------------------------
+bullets = [f"On track in **{on_track} of {len(contrib_years)}** years (75%+ of goal)."]
 if not hh.empty:
     worst = hh.loc[hh["shortfall"].idxmin()]
     if worst["shortfall"] < 0:
-        notes.append(f"Biggest gap right now is {pretty_category(worst['category'])} ({inr_short(worst['shortfall'])}).")
-goals = d.goals[(d.goals["year"] == year) & (d.goals["profile"].isin(scope))]
-if not goals.empty:
-    notes.append(f"Emergency fund goal for {year} is {inr(goals['emergency_fund_goal'].sum())}.")
-invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
-notes.append(f"Investing {agg['rate']:.0f}% of income this year, {inr(invested_to_date)} in so far across all years.")
+        bullets.append(f"Biggest gap right now: **{pretty_category(worst['category'])}**, {inr_short(-worst['shortfall'])} behind.")
+    else:
+        bullets.append("Every bucket is at or above plan this year. 🎯")
+if len(trend) > 1:
+    first = trend.iloc[0]
+    f_rate = 100 * first["investment"] / first["total_income"] if first["total_income"] else 0
+    bullets.append(f"Savings rate up from **{f_rate:.0f}%** in {int(first['year'])} to **{rate_now:.0f}%** now.")
 
-label("Notes")
-for n in notes:
-    st.caption(n)
+st.write("")
+for b in bullets:
+    st.markdown(f"<div style='color:#444;margin:.1rem 0'>• {b}</div>", unsafe_allow_html=True)

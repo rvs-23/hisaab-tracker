@@ -122,6 +122,22 @@ def metric_tile(col, label_text: str, value: str, sub: str = "", color: str = IN
     )
 
 
+def style_fig(fig, height: int = 320):
+    """Clean, Power-BI-ish Plotly styling: Inter font, no chrome, soft grid."""
+    fig.update_layout(
+        font=dict(family="Inter, sans-serif", size=13, color=INK),
+        paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
+        margin=dict(l=8, r=8, t=46, b=8), height=height,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, title=None),
+        hoverlabel=dict(font_family="Inter", bgcolor="white"),
+        title=dict(font=dict(size=14, color="#5a5a5a"), x=0, xanchor="left", y=0.97),
+        bargap=0.35,
+    )
+    fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
+    fig.update_yaxes(showgrid=True, gridcolor="#eef1f3", zeroline=False, showline=False)
+    return fig
+
+
 def page_header(title: str, profiles) -> list[str]:
     inject_theme()
     """Render the page title with a top-right multi-select View. Shared widget
