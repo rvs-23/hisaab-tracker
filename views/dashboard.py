@@ -58,6 +58,7 @@ metric_tile(r1[1], "Invested", inr_short(invested), "actual, this year", big=Tru
 metric_tile(r1[2], "Target", inr_short(target), "planned for the year", big=True)
 metric_tile(r1[3], "Still to go", inr_short(max(target - invested, 0)), "to hit the target",
             color=MULBERRY, big=True)
+st.markdown("<div style='height:.7rem'></div>", unsafe_allow_html=True)
 r2 = st.columns(4)
 metric_tile(r2[0], "Income", inr_short(inc_now), yoy)
 metric_tile(r2[1], "Savings rate", f"{rate_now:.0f}%", "of income invested")
@@ -109,18 +110,22 @@ with g2:
         st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
 
 # --- a few takeaways ---------------------------------------------------------
-bullets = [f"On track in **{on_track} of {len(contrib_years)}** years (75%+ of goal)."]
+bullets = [f"On track in <b>{on_track} of {len(contrib_years)}</b> years (75%+ of goal)."]
 if not hh.empty:
     worst = hh.loc[hh["shortfall"].idxmin()]
     if worst["shortfall"] < 0:
-        bullets.append(f"Biggest gap right now: **{pretty_category(worst['category'])}**, {inr_short(-worst['shortfall'])} behind.")
+        bullets.append(f"Biggest gap right now: <b>{pretty_category(worst['category'])}</b>, {inr_short(-worst['shortfall'])} behind.")
     else:
-        bullets.append("Every bucket is at or above plan this year. 🎯")
+        bullets.append("Every bucket is at or above plan this year.")
 if len(trend) > 1:
     first = trend.iloc[0]
     f_rate = 100 * first["investment"] / first["total_income"] if first["total_income"] else 0
-    bullets.append(f"Savings rate up from **{f_rate:.0f}%** in {int(first['year'])} to **{rate_now:.0f}%** now.")
+    bullets.append(f"Savings rate up from <b>{f_rate:.0f}%</b> in {int(first['year'])} to <b>{rate_now:.0f}%</b> now.")
 
-st.write("")
-for b in bullets:
-    st.markdown(f"<div style='color:#444;margin:.1rem 0'>• {b}</div>", unsafe_allow_html=True)
+items = "".join(f"<li style='margin:.2rem 0'>{b}</li>" for b in bullets)
+st.markdown(
+    f"<div style='margin-top:1.5rem'>"
+    f"<div style='color:#8a8a8a;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem'>Takeaways</div>"
+    f"<ul style='color:#444;margin:0;padding-left:1.1rem'>{items}</ul></div>",
+    unsafe_allow_html=True,
+)
