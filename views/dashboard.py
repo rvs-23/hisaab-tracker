@@ -84,13 +84,20 @@ with g1:
     else:
         yr = trend["year"].astype(int).astype(str)
         rate = (100 * trend["investment"] / trend["total_income"]).round(0)
+        inc_g = trend["total_income"].pct_change() * 100
+        inv_g = trend["investment"].pct_change() * 100
+        inc_text = ["" if pd.isna(v) else f"{v:+.0f}%" for v in inc_g]
+        inv_text = ["" if pd.isna(v) else f"{v:+.0f}%" for v in inv_g]
         f = go.Figure()
-        f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND)
-        f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=TEAL)
+        f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND,
+                  text=inc_text, textposition="outside", textfont=dict(size=10, color="#9aa0a6"))
+        f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=TEAL,
+                  text=inv_text, textposition="outside", textfont=dict(size=10, color=TEAL))
         f.add_trace(go.Scatter(
             x=yr, y=rate, name="Invest rate", yaxis="y2", mode="lines+markers",
             line=dict(color=MULBERRY, width=3), marker=dict(size=8),
         ))
+        f.update_traces(cliponaxis=False, selector=dict(type="bar"))
         f.update_layout(
             barmode="group",
             yaxis=dict(tickprefix="₹", tickformat="~s"),
@@ -99,12 +106,22 @@ with g1:
         style_fig(f)
         st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
 
+# Cumulative plan vs actual across every year we have contributions for.
+cum_parts = [
+    compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, cy)
+    for cy in contrib_years
+]
+cum = (
+    pd.concat(cum_parts).groupby("category", as_index=False)[["expected", "actual", "shortfall"]].sum()
+    if cum_parts else pd.DataFrame(columns=["category", "expected", "actual", "shortfall"])
+)
+
 with g2:
-    chart_title(f"Ahead and behind, by bucket · {year}")
-    if hh.empty:
+    chart_title("Ahead and behind, by bucket (all years)")
+    if cum.empty:
         st.caption("Add contributions to see where you stand against plan.")
     else:
-        gap = hh.sort_values("shortfall")
+        gap = cum.sort_values("shortfall")
         cats = [pretty_category(c) for c in gap["category"]]
         colors = [TEAL if s >= 0 else MULBERRY for s in gap["shortfall"]]
         f = go.Figure(go.Bar(
@@ -119,12 +136,12 @@ with g2:
 
 # --- a few takeaways ---------------------------------------------------------
 bullets = [f"On track in <b>{on_track} of {len(contrib_years)}</b> years (75%+ of goal)."]
-if not hh.empty:
-    worst = hh.loc[hh["shortfall"].idxmin()]
+if not cum.empty:
+    worst = cum.loc[cum["shortfall"].idxmin()]
     if worst["shortfall"] < 0:
-        bullets.append(f"Biggest gap right now: <b>{pretty_category(worst['category'])}</b>, {inr_short(-worst['shortfall'])} behind.")
+        bullets.append(f"Biggest gap so far: <b>{pretty_category(worst['category'])}</b>, {inr_short(-worst['shortfall'])} behind across all years.")
     else:
-        bullets.append("Every bucket is at or above plan this year.")
+        bullets.append("Every bucket is at or above plan so far.")
 if len(trend) > 1:
     first = trend.iloc[0]
     f_rate = 100 * first["investment"] / first["total_income"] if first["total_income"] else 0
