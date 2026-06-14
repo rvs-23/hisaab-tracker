@@ -70,7 +70,15 @@ st.write("")
 # --- two charts --------------------------------------------------------------
 g1, g2 = st.columns(2)
 
+def chart_title(text):
+    st.markdown(
+        f"<div style='font-weight:600;font-size:.92rem;color:#3a3a3a;margin:.2rem 0 -.2rem'>{text}</div>",
+        unsafe_allow_html=True,
+    )
+
+
 with g1:
+    chart_title("Earning more, investing a bigger slice")
     if trend.empty:
         st.caption("Add income to see the trajectory.")
     else:
@@ -84,7 +92,7 @@ with g1:
             line=dict(color=MULBERRY, width=3), marker=dict(size=8),
         ))
         f.update_layout(
-            barmode="group", title="Earning more, investing a bigger slice",
+            barmode="group",
             yaxis=dict(tickprefix="₹", tickformat="~s"),
             yaxis2=dict(overlaying="y", side="right", range=[0, 100], ticksuffix="%", showgrid=False),
         )
@@ -92,6 +100,7 @@ with g1:
         st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
 
 with g2:
+    chart_title(f"Ahead and behind, by bucket · {year}")
     if hh.empty:
         st.caption("Add contributions to see where you stand against plan.")
     else:
@@ -102,8 +111,7 @@ with g2:
             y=cats, x=gap["shortfall"], orientation="h", marker_color=colors,
             hovertemplate="%{y}: ₹%{x:,.0f}<extra></extra>",
         ))
-        f.update_layout(title=f"Ahead and behind, by bucket · {year}",
-                        xaxis=dict(tickprefix="₹", tickformat="~s"))
+        f.update_layout(xaxis=dict(tickprefix="₹", tickformat="~s"))
         style_fig(f)
         f.update_xaxes(showgrid=True, gridcolor="#eef1f3")
         f.update_yaxes(showgrid=False)

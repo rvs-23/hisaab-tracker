@@ -127,10 +127,9 @@ def style_fig(fig, height: int = 320):
     fig.update_layout(
         font=dict(family="Inter, sans-serif", size=13, color=INK),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        margin=dict(l=8, r=8, t=46, b=8), height=height,
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, x=0, title=None),
+        margin=dict(l=8, r=8, t=34, b=8), height=height,
+        legend=dict(orientation="h", yanchor="bottom", y=1.04, x=0, title=None),
         hoverlabel=dict(font_family="Inter", bgcolor="white"),
-        title=dict(font=dict(size=14, color="#5a5a5a"), x=0, xanchor="left", y=0.97),
         bargap=0.35,
     )
     fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
