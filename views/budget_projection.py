@@ -77,7 +77,7 @@ for profile in (p for p in d.profiles if p.key in scope):
                     title=None)
     style_fig(f, height=300)
     st.markdown("<div style='font-weight:600;font-size:.92rem;color:#3a3a3a;margin:.4rem 0 .4rem'>The investment slice, year by year</div>", unsafe_allow_html=True)
-    st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
     with st.expander("Full detail (all years + projections)"):
         table = bs.drop(columns=["invested_this_year"]).rename(columns=HEADERS)

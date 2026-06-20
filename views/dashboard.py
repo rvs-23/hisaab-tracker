@@ -96,7 +96,7 @@ with g1:
         f.update_layout(barmode="group", yaxis=dict(tickprefix="₹", tickformat="~s"),
                         yaxis2=dict(overlaying="y", side="right", range=[0, 100], ticksuffix="%", showgrid=False))
         style_fig(f)
-        st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 with g2:
     chart_title(f"Plan vs actual, by bucket · {year}")
@@ -112,7 +112,7 @@ with g2:
         style_fig(f)
         f.update_xaxes(showgrid=True, gridcolor="#eef1f3")
         f.update_yaxes(showgrid=False)
-        st.plotly_chart(f, use_container_width=True, config={"displayModeBar": False})
+        st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 # --- takeaways (year-specific, never empty) ----------------------------------
 bullets = []
