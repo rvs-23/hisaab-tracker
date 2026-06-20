@@ -5,7 +5,7 @@ import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    MULBERRY, TEAL, grid_color, inr_short, load_all, metric_tile, page_header, style_fig,
+    MULBERRY, TEAL, html_table, inr_short, load_all, metric_tile, page_header, style_fig,
 )
 
 NEEDS = "#b9c0c7"
@@ -28,21 +28,22 @@ yc, _ = st.columns([1, 5])
 year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
 
 HEADERS = {
-    "year": "Year", "age": "Age", "total_income": "Income (₹)",
-    "needs": "Needs (₹)", "wants": "Wants (₹)", "investment": "Investment (₹)",
-    "monthly_needs": "Needs /mo", "monthly_wants": "Wants /mo",
-    "monthly_investment": "Invest /mo", "cumulative_invested": "Cumulative invested",
+    "year": "Year", "age": "Age", "total_income": "Income", "needs": "Needs",
+    "wants": "Wants", "investment": "Investment", "monthly_needs": "Needs /mo",
+    "monthly_wants": "Wants /mo", "monthly_investment": "Invest /mo",
+    "cumulative_invested": "Cumulative",
 }
 MONEY = ["total_income", "needs", "wants", "investment", "monthly_needs",
          "monthly_wants", "monthly_investment", "cumulative_invested"]
+FMT = {c: (lambda v: f"{v:,.0f}") for c in MONEY}
+FMT["year"] = lambda v: f"{int(v)}"
+FMT["age"] = lambda v: f"{int(v)}"
 
 
-def style_row(row):
-    if row["is_projected"]:
-        return [f"color: {MULBERRY}; font-style: italic"] * len(row)
-    if row["Year"] == CURRENT_YEAR:
-        return ["background-color: #E0EFED; font-weight: 600"] * len(row)
-    return [""] * len(row)
+def row_class(r):
+    if r["is_projected"]:
+        return "proj"
+    return "cur" if int(r["year"]) == CURRENT_YEAR else ""
 
 
 # People with data first, so an empty placeholder profile doesn't sit on top.
@@ -85,10 +86,5 @@ for profile in visible:
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
     with st.expander("Full detail (all years + projections)"):
-        table = bs.drop(columns=["invested_this_year"]).rename(columns=HEADERS)
-        styled = (
-            table.style.apply(style_row, axis=1)
-            .format({HEADERS[c]: "{:,.0f}" for c in MONEY})
-            .hide(axis="index")
-        )
-        st.dataframe(styled, width="stretch", column_config={"is_projected": None})
+        st.caption("Current year highlighted; projected years in muted italics.")
+        html_table(bs, HEADERS, formats=FMT, row_class=row_class)

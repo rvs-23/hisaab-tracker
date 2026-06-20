@@ -126,9 +126,36 @@ def inject_theme() -> None:
         f":root{{{_VARS[dark]}}}"
         f"html, body, .stApp, [class*='css'], button, input, textarea, select "
         f"{{font-family:'Inter',-apple-system,sans-serif !important;}}"
-        f"h1,h2,h3{{letter-spacing:-0.01em;}}{base}</style>",
+        f"h1,h2,h3{{letter-spacing:-0.01em;}}"
+        # themed read-only table (dark-aware via the variables above)
+        f".ht{{border-collapse:collapse;width:100%;font-size:.84rem}}"
+        f".ht th{{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--card-border)}}"
+        f".ht td{{text-align:right;padding:6px 10px;border-bottom:1px solid var(--card-border);color:var(--text)}}"
+        f".ht th:first-child,.ht td:first-child{{text-align:left}}"
+        f".ht tr.cur td{{background:var(--strip-bg);font-weight:600}}"
+        f".ht tr.proj td{{color:var(--muted);font-style:italic}}"
+        f"{base}</style>",
         unsafe_allow_html=True,
     )
+
+
+def sidebar_dark_toggle() -> None:
+    """One global dark-mode toggle, rendered once at the top of the sidebar."""
+    st.sidebar.toggle("🌙 Dark mode", key="dark_mode")
+
+
+def html_table(df, headers: dict, formats: dict | None = None, row_class=None) -> None:
+    """Render a read-only DataFrame as a themed HTML table that respects dark
+    mode (st.dataframe is canvas-rendered and can't be themed by CSS)."""
+    formats = formats or {}
+    head = "".join(f"<th>{h}</th>" for h in headers.values())
+    body = ""
+    for _, r in df.iterrows():
+        cls = row_class(r) if row_class else ""
+        cells = "".join(f"<td>{formats.get(c, str)(r[c])}</td>" for c in headers)
+        body += f"<tr class='{cls}'>{cells}</tr>"
+    st.markdown(f"<table class='ht'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>",
+                unsafe_allow_html=True)
 
 
 def metric_tile(col, label_text: str, value: str, sub: str = "", color: str | None = None, big: bool = False) -> None:
@@ -167,10 +194,9 @@ def page_header(title: str, profiles) -> list[str]:
     """Title, a top-right View multiselect, and a dark-mode toggle. Returns the
     selected profile keys (empty selection means everyone)."""
     inject_theme()
-    left, mid, right = st.columns([5, 2, 1.2], vertical_alignment="bottom")
+    left, right = st.columns([3, 1], vertical_alignment="bottom")
     left.title(title)
-    right.toggle("Dark", key="dark_mode")
     names = [p.name for p in profiles]
-    selected = mid.multiselect("View", names, default=names, key="scope")
+    selected = right.multiselect("View", names, default=names, key="scope")
     keys = [p.key for p in profiles if p.name in selected]
     return keys or [p.key for p in profiles]
