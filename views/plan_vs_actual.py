@@ -3,8 +3,8 @@ import streamlit as st
 
 from finance_tracker import compute, storage
 from finance_tracker.ui import (
-    MULBERRY, TEAL, grid_color, html_table, inr, inr_short, load_all, metric_tile,
-    page_header, pretty_category, style_fig,
+    MULBERRY, ON_TRACK_PCT, TEAL, grid_color, html_table, inr, inr_short, load_all,
+    metric_tile, page_header, pretty_category, style_fig,
 )
 
 d = load_all()
@@ -30,7 +30,7 @@ if pva.empty:
 
 cols = st.columns(3)
 metric_tile(cols[0], "Goal achieved", f"{compute.pct_goal_achieved(pva):.0f}%", f"of {year}'s plan",
-            color=TEAL if compute.pct_goal_achieved(pva) >= 75 else MULBERRY, big=True)
+            color=TEAL if compute.pct_goal_achieved(pva) >= ON_TRACK_PCT else MULBERRY, big=True)
 if not goal_rows.empty:
     metric_tile(cols[1], "Emergency-fund goal", inr_short(goal_rows["emergency_fund_goal"].sum()), f"for {year}", big=True)
 st.write("")

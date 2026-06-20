@@ -19,6 +19,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
+from finance_tracker.config import INCOME_COMPONENTS
 from finance_tracker.models import Config, Profile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -26,8 +27,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 # Income drives everything; the budget split is derived (see compute.py).
 # Entered monthly (month 1–12); compute aggregates to yearly. "other" catches
 # anything that isn't salary/bonus/RSU, e.g. an FD or RD maturing.
-INCOME_COLUMNS = ["profile", "year", "month", "salary", "bonus", "rsu", "other"]
-INCOME_COMPONENTS = ["salary", "bonus", "rsu", "other"]
+INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
 TARGETS_COLUMNS = ["profile", "year", "tier", "category", "pct"]

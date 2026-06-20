@@ -23,11 +23,10 @@ import datetime as dt
 
 import pandas as pd
 
+from finance_tracker.config import (
+    BASE_SPLIT, INCOME_COMPONENTS, INCREMENT_SPLIT, PROJECTION_YEARS_AHEAD,
+)
 from finance_tracker.models import Profile
-
-BASE_SPLIT = {"needs": 50, "wants": 30, "investment": 20}        # anchor-year split
-INCREMENT_SPLIT = {"needs": 20, "wants": 30, "investment": 50}   # split of each raise
-PROJECTION_YEARS_AHEAD = 3  # budget extends to current year + 3
 
 BUDGET_COLUMNS = [
     "year", "age", "total_income", "needs", "wants", "investment",
@@ -36,18 +35,16 @@ BUDGET_COLUMNS = [
 ]
 
 
-COMPONENTS = ["salary", "bonus", "rsu", "other"]
-
-
 def total_income(row) -> float:
-    return sum(float(row[c]) for c in COMPONENTS)
+    """Sums a row's income components (salary + bonus + rsu + other)."""
+    return sum(float(row[c]) for c in INCOME_COMPONENTS)
 
 
 def annual_income(income: pd.DataFrame) -> pd.DataFrame:
-    """Collapse the monthly income rows to one row per (profile, year)."""
+    """Collapses the monthly income rows to one row per (profile, year)."""
     if income.empty:
-        return pd.DataFrame(columns=["profile", "year", *COMPONENTS])
-    return income.groupby(["profile", "year"], as_index=False)[COMPONENTS].sum()
+        return pd.DataFrame(columns=["profile", "year", *INCOME_COMPONENTS])
+    return income.groupby(["profile", "year"], as_index=False)[INCOME_COMPONENTS].sum()
 
 
 def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None = None) -> pd.DataFrame:

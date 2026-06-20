@@ -5,10 +5,9 @@ import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    MULBERRY, TEAL, html_table, inr_short, load_all, metric_tile, page_header, style_fig,
+    MULBERRY, NEEDS, TEAL, html_table, inr_short, load_all, metric_tile, page_header, style_fig,
 )
 
-NEEDS = "#b9c0c7"
 CURRENT_YEAR = dt.date.today().year
 
 d = load_all()

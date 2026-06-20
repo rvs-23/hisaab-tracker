@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from finance_tracker import storage
+from finance_tracker.config import INCOME_COMPONENTS as COMPONENTS
 from finance_tracker.ui import MULBERRY, TEAL, inr_short, load_all, page_header, style_fig
 
 d = load_all()
@@ -12,7 +13,6 @@ scope = page_header("Income", d.profiles)
 selected = [p for p in d.profiles if p.key in scope]
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-COMPONENTS = ["salary", "bonus", "rsu", "other"]
 names = {p.key: p.name for p in d.profiles}
 ss = st.session_state
 
