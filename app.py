@@ -2,12 +2,11 @@ from pathlib import Path
 
 import streamlit as st
 
-from finance_tracker.ui import dark_toggle_button, inject_theme
+from finance_tracker.ui import inject_theme
 
 st.set_page_config(page_title="CBSE Finances", page_icon=":material/savings:", layout="wide")
 st.logo(str(Path(__file__).parent / "assets" / "logo.svg"), size="large")
-inject_theme()
-dark_toggle_button()  # one global dark-mode icon, pinned top-right
+inject_theme()  # font + theme-aware variables; dark mode via ☰ → Settings → Theme
 
 # Nav reads as the money pipeline: in -> split -> destination -> monthly action -> verdict.
 st.navigation(

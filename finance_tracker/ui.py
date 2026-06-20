@@ -92,66 +92,47 @@ def grays(n: int) -> list[str]:
 
 
 def is_dark() -> bool:
-    return bool(st.session_state.get("dark_mode", False))
+    """Follow Streamlit's native theme (☰ → Settings → Theme). Letting Streamlit
+    own the theme is the only flicker-free way; our custom HTML just reads it."""
+    try:
+        return st.context.theme.type == "dark"
+    except Exception:
+        return False
 
 
 def grid_color() -> str:
-    return "#2a2f3a" if is_dark() else "#eef1f3"
+    return "#3a3f4b" if is_dark() else "#eef1f3"
 
 
+# Colors for our custom HTML, chosen to sit on Streamlit's native light/dark
+# surfaces. Streamlit themes its own widgets, tables and background natively.
 _VARS = {
-    False: ("--text:#1f1f1f;--muted:#8a8a8a;--card-bg:#ffffff;--card-border:#eceff1;"
+    False: ("--text:#1f1f1f;--muted:#7c828c;--card-bg:#ffffff;--card-border:#e7eaee;"
             "--strip-bg:#f3faf9;--strip-border:#d4e7e4;--strip-text:#0F766E;"),
-    True: ("--text:#e8e8ea;--muted:#9aa0a6;--card-bg:#191d24;--card-border:#2a2f3a;"
+    True: ("--text:#fafafa;--muted:#a3a8b4;--card-bg:#1b1f2b;--card-border:#363b48;"
            "--strip-bg:#10211f;--strip-border:#1f3d39;--strip-text:#5eead4;"),
 }
 
-_DARK_BASE = """
-.stApp{background:#0e1117;}
-section[data-testid="stSidebar"]{background:#11151c;}
-.stApp, .stApp p, .stApp span, .stApp label, .stApp li, h1,h2,h3,h4,h5,h6{color:#e8e8ea;}
-[data-testid="stHeader"]{background:transparent;}
-[data-baseweb="select"]>div, [data-baseweb="input"]>div, [data-baseweb="popover"] ul{background:#191d24;}
-"""
-
 
 def inject_theme() -> None:
-    """Inter font + CSS variables for light/dark. Runs once per page via
-    page_header; custom components read the variables so dark mode is one flip."""
-    dark = is_dark()
-    base = _DARK_BASE if dark else ""
+    """Inter font + CSS variables that track Streamlit's native theme. No
+    background/widget overrides (those caused the flicker); Streamlit owns those."""
     st.markdown(
         f"<style>"
         f"@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');"
-        f":root{{{_VARS[dark]}}}"
+        f":root{{{_VARS[is_dark()]}}}"
         f"html, body, .stApp, [class*='css'], button, input, textarea, select "
         f"{{font-family:'Inter',-apple-system,sans-serif !important;}}"
         f"h1,h2,h3{{letter-spacing:-0.01em;}}"
-        # themed read-only table (dark-aware via the variables above)
         f".ht{{border-collapse:collapse;width:100%;font-size:.84rem}}"
         f".ht th{{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--card-border)}}"
         f".ht td{{text-align:right;padding:6px 10px;border-bottom:1px solid var(--card-border);color:var(--text)}}"
         f".ht th:first-child,.ht td:first-child{{text-align:left}}"
         f".ht tr.cur td{{background:var(--strip-bg);font-weight:600}}"
         f".ht tr.proj td{{color:var(--muted);font-style:italic}}"
-        # dark-mode icon button, pinned to the top-right header
-        f".st-key-dark_toggle{{position:fixed;top:.5rem;right:5.4rem;z-index:1000000}}"
-        f".st-key-dark_toggle button{{min-height:0;height:2.3rem;width:2.3rem;border-radius:50%;"
-        f"padding:0;border:1px solid var(--card-border);background:var(--card-bg)}}"
-        f".st-key-dark_toggle button p{{font-size:1.1rem}}"
-        f"{base}</style>",
+        f"</style>",
         unsafe_allow_html=True,
     )
-
-
-def _toggle_dark() -> None:
-    st.session_state["dark_mode"] = not st.session_state.get("dark_mode", False)
-
-
-def dark_toggle_button() -> None:
-    """One global dark-mode toggle, an icon pinned to the top-right header."""
-    st.button("☀️" if is_dark() else "🌙", key="dark_toggle",
-              help="Toggle dark mode", on_click=_toggle_dark)
 
 
 def html_table(df, headers: dict, formats: dict | None = None, row_class=None) -> None:
