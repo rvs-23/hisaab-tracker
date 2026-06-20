@@ -4,7 +4,9 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from finance_tracker import compute
-from finance_tracker.ui import INK, MULBERRY, TEAL, inr_short, load_all, metric_tile, page_header, style_fig
+from finance_tracker.ui import (
+    MULBERRY, TEAL, grid_color, inr_short, load_all, metric_tile, page_header, style_fig,
+)
 
 NEEDS = "#b9c0c7"
 CURRENT_YEAR = dt.date.today().year
@@ -43,11 +45,14 @@ def style_row(row):
     return [""] * len(row)
 
 
-for profile in (p for p in d.profiles if p.key in scope):
+# People with data first, so an empty placeholder profile doesn't sit on top.
+visible = sorted((p for p in d.profiles if p.key in scope),
+                 key=lambda p: compute.budget_series(p, d.income).empty)
+for profile in visible:
     bs = compute.budget_series(profile, d.income)
     st.subheader(profile.name)
     if bs.empty:
-        st.info(f"No income for {profile.name} yet. Add it on the Income page.")
+        st.caption(f"No income for {profile.name} yet. Add it on the Income page.")
         continue
 
     # This year's split.
@@ -56,7 +61,7 @@ for profile in (p for p in d.profiles if p.key in scope):
         r = row.iloc[0]
         pct = compute.split_pct(r)
         cols = st.columns(3)
-        metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", color=INK, big=True)
+        metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
         metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=MULBERRY, big=True)
         metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=TEAL, big=True)
 
@@ -76,7 +81,7 @@ for profile in (p for p in d.profiles if p.key in scope):
     f.update_layout(barmode="stack", yaxis=dict(ticksuffix="%", range=[0, 100]),
                     title=None)
     style_fig(f, height=300)
-    st.markdown("<div style='font-weight:600;font-size:.92rem;color:#3a3a3a;margin:.4rem 0 .4rem'>The investment slice, year by year</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.4rem 0 .4rem'>The investment slice, year by year</div>", unsafe_allow_html=True)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
     with st.expander("Full detail (all years + projections)"):

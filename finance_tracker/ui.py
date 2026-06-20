@@ -91,61 +91,86 @@ def grays(n: int) -> list[str]:
     return GRAYS[:n] if n <= len(GRAYS) else GRAYS + GRAYS[: n - len(GRAYS)]
 
 
+def is_dark() -> bool:
+    return bool(st.session_state.get("dark_mode", False))
+
+
+def grid_color() -> str:
+    return "#2a2f3a" if is_dark() else "#eef1f3"
+
+
+_VARS = {
+    False: ("--text:#1f1f1f;--muted:#8a8a8a;--card-bg:#ffffff;--card-border:#eceff1;"
+            "--strip-bg:#f3faf9;--strip-border:#d4e7e4;--strip-text:#0F766E;"),
+    True: ("--text:#e8e8ea;--muted:#9aa0a6;--card-bg:#191d24;--card-border:#2a2f3a;"
+           "--strip-bg:#10211f;--strip-border:#1f3d39;--strip-text:#5eead4;"),
+}
+
+_DARK_BASE = """
+.stApp{background:#0e1117;}
+section[data-testid="stSidebar"]{background:#11151c;}
+.stApp, .stApp p, .stApp span, .stApp label, .stApp li, h1,h2,h3,h4,h5,h6{color:#e8e8ea;}
+[data-testid="stHeader"]{background:transparent;}
+[data-baseweb="select"]>div, [data-baseweb="input"]>div, [data-baseweb="popover"] ul{background:#191d24;}
+"""
+
+
 def inject_theme() -> None:
-    """Load Inter (the modern-dashboard typeface) and a few polish tweaks. Runs
-    once per page via page_header."""
+    """Inter font + CSS variables for light/dark. Runs once per page via
+    page_header; custom components read the variables so dark mode is one flip."""
+    dark = is_dark()
+    base = _DARK_BASE if dark else ""
     st.markdown(
-        """
-        <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-        html, body, .stApp, [class*="css"], button, input, textarea, select,
-        [data-testid="stMetricValue"], [data-testid="stDataFrame"] {
-            font-family: 'Inter', -apple-system, sans-serif !important;
-        }
-        h1, h2, h3 { letter-spacing: -0.01em; }
-        </style>
-        """,
+        f"<style>"
+        f"@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');"
+        f":root{{{_VARS[dark]}}}"
+        f"html, body, .stApp, [class*='css'], button, input, textarea, select "
+        f"{{font-family:'Inter',-apple-system,sans-serif !important;}}"
+        f"h1,h2,h3{{letter-spacing:-0.01em;}}{base}</style>",
         unsafe_allow_html=True,
     )
 
 
-def metric_tile(col, label_text: str, value: str, sub: str = "", color: str = INK, big: bool = False) -> None:
-    """A bordered dashboard tile: small uppercase label, bold value, gray sub."""
+def metric_tile(col, label_text: str, value: str, sub: str = "", color: str | None = None, big: bool = False) -> None:
+    """A bordered dashboard tile: small uppercase label, bold value, muted sub.
+    Themes via CSS variables; pass color only for an accent value (teal/mulberry)."""
     size = "1.9rem" if big else "1.35rem"
+    value_color = color or "var(--text)"
     col.markdown(
-        f"<div style='border:1px solid #eceff1;border-radius:12px;padding:14px 16px;"
-        f"background:#fff;height:100%'>"
-        f"<div style='font-size:.7rem;color:#8a8a8a;text-transform:uppercase;letter-spacing:.05em'>{label_text}</div>"
-        f"<div style='font-size:{size};font-weight:700;color:{color};margin-top:3px;line-height:1.1'>{value}</div>"
-        f"<div style='font-size:.76rem;color:#8a8a8a;margin-top:3px'>{sub}</div></div>",
+        f"<div style='border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;"
+        f"background:var(--card-bg);height:100%'>"
+        f"<div style='font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>{label_text}</div>"
+        f"<div style='font-size:{size};font-weight:700;color:{value_color};margin-top:3px;line-height:1.1'>{value}</div>"
+        f"<div style='font-size:.76rem;color:var(--muted);margin-top:3px'>{sub}</div></div>",
         unsafe_allow_html=True,
     )
 
 
 def style_fig(fig, height: int = 320):
     """Clean, Power-BI-ish Plotly styling: Inter font, no chrome, soft grid."""
+    dark = is_dark()
+    text = "#cfd3da" if dark else INK
     fig.update_layout(
-        font=dict(family="Inter, sans-serif", size=13, color=INK),
+        font=dict(family="Inter, sans-serif", size=13, color=text),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=8, r=8, t=34, b=8), height=height,
         legend=dict(orientation="h", yanchor="bottom", y=1.04, x=0, title=None),
-        hoverlabel=dict(font_family="Inter", bgcolor="white"),
+        hoverlabel=dict(font_family="Inter", bgcolor="#191d24" if dark else "white"),
         bargap=0.35,
     )
     fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
-    fig.update_yaxes(showgrid=True, gridcolor="#eef1f3", zeroline=False, showline=False)
+    fig.update_yaxes(showgrid=True, gridcolor=grid_color(), zeroline=False, showline=False)
     return fig
 
 
 def page_header(title: str, profiles) -> list[str]:
+    """Title, a top-right View multiselect, and a dark-mode toggle. Returns the
+    selected profile keys (empty selection means everyone)."""
     inject_theme()
-    """Render the page title with a top-right multi-select View. Shared widget
-    key, so the choice sticks across navigation. Returns the selected profile
-    keys (empty selection is treated as everyone). When 2+ are selected, pages
-    also show a combined total."""
-    left, right = st.columns([3, 1], vertical_alignment="bottom")
+    left, mid, right = st.columns([5, 2, 1.2], vertical_alignment="bottom")
     left.title(title)
+    right.toggle("Dark", key="dark_mode")
     names = [p.name for p in profiles]
-    selected = right.multiselect("View", names, default=names, key="scope")
+    selected = mid.multiselect("View", names, default=names, key="scope")
     keys = [p.key for p in profiles if p.name in selected]
     return keys or [p.key for p in profiles]

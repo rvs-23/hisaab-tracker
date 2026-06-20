@@ -6,7 +6,8 @@ import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    MULBERRY, TEAL, inr_short, load_all, metric_tile, page_header, pretty_category, style_fig,
+    MULBERRY, TEAL, grid_color, inr_short, load_all, metric_tile, page_header,
+    pretty_category, style_fig,
 )
 
 ON_TRACK = 75
@@ -52,7 +53,7 @@ inc_now, inc_prev = tv("total_income", year), tv("total_income", year - 1)
 yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else "first year"
 rate = 100 * tv("investment", year) / inc_now if inc_now else 0.0
 
-st.markdown(f"<div style='color:#8a8a8a;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em'>Snapshot · {year}</div>", unsafe_allow_html=True)
+st.markdown(f"<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em'>Snapshot · {year}</div>", unsafe_allow_html=True)
 c = st.columns(3)
 metric_tile(c[0], "Goal progress", f"{progress:.0f}%", f"{inr_short(invested)} of {inr_short(target)}",
             color=TEAL if progress >= ON_TRACK else MULBERRY, big=True)
@@ -62,17 +63,17 @@ metric_tile(c[2], "Savings rate", f"{rate:.0f}%", "of income invested", big=True
 # --- all-time, set apart -----------------------------------------------------
 invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
 st.markdown(
-    f"<div style='border:1px solid #d4e7e4;background:#f3faf9;border-radius:12px;padding:11px 18px;"
+    f"<div style='border:1px solid var(--strip-border);background:var(--strip-bg);border-radius:12px;padding:11px 18px;"
     f"margin-top:.6rem;display:flex;justify-content:space-between;align-items:center'>"
-    f"<div style='color:#0F766E;font-size:.72rem;text-transform:uppercase;letter-spacing:.05em'>All time · invested to date</div>"
-    f"<div style='font-size:1.4rem;font-weight:700;color:#0F766E'>{inr_short(invested_to_date)}</div></div>",
+    f"<div style='color:var(--strip-text);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em'>All time · invested to date</div>"
+    f"<div style='font-size:1.4rem;font-weight:700;color:var(--strip-text)'>{inr_short(invested_to_date)}</div></div>",
     unsafe_allow_html=True,
 )
 st.write("")
 
 
 def chart_title(text):
-    st.markdown(f"<div style='font-weight:600;font-size:.92rem;color:#3a3a3a;margin:.2rem 0 .6rem'>{text}</div>",
+    st.markdown(f"<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.2rem 0 .6rem'>{text}</div>",
                 unsafe_allow_html=True)
 
 
@@ -110,7 +111,7 @@ with g2:
         f.add_bar(y=cats, x=gp["actual"], name="Actual", orientation="h", marker_color=TEAL)
         f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
         style_fig(f)
-        f.update_xaxes(showgrid=True, gridcolor="#eef1f3")
+        f.update_xaxes(showgrid=True, gridcolor=grid_color())
         f.update_yaxes(showgrid=False)
         st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
@@ -134,7 +135,7 @@ else:
 items = "".join(f"<li style='margin:.2rem 0'>{b}</li>" for b in bullets)
 st.markdown(
     f"<div style='margin-top:1.2rem'>"
-    f"<div style='color:#8a8a8a;font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem'>Takeaways · {year}</div>"
-    f"<ul style='color:#444;margin:0;padding-left:1.1rem'>{items}</ul></div>",
+    f"<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem'>Takeaways · {year}</div>"
+    f"<ul style='color:var(--text);margin:0;padding-left:1.1rem'>{items}</ul></div>",
     unsafe_allow_html=True,
 )
