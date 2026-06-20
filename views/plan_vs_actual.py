@@ -1,7 +1,11 @@
+import plotly.graph_objects as go
 import streamlit as st
 
 from finance_tracker import compute, storage
-from finance_tracker.ui import MULBERRY, TEAL, inr, load_all, page_header
+from finance_tracker.ui import (
+    MULBERRY, TEAL, grid_color, html_table, inr, inr_short, load_all, metric_tile,
+    page_header, pretty_category, style_fig,
+)
 
 d = load_all()
 scope = page_header("Plan vs Actual", d.profiles)
@@ -24,26 +28,32 @@ if pva.empty:
     st.info("No plan for this selection/year yet.")
     st.stop()
 
-cols = st.columns(2)
-cols[0].metric("Goal achieved", f"{compute.pct_goal_achieved(pva):.1f}%")
+cols = st.columns(3)
+metric_tile(cols[0], "Goal achieved", f"{compute.pct_goal_achieved(pva):.0f}%", f"of {year}'s plan",
+            color=TEAL if compute.pct_goal_achieved(pva) >= 75 else MULBERRY, big=True)
 if not goal_rows.empty:
-    cols[1].metric("Emergency-fund goal", inr(goal_rows["emergency_fund_goal"].sum()))
+    metric_tile(cols[1], "Emergency-fund goal", inr_short(goal_rows["emergency_fund_goal"].sum()), f"for {year}", big=True)
+st.write("")
 
-st.dataframe(
-    pva.sort_values("expected", ascending=False),
-    column_config={
-        "category": "Category",
-        "expected": st.column_config.NumberColumn("Planned (₹)", format="%.0f"),
-        "actual": st.column_config.NumberColumn("Actual (₹)", format="%.0f"),
-        "shortfall": st.column_config.NumberColumn("Shortfall / surplus (₹)", format="%.0f"),
-    },
-    hide_index=True, width="stretch",
+ordered = pva.sort_values("expected", ascending=False)
+html_table(
+    ordered,
+    {"category": "Category", "expected": "Planned", "actual": "Actual", "shortfall": "Shortfall / surplus"},
+    formats={"category": pretty_category, "expected": inr_short, "actual": inr_short, "shortfall": inr_short},
 )
+st.write("")
 
-chart = pva.set_index("category")[["expected", "actual"]].rename(
-    columns={"expected": "Planned", "actual": "Actual"}
-)
-st.bar_chart(chart, color=[MULBERRY, TEAL], horizontal=True)
+asc = pva.sort_values("expected")
+f = go.Figure()
+f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], name="Planned",
+          orientation="h", marker_color=MULBERRY)
+f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name="Actual",
+          orientation="h", marker_color=TEAL)
+f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
+style_fig(f)
+f.update_xaxes(showgrid=True, gridcolor=grid_color())
+f.update_yaxes(showgrid=False)
+st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 # --- edit-in-place: the actuals this page is built on -----------------------
 

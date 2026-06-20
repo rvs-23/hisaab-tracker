@@ -134,14 +134,24 @@ def inject_theme() -> None:
         f".ht th:first-child,.ht td:first-child{{text-align:left}}"
         f".ht tr.cur td{{background:var(--strip-bg);font-weight:600}}"
         f".ht tr.proj td{{color:var(--muted);font-style:italic}}"
+        # dark-mode icon button, pinned to the top-right header
+        f".st-key-dark_toggle{{position:fixed;top:.5rem;right:5.4rem;z-index:1000000}}"
+        f".st-key-dark_toggle button{{min-height:0;height:2.3rem;width:2.3rem;border-radius:50%;"
+        f"padding:0;border:1px solid var(--card-border);background:var(--card-bg)}}"
+        f".st-key-dark_toggle button p{{font-size:1.1rem}}"
         f"{base}</style>",
         unsafe_allow_html=True,
     )
 
 
-def sidebar_dark_toggle() -> None:
-    """One global dark-mode toggle, rendered once at the top of the sidebar."""
-    st.sidebar.toggle("🌙 Dark mode", key="dark_mode")
+def _toggle_dark() -> None:
+    st.session_state["dark_mode"] = not st.session_state.get("dark_mode", False)
+
+
+def dark_toggle_button() -> None:
+    """One global dark-mode toggle, an icon pinned to the top-right header."""
+    st.button("☀️" if is_dark() else "🌙", key="dark_toggle",
+              help="Toggle dark mode", on_click=_toggle_dark)
 
 
 def html_table(df, headers: dict, formats: dict | None = None, row_class=None) -> None:

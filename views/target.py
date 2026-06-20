@@ -4,7 +4,7 @@ import pandas as pd
 import streamlit as st
 
 from finance_tracker import compute, storage
-from finance_tracker.ui import inr, load_all, page_header
+from finance_tracker.ui import html_table, inr, inr_short, load_all, page_header, pretty_category
 
 d = load_all()
 scope = page_header("Target", d.profiles)
@@ -30,15 +30,14 @@ for profile in (p for p in d.profiles if p.key in scope):
             rows.append({"tier": label, "category": cat, "pct": pct})
     in_force = pd.DataFrame(rows)
     in_force["yearly"] = [expected.get(r.category, 0.0) for r in in_force.itertuples()]
-    st.dataframe(
+    html_table(
         in_force,
-        column_config={
-            "tier": "Tier",
-            "category": "Category",
-            "pct": st.column_config.NumberColumn("Target %", format="%.0f%%"),
-            "yearly": st.column_config.NumberColumn("≈ This year (₹)", format="%.0f"),
+        {"tier": "Tier", "category": "Category", "pct": "Target %", "yearly": "≈ This year"},
+        formats={
+            "category": pretty_category,
+            "pct": lambda v: f"{v:.0f}%",
+            "yearly": inr_short,
         },
-        hide_index=True, width="stretch",
     )
     st.caption(f"Total planned this year: {inr(sum(expected.values()))}")
 

@@ -1,10 +1,11 @@
 import datetime as dt
 
 import pandas as pd
+import plotly.graph_objects as go
 import streamlit as st
 
 from finance_tracker import storage
-from finance_tracker.ui import MULBERRY, TEAL, inr_short, load_all, page_header
+from finance_tracker.ui import MULBERRY, TEAL, inr_short, load_all, page_header, style_fig
 
 d = load_all()
 scope = page_header("Income", d.profiles)
@@ -22,9 +23,14 @@ if not visible.empty:
         visible.assign(total=visible[COMPONENTS].sum(axis=1))
         .groupby(["year", "profile"])["total"].sum().unstack("profile").rename(columns=names)
     )
-    by_year.index = by_year.index.astype(int).astype(str)  # discrete year labels, no decimals
-    colors = [TEAL, MULBERRY][: by_year.shape[1]]
-    st.bar_chart(by_year, color=colors if by_year.shape[1] > 1 else TEAL, stack=True)
+    yr = by_year.index.astype(int).astype(str)
+    accents = [TEAL, MULBERRY]
+    f = go.Figure()
+    for i, col in enumerate(by_year.columns):
+        f.add_bar(x=yr, y=by_year[col], name=col, marker_color=accents[i % 2])
+    f.update_layout(barmode="stack", yaxis=dict(tickprefix="₹", tickformat="~s"))
+    style_fig(f, height=280)
+    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 st.divider()
 st.caption("Fill the 12 months for a year. Salary, bonus, RSU, and anything else like an FD or RD maturing.")
@@ -100,7 +106,7 @@ for profile in selected:
         except Exception as exc:
             st.error(f"Not saved: {exc}")
     b3.markdown(
-        f"<div style='padding-top:.4rem;color:#8a8a8a'>{filled} of 12 months entered &nbsp;·&nbsp; "
-        f"<b>{inr_short(total)}</b> for {year} ({delta})</div>",
+        f"<div style='padding-top:.4rem;color:var(--muted)'>{filled} of 12 months entered &nbsp;·&nbsp; "
+        f"<b style='color:var(--text)'>{inr_short(total)}</b> for {year} ({delta})</div>",
         unsafe_allow_html=True,
     )
