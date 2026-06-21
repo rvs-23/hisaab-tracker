@@ -30,8 +30,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
-TARGETS_COLUMNS = ["profile", "year", "tier", "category", "pct"]
-TIERS = {"short_term", "long_term"}
+TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
 
 
 def data_dir() -> Path:
@@ -63,12 +62,11 @@ def load_profiles(root: Path, config: Config) -> list[Profile]:
     for file in files:
         with open(file) as f:
             profile = Profile(key=file.stem, **yaml.safe_load(f))
-        for tier in (profile.default_target.short_term, profile.default_target.long_term):
-            unknown = set(tier) - set(config.categories)
-            if unknown:
-                raise ValueError(
-                    f"{file.name}: default_target uses categories not in config.yaml: {sorted(unknown)}"
-                )
+        unknown = set(profile.default_target) - set(config.categories)
+        if unknown:
+            raise ValueError(
+                f"{file.name}: default_target uses categories not in config.yaml: {sorted(unknown)}"
+            )
         profiles.append(profile)
     return profiles
 
@@ -89,18 +87,13 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
     if df.empty:
         return
     _check_profiles(df, profiles, "targets.csv")
-    bad_tier = set(df["tier"].dropna()) - TIERS
-    if bad_tier:
-        raise ValueError(f"targets.csv has unknown tiers: {sorted(bad_tier)} (use short_term/long_term)")
     bad_cat = set(df["category"].dropna()) - set(config.categories)
     if bad_cat:
         raise ValueError(f"targets.csv uses categories not in config.yaml: {sorted(bad_cat)}")
-    for (profile, year, tier), g in df.groupby(["profile", "year", "tier"]):
+    for (profile, year), g in df.groupby(["profile", "year"]):
         total = g["pct"].sum()
         if abs(total - 100) > 0.01:
-            raise ValueError(
-                f"targets.csv {profile} {int(year)} {tier}: pct must sum to 100, got {total}"
-            )
+            raise ValueError(f"targets.csv {profile} {int(year)}: pct must sum to 100, got {total}")
 
 
 # --- income ---------------------------------------------------------------
@@ -168,7 +161,7 @@ def save_goals(root: Path, df: pd.DataFrame) -> None:
 
 
 def save_targets(root: Path, df: pd.DataFrame) -> None:
-    df.sort_values(["profile", "year", "tier", "category"]).to_csv(root / "targets.csv", index=False)
+    df.sort_values(["profile", "year", "category"]).to_csv(root / "targets.csv", index=False)
 
 
 # --- helpers --------------------------------------------------------------

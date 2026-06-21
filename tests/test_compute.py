@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 
 from finance_tracker import compute, storage
-from finance_tracker.models import Profile, Target
+from finance_tracker.models import Profile
 from finance_tracker.ui import inr
 
 TODAY = dt.date(2026, 6, 12)
@@ -13,12 +13,9 @@ TODAY = dt.date(2026, 6, 12)
 @pytest.fixture
 def rv():
     return Profile(
-        key="rv", name="Rv", birth_year=1998, forward_increment_pct=5, wants_invest_pct=6,
-        default_target=Target(
-            short_term={"fixed_deposit": 50, "mfs": 30, "us_market": 10, "indian_stocks": 10},
-            long_term={"mfs": 45, "gold_metals": 25, "indian_stocks": 14,
-                       "us_market": 10, "ppf_nps": 5, "bonds_gsec_aif": 1},
-        ),
+        key="rv", name="Rv", birth_year=1998, forward_increment_pct=5,
+        default_target={"mfs": 45, "gold_metals": 25, "indian_stocks": 14,
+                        "us_market": 10, "ppf_nps": 5, "bonds_gsec_aif": 1},
     )
 
 
@@ -79,49 +76,42 @@ def test_budget_projects_to_current_plus_three(rv, income):
 
 
 def test_targets_carry_forward(rv, income):
-    """A 2025 override applies to 2026+ until replaced; missing tier falls back."""
+    """A 2025 override applies to 2026+ until replaced; earlier years use default."""
     override = pd.DataFrame(
-        [{"profile": "rv", "year": 2025, "tier": "long_term", "category": "mfs", "pct": 100}]
+        [{"profile": "rv", "year": 2025, "category": "mfs", "pct": 100}]
     )
-    t2026 = compute.resolve_target(rv, override, 2026)
-    assert t2026["long_term"] == {"mfs": 100}
-    assert t2026["short_term"] == rv.default_target.short_term  # tier fallback
-    t2024 = compute.resolve_target(rv, override, 2024)  # before the override
-    assert t2024["long_term"] == rv.default_target.long_term
+    assert compute.resolve_target(rv, override, 2026) == {"mfs": 100}
+    assert compute.resolve_target(rv, override, 2024) == rv.default_target  # before the override
 
 
-def test_expected_reproduces_source_sheet(rv, income, targets):
+def test_expected_is_investment_times_target(rv, income, targets):
+    """The goal is the year's investment amount split by the target allocation."""
+    bs = compute.budget_series(rv, income).set_index("year")
+    investment = bs.loc[2024, "investment"]  # 380424
     exp = compute.expected_contributions(rv, income, targets, 2024)
-    sheet = {
-        "us_market": 40608.0, "indian_stocks": 55825.0, "mfs": 178887.7,
-        "fixed_deposit": 12827.5, "ppf_nps": 19021.2, "bonds_gsec_aif": 3804.2,
-        "gold_metals": 95106.2,
-    }
-    for cat, want in sheet.items():
-        assert exp[cat] == pytest.approx(want, abs=1.0), cat
+    for cat, pct in rv.default_target.items():
+        assert exp[cat] == pytest.approx(investment * pct / 100, abs=1.0), cat
+    assert sum(exp.values()) == pytest.approx(investment, abs=1.0)  # 100% of investment
 
 
 def test_pct_goal_achieved_matches_sheet(rv, income, targets, contributions):
     pva = compute.plan_vs_actual(rv, income, targets, contributions, 2024)
-    assert compute.pct_goal_achieved(pva) == pytest.approx(76.78, abs=0.05)
+    assert compute.pct_goal_achieved(pva) == pytest.approx(81.96, abs=0.05)
 
 
 def test_per_year_target_override_changes_expected(rv, income, contributions):
-    override = pd.DataFrame(
-        [
-            {"profile": "rv", "year": 2024, "tier": "long_term", "category": "mfs", "pct": 100},
-            {"profile": "rv", "year": 2024, "tier": "short_term", "category": "mfs", "pct": 100},
-        ]
-    )
+    override = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 100}])
     exp = compute.expected_contributions(rv, income, override, 2024)
-    assert exp.get("us_market", 0) == 0
-    assert "mfs" in exp and exp["mfs"] > 0
+    assert exp.get("us_market", 0) == 0  # everything now lands in mfs
+    assert exp["mfs"] == pytest.approx(380424, abs=2)  # the whole 2024 investment
 
 
 def test_plan_vs_actual_shortfall(rv, income, targets, contributions):
     pva = compute.plan_vs_actual(rv, income, targets, contributions, 2024).set_index("category")
-    assert pva.loc["us_market", "shortfall"] == pytest.approx(-1262.5, abs=1.0)
-    assert pva.loc["indian_stocks", "shortfall"] == pytest.approx(39253.0, abs=1.0)
+    # us_market: actual 39345.5 - expected 38042.5 = +1303 (surplus)
+    assert pva.loc["us_market", "shortfall"] == pytest.approx(1303.0, abs=1.0)
+    # indian_stocks: 95078 - 53259.5 = +41818.5
+    assert pva.loc["indian_stocks", "shortfall"] == pytest.approx(41818.5, abs=1.0)
 
 
 def test_bonus_counts_toward_income_split(rv, income):
@@ -156,7 +146,7 @@ def test_job_change_and_yoy_surface_in_budget(rv, income):
 
 def test_household_sums_actuals_across_people(rv, income, targets, contributions):
     bob = Profile(
-        key="bob", name="Bob", birth_year=1990, forward_increment_pct=5, wants_invest_pct=0,
+        key="bob", name="Bob", birth_year=1990, forward_increment_pct=5,
         default_target=rv.default_target,
     )
     income2 = pd.concat([income, income.assign(profile="bob")], ignore_index=True)

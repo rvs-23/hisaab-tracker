@@ -8,11 +8,10 @@ workbook) is fixed:
   - Every year after, last year's rupee amounts carry forward and only the
     *increment* in income splits 20/30/50 — so more of each raise is invested.
 
-Then, for contributions tracking:
+Then, for contributions tracking, the goal is that year's investment amount
+split across instruments by the target allocation:
 
-  expected[category] = investment_pool × long_term%  +  wants_pool × short_term%
-      investment_pool = that year's investment amount
-      wants_pool      = that year's wants amount × wants_invest_pct
+  expected[category] = investment × target%[category]
 
 "actual" comes from contributions.csv; the gap is the shortfall.
 """
@@ -126,50 +125,35 @@ def split_pct(row) -> dict[str, float]:
     return {k: 100 * row[k] / total for k in ("needs", "wants", "investment")}
 
 
-def resolve_target(profile: Profile, targets: pd.DataFrame, year: int) -> dict[str, dict[str, float]]:
-    """The allocation in force for a person/year. Target rows carry forward: the
-    most recent override year ≤ the asked year wins; with no override yet, the
-    profile's default_target applies. A tier missing from the override falls
-    back to the default for that tier."""
-    default = {
-        "short_term": dict(profile.default_target.short_term),
-        "long_term": dict(profile.default_target.long_term),
-    }
-    if targets.empty:
-        return default
-    mine = targets[(targets["profile"] == profile.key) & (targets["year"] <= year)]
-    if mine.empty:
-        return default
-    rows = mine[mine["year"] == mine["year"].max()]
-    out: dict[str, dict[str, float]] = {"short_term": {}, "long_term": {}}
-    for _, r in rows.iterrows():
-        out[r["tier"]][r["category"]] = r["pct"]
-    for tier in out:
-        if not out[tier]:
-            out[tier] = default[tier]
-    return out
+def resolve_target(profile: Profile, targets: pd.DataFrame, year: int) -> dict[str, float]:
+    """Returns the target allocation in force for a person/year.
+
+    Per-year override rows carry forward: the most recent override year ≤ the
+    asked year wins. With no override yet, the profile's default_target applies.
+    """
+    if not targets.empty:
+        mine = targets[(targets["profile"] == profile.key) & (targets["year"] <= year)]
+        if not mine.empty:
+            rows = mine[mine["year"] == mine["year"].max()]
+            return dict(zip(rows["category"], rows["pct"]))
+    return dict(profile.default_target)
 
 
 def expected_contributions(
     profile: Profile, income: pd.DataFrame, targets: pd.DataFrame, year: int
 ) -> dict[str, float]:
-    """Planned rupee amount per category for one person/year — the target mix
-    applied to that year's investment pool and (wants-derived) short-term pool."""
+    """Returns the planned rupee amount per category for one person/year.
+
+    The whole goal is that year's investment amount, split across instruments by
+    the target allocation: ``expected[cat] = investment × target%[cat]``.
+    """
     bs = budget_series(profile, income)
     row = bs[bs["year"] == year]
     if row.empty:
         return {}
-    r = row.iloc[0]
-    investment_pool = r["investment"]
-    wants_pool = r["wants"] * profile.wants_invest_pct / 100
+    investment = row.iloc[0]["investment"]
     target = resolve_target(profile, targets, year)
-
-    expected: dict[str, float] = {}
-    for cat, pct in target["long_term"].items():
-        expected[cat] = expected.get(cat, 0.0) + investment_pool * pct / 100
-    for cat, pct in target["short_term"].items():
-        expected[cat] = expected.get(cat, 0.0) + wants_pool * pct / 100
-    return expected
+    return {cat: investment * pct / 100 for cat, pct in target.items()}
 
 
 def plan_vs_actual(

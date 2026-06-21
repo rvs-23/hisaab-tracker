@@ -19,9 +19,7 @@ PAGES = [
 ]
 
 TARGET = (
-    "default_target:\n"
-    "  short_term: {fixed_deposit: 50, mfs: 30, us_market: 10, indian_stocks: 10}\n"
-    "  long_term: {mfs: 45, gold_metals: 25, indian_stocks: 14, us_market: 10, ppf_nps: 5, bonds_gsec_aif: 1}\n"
+    "default_target: {mfs: 45, gold_metals: 25, indian_stocks: 14, us_market: 10, ppf_nps: 5, bonds_gsec_aif: 1}\n"
 )
 
 
@@ -35,10 +33,10 @@ def fake_data_dir(tmp_path, monkeypatch):
     profiles = tmp_path / "profiles"
     profiles.mkdir()
     (profiles / "rv.yaml").write_text(
-        "name: Rv\nbirth_year: 1998\nforward_increment_pct: 10\nwants_invest_pct: 6\n" + TARGET
+        "name: Rv\nbirth_year: 1998\nforward_increment_pct: 10\n" + TARGET
     )
     (profiles / "partner.yaml").write_text(
-        "name: Partner\nbirth_year: 1998\nforward_increment_pct: 10\nwants_invest_pct: 6\n" + TARGET
+        "name: Partner\nbirth_year: 1998\nforward_increment_pct: 10\n" + TARGET
     )
     (tmp_path / "income.csv").write_text(
         "profile,year,month,salary,bonus,other,job_change\n"

@@ -11,42 +11,31 @@ import datetime as dt
 from pydantic import BaseModel, model_validator
 
 
-def _check_sums_to_100(mix: dict[str, float], where: str) -> None:
-    total = sum(mix.values())
-    if abs(total - 100) > 0.01:
-        raise ValueError(f"{where} must sum to 100, got {total}")
-
-
-class Target(BaseModel):
-    """One person's target allocation, constant across years. Two tiers because
-    wants-money and investment-money are deployed to different mixes:
-      short_term — where the invested slice of *wants* money goes
-      long_term  — where *investment* money goes
-    Each tier is a {category: percent} map summing to 100."""
-
-    short_term: dict[str, float]
-    long_term: dict[str, float]
-
-    @model_validator(mode="after")
-    def _tiers_sum_to_100(self) -> "Target":
-        _check_sums_to_100(self.short_term, "target.short_term")
-        _check_sums_to_100(self.long_term, "target.long_term")
-        return self
-
-
 class Profile(BaseModel):
-    """One person. Loaded from profiles/<key>.yaml; `key` is the filename stem
-    and is the value used in the `profile` column of every CSV.
+    """One person, loaded from profiles/<key>.yaml.
 
-    `default_target` is the fallback allocation; per-year overrides live in
-    targets.csv and win for the years they cover."""
+    Attributes:
+        key: Filename stem; the value used in the `profile` column of every CSV.
+        name: Display name.
+        birth_year: Used to show age in the budget projection.
+        forward_increment_pct: Assumed annual income growth for projected years.
+        default_target: Fallback allocation as a {category: percent} map summing
+            to 100. Per-year overrides live in targets.csv and win for the years
+            they cover.
+    """
 
     key: str
     name: str
     birth_year: int
-    forward_increment_pct: float  # assumed annual raise for projected future years
-    wants_invest_pct: float       # % of wants money that gets invested (short-term tier)
-    default_target: Target
+    forward_increment_pct: float
+    default_target: dict[str, float]
+
+    @model_validator(mode="after")
+    def _target_sums_to_100(self) -> "Profile":
+        total = sum(self.default_target.values())
+        if abs(total - 100) > 0.01:
+            raise ValueError(f"default_target must sum to 100, got {total}")
+        return self
 
 
 class Config(BaseModel):
