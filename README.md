@@ -80,11 +80,11 @@ hand-edits; pydantic (`models.py`) validates the YAML.
 
 ## Pages
 
-Navigation reads as the money pipeline: **Income → Dashboard → Budget →
-Allocation → Actuals**. **Dashboard** is the default landing page. Each page has
-a top-right **View** multiselect that scopes every figure to the selected people
-(combined when 2+). **Each page edits its own data in place** — there is no
-separate Update-Data page.
+Nav order is **Dashboard, Income, Budget, Allocation, Actuals** — Dashboard
+leads and is the default landing page, then the money-flow pipeline (income →
+split → allocate → record). Each page has a top-right **View** multiselect that
+scopes every figure to the selected people (combined when 2+). **Each page edits
+its own data in place** — there is no separate Update-Data page.
 
 - **Income** — income-over-time chart and a 12-month editable grid per person
   (salary/bonus/other + Total, job-change flag, "copy January down").
