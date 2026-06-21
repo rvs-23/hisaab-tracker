@@ -8,14 +8,13 @@ st.set_page_config(page_title="CBSE Finances", page_icon=":material/savings:", l
 st.logo(str(Path(__file__).parent / "assets" / "logo.svg"), size="large")
 inject_theme()  # font + theme-aware variables; dark mode via ☰ → Settings → Theme
 
-# Nav reads as the money pipeline: in -> split -> destination -> monthly action -> verdict.
+# Nav reads as the money pipeline: in -> split -> allocate -> record actuals.
 st.navigation(
     [
-        st.Page("views/dashboard.py", title="Dashboard", icon=":material/dashboard:", default=True),
         st.Page("views/income.py", title="Income", icon=":material/payments:"),
+        st.Page("views/dashboard.py", title="Dashboard", icon=":material/dashboard:", default=True),
         st.Page("views/budget_projection.py", title="Budget", icon=":material/call_split:"),
-        st.Page("views/target.py", title="Target", icon=":material/flag:"),
-        st.Page("views/monthly_plan.py", title="Monthly Plan", icon=":material/event_repeat:"),
-        st.Page("views/plan_vs_actual.py", title="Plan vs Actual", icon=":material/track_changes:"),
+        st.Page("views/allocation.py", title="Allocation", icon=":material/donut_small:"),
+        st.Page("views/actuals.py", title="Actuals", icon=":material/track_changes:"),
     ]
 ).run()

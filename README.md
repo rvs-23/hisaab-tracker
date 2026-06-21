@@ -80,25 +80,24 @@ hand-edits; pydantic (`models.py`) validates the YAML.
 
 ## Pages
 
-Navigation reads as the money pipeline — in → split → destination → monthly
-action → verdict. **Dashboard** is the default landing page. Each page has a
-top-right **View** multiselect that scopes every figure to the selected people
+Navigation reads as the money pipeline: **Income → Dashboard → Budget →
+Allocation → Actuals**. **Dashboard** is the default landing page. Each page has
+a top-right **View** multiselect that scopes every figure to the selected people
 (combined when 2+). **Each page edits its own data in place** — there is no
 separate Update-Data page.
 
+- **Income** — income-over-time chart and a 12-month editable grid per person
+  (salary/bonus/other + Total, job-change flag, "copy January down").
 - **Dashboard** *(landing)* — year snapshot (goal progress, income, savings
   rate), all-time invested-to-date strip, income-vs-investment trajectory chart,
   plan-vs-actual by bucket, and year-specific takeaways.
-- **Income** — income-over-time chart and a 12-month editable grid per person
-  (salary/bonus/other, job-change flag, "copy January down").
 - **Budget** — the derived split for a chosen year, the investment slice year by
-  year (100%-stacked), and a full detail table (all years + projections, current
-  year highlighted, projected years muted).
-- **Target** — the allocation in force this year with auto-calculated rupee
-  amounts, plus an editor for per-year target overrides.
-- **Monthly Plan** — what to invest each month per instrument
-  (`target % × this year's budget ÷ 12`).
-- **Plan vs Actual** — planned vs actual per category for a year, `%goal`,
+  year (100%-stacked, labelled with % and ₹/yr), and a full detail table (all
+  years + projections, YoY and Job-change columns, current year highlighted).
+- **Allocation** — the editable target % per instrument with the resulting
+  ₹/year and ₹/month, plus the total to invest this year / per month. (Merges
+  the former Target and Monthly Plan pages.)
+- **Actuals** — planned vs actual per category for a year, `%goal`,
   emergency-fund goal, and in-place editors for contributions and goals.
 
 ## Visual language

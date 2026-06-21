@@ -8,8 +8,8 @@ from finance_tracker.ui import (
 )
 
 d = load_all()
-scope = page_header("Plan vs Actual", d.profiles)
-st.caption("Did we invest what the plan said? Planned (mulberry) vs actual (teal) per category. Negative shortfall = under-invested.")
+scope = page_header("Actuals", d.profiles)
+st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested. Record contributions below.")
 
 years = compute.available_years(d.income, d.contributions)
 if not years:
