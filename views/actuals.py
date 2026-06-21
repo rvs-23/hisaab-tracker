@@ -3,13 +3,13 @@ import streamlit as st
 
 from finance_tracker import compute, storage
 from finance_tracker.ui import (
-    MULBERRY, ON_TRACK_PCT, TEAL, grid_color, html_table, inr, inr_short, load_all,
-    metric_tile, page_header, pretty_category, style_fig,
+    MULBERRY, ON_TRACK_PCT, TEAL, edit_card, grid_color, html_table, inr_short, load_all,
+    metric_tile, page_header, pretty_category, section, style_fig,
 )
 
 d = load_all()
 scope = page_header("Actuals", d.profiles)
-st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested. Record contributions below.")
+st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested.")
 
 years = compute.available_years(d.income, d.contributions)
 if not years:
@@ -18,7 +18,8 @@ if not years:
 
 contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
 default = contrib_years[-1] if contrib_years else years[-1]
-year = st.selectbox("Year", years, index=years.index(default))
+yc, _ = st.columns([1, 5])
+year = int(yc.selectbox("Year", years, index=years.index(default)))
 
 selected = [p for p in d.profiles if p.key in scope]
 pva = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
@@ -28,6 +29,7 @@ if pva.empty:
     st.info("No plan for this selection/year yet.")
     st.stop()
 
+section(f"How {year} is tracking")
 cols = st.columns(3)
 metric_tile(cols[0], "Goal achieved", f"{compute.pct_goal_achieved(pva):.0f}%", f"of {year}'s plan",
             color=TEAL if compute.pct_goal_achieved(pva) >= ON_TRACK_PCT else MULBERRY, big=True)
@@ -55,45 +57,46 @@ f.update_xaxes(showgrid=True, gridcolor=grid_color())
 f.update_yaxes(showgrid=False)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-# --- edit-in-place: the actuals this page is built on -----------------------
+section("Fill in")
 
-st.divider()
-st.subheader("Record actual contributions")
-edited = st.data_editor(
-    d.contributions.sort_values(["year", "profile", "category"]).reset_index(drop=True),
-    num_rows="dynamic", hide_index=True, width="stretch", key="contrib_editor",
-    column_config={
-        "year": st.column_config.NumberColumn("Year", format="%d", required=True),
-        "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
-        "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
-        "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
-        "notes": "Notes",
-    },
-)
-if st.button("Save contributions", type="primary"):
-    try:
-        storage.validate_contributions(edited, d.config, d.profiles)
-        storage.save_contributions(d.root, edited)
-        st.success("Saved.")
-        st.rerun()
-    except Exception as exc:
-        st.error(f"Not saved: {exc}")
+with edit_card("Record what you actually invested"):
+    st.caption("One row per person / year / instrument. Add rows as you invest.")
+    edited = st.data_editor(
+        d.contributions.sort_values(["year", "profile", "category"]).reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch", key="contrib_editor",
+        column_config={
+            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+            "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
+            "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
+            "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
+            "notes": "Notes",
+        },
+    )
+    if st.button("Save contributions", type="primary"):
+        try:
+            storage.validate_contributions(edited, d.config, d.profiles)
+            storage.save_contributions(d.root, edited)
+            st.success("Saved.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Not saved: {exc}")
 
-st.subheader("Emergency-fund goals")
-edited_goals = st.data_editor(
-    d.goals.sort_values(["year", "profile"]).reset_index(drop=True),
-    num_rows="dynamic", hide_index=True, width="stretch", key="goals_editor",
-    column_config={
-        "year": st.column_config.NumberColumn("Year", format="%d", required=True),
-        "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
-        "emergency_fund_goal": st.column_config.NumberColumn("Goal (₹)", required=True),
-    },
-)
-if st.button("Save goals", type="primary"):
-    try:
-        storage.validate_goals(edited_goals, d.profiles)
-        storage.save_goals(d.root, edited_goals)
-        st.success("Saved.")
-        st.rerun()
-    except Exception as exc:
-        st.error(f"Not saved: {exc}")
+with edit_card("Emergency-fund goal"):
+    st.caption("The cash buffer you're aiming for, per person / year.")
+    edited_goals = st.data_editor(
+        d.goals.sort_values(["year", "profile"]).reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch", key="goals_editor",
+        column_config={
+            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
+            "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
+            "emergency_fund_goal": st.column_config.NumberColumn("Goal (₹)", required=True),
+        },
+    )
+    if st.button("Save goals", type="primary"):
+        try:
+            storage.validate_goals(edited_goals, d.profiles)
+            storage.save_goals(d.root, edited_goals)
+            st.success("Saved.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Not saved: {exc}")

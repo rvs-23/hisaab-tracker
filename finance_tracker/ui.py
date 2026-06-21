@@ -6,6 +6,8 @@ views use so a view imports everything it needs from one place.
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
 import pandas as pd
 import streamlit as st
 
@@ -179,6 +181,34 @@ def style_fig(fig, height: int = 320):
     fig.update_xaxes(showgrid=False, zeroline=False, showline=False)
     fig.update_yaxes(showgrid=True, gridcolor=GRID, zeroline=False, showline=False)
     return fig
+
+
+def section(label: str) -> None:
+    """Renders a small uppercase section label to give a page rhythm."""
+    st.markdown(
+        f"<div style='color:var(--muted);font-size:.74rem;text-transform:uppercase;"
+        f"letter-spacing:.06em;font-weight:600;margin:.9rem 0 .2rem'>{label}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+@contextmanager
+def edit_card(title: str):
+    """A bordered card with a teal heading that marks an editable 'fill here' zone.
+
+    Use as a context manager; everything in the body renders inside the card::
+
+        with edit_card("Record contributions"):
+            edited = st.data_editor(...)
+            st.button("Save", ...)
+    """
+    with st.container(border=True):
+        st.markdown(
+            f"<div style='font-weight:700;color:{TEAL};font-size:.95rem;margin-bottom:.4rem'>"
+            f"{title}</div>",
+            unsafe_allow_html=True,
+        )
+        yield
 
 
 def page_header(title: str, profiles) -> list[str]:

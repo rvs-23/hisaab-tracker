@@ -6,7 +6,7 @@ import streamlit as st
 
 from finance_tracker import compute
 from finance_tracker.ui import (
-    MULBERRY, NEEDS, TEAL, html_table, inr_short, load_all, metric_tile, page_header, style_fig,
+    MULBERRY, NEEDS, TEAL, html_table, inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -17,6 +17,13 @@ st.caption(
     "How income splits, derived from the plan. The anchor year is 50/30/20 "
     "(needs/wants/investment). After that only each year's raise splits 20/30/50, "
     "so the investment slice keeps growing."
+)
+st.markdown(
+    "<div style='border-left:3px solid #b9c0c7;background:#f7f8f9;border-radius:4px;"
+    "padding:.5rem .8rem;color:#555;font-size:.85rem;margin:.2rem 0 .4rem'>"
+    "Nothing to fill here — these figures are <b>derived</b>. To change them, edit "
+    "<b>Income</b>.</div>",
+    unsafe_allow_html=True,
 )
 
 income_years = sorted(d.income["year"].dropna().astype(int).unique())
@@ -64,6 +71,7 @@ for profile in visible:
     if not row.empty:
         r = row.iloc[0]
         pct = compute.split_pct(r)
+        section(f"Monthly split · {year}")
         cols = st.columns(3)
         metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
         metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=MULBERRY, big=True)
