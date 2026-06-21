@@ -172,7 +172,7 @@ def style_fig(fig, height: int = 320):
         font=dict(family="Inter, sans-serif", size=13, color=INK),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         margin=dict(l=8, r=8, t=34, b=8), height=height,
-        legend=dict(orientation="h", yanchor="bottom", y=1.04, x=0, title=None),
+        legend=dict(orientation="h", yanchor="bottom", y=1.04, x=0),
         hoverlabel=dict(font_family="Inter", bgcolor="white"),
         bargap=0.35,
     )

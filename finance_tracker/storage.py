@@ -25,9 +25,9 @@ from finance_tracker.models import Config, Profile
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # Income drives everything; the budget split is derived (see compute.py).
-# Entered monthly (month 1–12); compute aggregates to yearly. "other" catches
-# anything that isn't salary/bonus/RSU, e.g. an FD or RD maturing.
-INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS]
+# Entered monthly (month 1–12); compute aggregates to yearly. `job_change` is a
+# per-year 0/1 flag (repeated across the year's rows) marking a job switch.
+INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
 TARGETS_COLUMNS = ["profile", "year", "tier", "category", "pct"]
@@ -107,6 +107,8 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
 
 def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
     df = pd.read_csv(root / "income.csv")
+    if "job_change" not in df.columns:  # tolerate older files without the flag
+        df["job_change"] = 0
     validate_income(df, profiles)
     return df.sort_values(["profile", "year"]).reset_index(drop=True)
 

@@ -29,8 +29,9 @@ INCREMENT_SPLIT = {"needs": 20, "wants": 30, "investment": 50}
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 
-# The four components that sum to a year's total income.
-INCOME_COMPONENTS = ["salary", "bonus", "rsu", "other"]
+# The components that sum to a year's total income. "other" catches anything
+# beyond salary and bonus (RSU vesting, an FD/RD maturing, and so on).
+INCOME_COMPONENTS = ["salary", "bonus", "other"]
 
 # Display names for the asset-class categories used across the app.
 CATEGORY_LABELS = {

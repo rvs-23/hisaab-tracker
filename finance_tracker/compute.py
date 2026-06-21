@@ -29,22 +29,28 @@ from finance_tracker.config import (
 from finance_tracker.models import Profile
 
 BUDGET_COLUMNS = [
-    "year", "age", "total_income", "needs", "wants", "investment",
+    "year", "age", "total_income", "yoy", "job_change", "needs", "wants", "investment",
     "monthly_needs", "monthly_wants", "monthly_investment",
     "invested_this_year", "cumulative_invested", "is_projected",
 ]
 
 
 def total_income(row) -> float:
-    """Sums a row's income components (salary + bonus + rsu + other)."""
+    """Sums a row's income components (salary + bonus + other)."""
     return sum(float(row[c]) for c in INCOME_COMPONENTS)
 
 
 def annual_income(income: pd.DataFrame) -> pd.DataFrame:
-    """Collapses the monthly income rows to one row per (profile, year)."""
+    """Collapses the monthly income rows to one row per (profile, year).
+
+    Income components are summed; ``job_change`` is a per-year flag, so its max
+    over the year's rows is kept.
+    """
     if income.empty:
-        return pd.DataFrame(columns=["profile", "year", *INCOME_COMPONENTS])
-    return income.groupby(["profile", "year"], as_index=False)[INCOME_COMPONENTS].sum()
+        return pd.DataFrame(columns=["profile", "year", *INCOME_COMPONENTS, "job_change"])
+    agg = {c: "sum" for c in INCOME_COMPONENTS}
+    agg["job_change"] = "max"
+    return income.groupby(["profile", "year"], as_index=False).agg(agg)
 
 
 def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None = None) -> pd.DataFrame:
@@ -65,7 +71,7 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     prev = {"needs": 0.0, "wants": 0.0, "investment": 0.0}
     cumulative = 0.0
 
-    def add_year(year: int, total: float, projected: bool) -> None:
+    def add_year(year: int, total: float, projected: bool, job_change: bool) -> None:
         nonlocal prev_total, prev, cumulative
         if prev_total is None:  # anchor year
             amt = {k: total * BASE_SPLIT[k] / 100 for k in BASE_SPLIT}
@@ -73,11 +79,14 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
             delta = total - prev_total
             amt = {k: prev[k] + delta * INCREMENT_SPLIT[k] / 100 for k in INCREMENT_SPLIT}
         cumulative += amt["investment"]
+        yoy = (total / prev_total - 1) * 100 if prev_total else None
         out.append(
             {
                 "year": year,
                 "age": year - profile.birth_year,
                 "total_income": round(total),
+                "yoy": yoy,
+                "job_change": job_change,
                 "needs": round(amt["needs"]),
                 "wants": round(amt["wants"]),
                 "investment": round(amt["investment"]),
@@ -92,14 +101,15 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
         prev_total, prev = total, amt
 
     for _, r in rows.iterrows():
-        add_year(int(r["year"]), total_income(r), projected=False)
+        add_year(int(r["year"]), total_income(r), projected=False,
+                 job_change=bool(r.get("job_change", 0)))
 
     horizon = (today or dt.date.today()).year + PROJECTION_YEARS_AHEAD
     year, total = int(rows["year"].max()), prev_total
     while year < horizon:
         year += 1
         total = total * (1 + profile.forward_increment_pct / 100)
-        add_year(year, total, projected=True)
+        add_year(year, total, projected=True, job_change=False)
 
     return pd.DataFrame(out)
 

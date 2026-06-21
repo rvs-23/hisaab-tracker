@@ -1,5 +1,6 @@
 import datetime as dt
 
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -27,8 +28,9 @@ yc, _ = st.columns([1, 5])
 year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
 
 HEADERS = {
-    "year": "Year", "age": "Age", "total_income": "Income", "needs": "Needs",
-    "wants": "Wants", "investment": "Investment", "monthly_needs": "Needs /mo",
+    "year": "Year", "age": "Age", "total_income": "Income", "yoy": "YoY",
+    "job_change": "Job change", "needs": "Needs", "wants": "Wants",
+    "investment": "Investment", "monthly_needs": "Needs /mo",
     "monthly_wants": "Wants /mo", "monthly_investment": "Invest /mo",
     "cumulative_invested": "Cumulative",
 }
@@ -37,6 +39,8 @@ MONEY = ["total_income", "needs", "wants", "investment", "monthly_needs",
 FMT = {c: (lambda v: f"{v:,.0f}") for c in MONEY}
 FMT["year"] = lambda v: f"{int(v)}"
 FMT["age"] = lambda v: f"{int(v)}"
+FMT["yoy"] = lambda v: "—" if v is None or pd.isna(v) else f"{v:+.0f}%"
+FMT["job_change"] = lambda v: "Yes" if v else ""
 
 
 def row_class(r):
@@ -65,23 +69,24 @@ for profile in visible:
         metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=MULBERRY, big=True)
         metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=TEAL, big=True)
 
-    # The slice shifting over the actual years (100% stacked).
+    # The slice shifting over the actual years (100% stacked), with the
+    # investment segment labelled with both its % and the raw yearly rupees.
     actual = bs[~bs["is_projected"]]
     yr = actual["year"].astype(int).astype(str)
     tot = actual["total_income"]
     needs_p = (100 * actual["needs"] / tot).round(0)
     wants_p = (100 * actual["wants"] / tot).round(0)
     inv_p = (100 * actual["investment"] / tot).round(0)
+    inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
     f = go.Figure()
     f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
     f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=MULBERRY)
     f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=TEAL,
-              text=[f"{v:.0f}%" for v in inv_p], textposition="inside",
+              text=inv_label, textposition="inside",
               textfont=dict(color="white", size=11), insidetextanchor="middle")
-    f.update_layout(barmode="stack", yaxis=dict(ticksuffix="%", range=[0, 100]),
-                    title=None)
+    f.update_layout(barmode="stack", yaxis=dict(ticksuffix="%", range=[0, 100]))
     style_fig(f, height=300)
-    st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.4rem 0 .4rem'>The investment slice, year by year</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.4rem 0 .4rem'>The investment slice, year by year (label shows % and ₹/yr invested)</div>", unsafe_allow_html=True)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
     with st.expander("Full detail (all years + projections)"):

@@ -33,7 +33,7 @@ if not visible.empty:
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 st.divider()
-st.caption("Fill the 12 months for a year. Salary, bonus, RSU, and anything else like an FD or RD maturing.")
+st.caption("Fill the 12 months for a year. Salary, bonus, and anything else (RSU vesting, an FD or RD maturing) under Other.")
 
 existing_years = sorted(d.income["year"].dropna().astype(int).unique())
 default_year = existing_years[-1] if existing_years else dt.date.today().year
@@ -46,16 +46,22 @@ def annual(profile_key, yr):
     return rows[COMPONENTS].sum().sum()
 
 
+def saved_job_change(profile_key, yr):
+    rows = d.income[(d.income["profile"] == profile_key) & (d.income["year"] == yr)]
+    return bool(rows["job_change"].max()) if not rows.empty else False
+
+
 def fresh_grid(profile_key, yr):
-    grid = pd.DataFrame({"Month": MONTHS, "salary": 0, "bonus": 0, "rsu": 0, "other": 0})
+    grid = pd.DataFrame({"Month": MONTHS})
+    for component in COMPONENTS:
+        grid[component] = 0
     mine = d.income[(d.income["profile"] == profile_key) & (d.income["year"] == yr)]
     if not mine.empty:
         for _, r in mine.iterrows():
             grid.loc[int(r["month"]) - 1, COMPONENTS] = [r[c] for c in COMPONENTS]
-    else:  # new year: carry last year's monthly salary so flat years need no typing
-        prev = annual(profile_key, yr - 1)
-        if prev:
-            grid["salary"] = round(prev / 12)
+    elif annual(profile_key, yr - 1):  # new year: carry last year's monthly salary
+        grid["salary"] = round(annual(profile_key, yr - 1) / 12)
+    grid["Total"] = grid[COMPONENTS].sum(axis=1)
     return grid
 
 
@@ -74,10 +80,15 @@ for profile in selected:
             "Month": st.column_config.TextColumn("Month", disabled=True),
             "salary": st.column_config.NumberColumn("Salary (₹)", required=True),
             "bonus": st.column_config.NumberColumn("Bonus (₹)", required=True),
-            "rsu": st.column_config.NumberColumn("RSU (₹)", required=True),
             "other": st.column_config.NumberColumn("Other (₹)", required=True),
+            "Total": st.column_config.NumberColumn("Total (₹)", disabled=True),
         },
     )
+    # Keep the (disabled) Total in sync with edits for the next render.
+    ss[gkey] = edited.assign(Total=edited[COMPONENTS].sum(axis=1))
+
+    job_change = st.checkbox("Job change this year?", value=saved_job_change(profile.key, year),
+                             key=f"{base}_jc")
     filled = int((edited[COMPONENTS].sum(axis=1) > 0).sum())
     total = edited[COMPONENTS].sum().sum()
     prev_total = annual(profile.key, year - 1)
@@ -89,17 +100,19 @@ for profile in selected:
         g = edited.copy()
         for c in COMPONENTS:
             g[c] = jan[c]
-        ss[gkey] = g
+        ss[gkey] = g.assign(Total=g[COMPONENTS].sum(axis=1))
         ss[vkey] += 1
         st.rerun()
     if b2.button("Save", key=f"{base}_save", type="primary"):
-        new = edited.copy()
+        new = edited[COMPONENTS].copy()
         new["profile"], new["year"], new["month"] = profile.key, year, range(1, 13)
+        new["job_change"] = int(job_change)
         new = new[storage.INCOME_COLUMNS]
         others = d.income[~((d.income["profile"] == profile.key) & (d.income["year"] == year))]
+        merged = pd.concat([others, new], ignore_index=True)
         try:
-            storage.validate_income(pd.concat([others, new], ignore_index=True), d.profiles)
-            storage.save_income(d.root, pd.concat([others, new], ignore_index=True))
+            storage.validate_income(merged, d.profiles)
+            storage.save_income(d.root, merged)
             del ss[gkey]
             st.success("Saved.")
             st.rerun()
