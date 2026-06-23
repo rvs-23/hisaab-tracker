@@ -11,8 +11,8 @@ from contextlib import contextmanager
 import pandas as pd
 import streamlit as st
 
-from finance_tracker import storage
-from finance_tracker.config import (  # re-exported for views
+import storage
+from config import (  # re-exported for views
     CARD_BG, CARD_BORDER, CATEGORY_LABELS, GRID, INK, MULBERRY, MUTED,
     NEEDS, ON_TRACK_PCT, SAND, STRIP_BORDER, STRIP_BG, STRIP_TEXT, TEAL,
 )

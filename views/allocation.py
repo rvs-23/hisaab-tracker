@@ -10,8 +10,9 @@ import datetime as dt
 import pandas as pd
 import streamlit as st
 
-from finance_tracker import compute, storage
-from finance_tracker.ui import (
+import compute
+import storage
+from ui import (
     MULBERRY, TEAL, edit_card, inr_short, load_all, metric_tile, page_header, pretty_category, section,
 )
 

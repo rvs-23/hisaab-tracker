@@ -22,10 +22,10 @@ import datetime as dt
 
 import pandas as pd
 
-from finance_tracker.config import (
+from config import (
     BASE_SPLIT, INCOME_COMPONENTS, INCREMENT_SPLIT, PROJECTION_YEARS_AHEAD,
 )
-from finance_tracker.models import Profile
+from models import Profile
 
 BUDGET_COLUMNS = [
     "year", "age", "total_income", "yoy", "job_change", "needs", "wants", "investment",

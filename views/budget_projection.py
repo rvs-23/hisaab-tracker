@@ -4,8 +4,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from finance_tracker import compute
-from finance_tracker.ui import (
+import compute
+from ui import (
     MULBERRY, NEEDS, TEAL, html_table, inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 

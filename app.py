@@ -2,10 +2,10 @@ from pathlib import Path
 
 import streamlit as st
 
-from finance_tracker.ui import inject_theme
+from ui import inject_theme
 
 st.set_page_config(page_title="CBSE Finances", page_icon=":material/savings:", layout="wide")
-st.logo(str(Path(__file__).parent / "assets" / "logo.svg"), size="large")
+st.logo(str(Path(__file__).parent / "logo.svg"), size="large")
 inject_theme()  # font + theme-aware variables; dark mode via ☰ → Settings → Theme
 
 # Nav reads as the money pipeline: in -> split -> allocate -> record actuals.

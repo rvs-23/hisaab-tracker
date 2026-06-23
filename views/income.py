@@ -4,9 +4,9 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from finance_tracker import storage
-from finance_tracker.config import INCOME_COMPONENTS as COMPONENTS
-from finance_tracker.ui import (
+import storage
+from config import INCOME_COMPONENTS as COMPONENTS
+from ui import (
     MULBERRY, TEAL, edit_card, inr_short, load_all, page_header, section, style_fig,
 )
 

@@ -19,8 +19,8 @@ from pathlib import Path
 import pandas as pd
 import yaml
 
-from finance_tracker.config import INCOME_COMPONENTS
-from finance_tracker.models import Config, Profile
+from config import INCOME_COMPONENTS
+from models import Config, Profile
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 

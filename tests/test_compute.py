@@ -3,9 +3,10 @@ import datetime as dt
 import pandas as pd
 import pytest
 
-from finance_tracker import compute, storage
-from finance_tracker.models import Profile
-from finance_tracker.ui import inr
+import compute
+import storage
+from models import Profile
+from ui import inr
 
 TODAY = dt.date(2026, 6, 12)
 

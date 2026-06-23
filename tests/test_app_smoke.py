@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from streamlit.testing.v1 import AppTest
 
-from finance_tracker import storage
+import storage
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 
