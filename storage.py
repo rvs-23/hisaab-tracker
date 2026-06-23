@@ -22,7 +22,7 @@ import yaml
 from config import INCOME_COMPONENTS
 from models import Config, Profile
 
-REPO_ROOT = Path(__file__).resolve().parent.parent
+REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 
 # Income drives everything; the budget split is derived (see compute.py).
 # Entered monthly (month 1–12); compute aggregates to yearly. `job_change` is a

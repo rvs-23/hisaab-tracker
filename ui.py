@@ -117,13 +117,15 @@ def inject_theme() -> None:
         f".ht th:first-child,.ht td:first-child{{text-align:left}}"
         f".ht tr.cur td{{background:var(--strip-bg);font-weight:600}}"
         f".ht tr.proj td{{color:var(--muted);font-style:italic}}"
+        # slimmer sidebar
+        f"section[data-testid='stSidebar']{{width:212px!important;min-width:212px!important}}"
         f"</style>",
         unsafe_allow_html=True,
     )
 
 
 def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = None,
-                big: bool = False) -> None:
+                big: bool = False, help: str = "") -> None:
     """Renders a bordered KPI tile (uppercase label, bold value, muted sub).
 
     Args:
@@ -134,12 +136,15 @@ def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = 
         color: Value colour; defaults to the body text colour. Pass an accent
             (teal/mulberry) to highlight.
         big: Use the larger value size for hero tiles.
+        help: Plain-language explanation shown as an (i) hover tooltip.
     """
     size = "1.9rem" if big else "1.35rem"
+    info = (f" <span title='{help}' style='cursor:help;font-weight:400;"
+            f"font-size:.85em'>&#9432;</span>") if help else ""
     col.markdown(
         f"<div style='border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;"
         f"background:var(--card-bg);height:100%'>"
-        f"<div style='font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>{label}</div>"
+        f"<div style='font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>{label}{info}</div>"
         f"<div style='font-size:{size};font-weight:700;color:{color or 'var(--text)'};margin-top:3px;line-height:1.1'>{value}</div>"
         f"<div style='font-size:.76rem;color:var(--muted);margin-top:3px'>{sub}</div></div>",
         unsafe_allow_html=True,
