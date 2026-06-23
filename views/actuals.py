@@ -30,6 +30,20 @@ if pva.empty:
     st.info("No plan for this selection/year yet.")
     st.stop()
 
+# Graph first: planned vs actual per bucket.
+st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.2rem 0 .4rem'>Planned vs actual, by bucket · {year}</div>", unsafe_allow_html=True)
+asc = pva.sort_values("expected")
+f = go.Figure()
+f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], name="Planned",
+          orientation="h", marker_color=MULBERRY)
+f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name="Actual",
+          orientation="h", marker_color=TEAL)
+f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
+style_fig(f)
+f.update_xaxes(showgrid=True, gridcolor=grid_color())
+f.update_yaxes(showgrid=False)
+st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+
 section(f"How {year} is tracking")
 cols = st.columns(3)
 metric_tile(cols[0], "Goal achieved", f"{compute.pct_goal_achieved(pva):.0f}%", f"of {year}'s plan",
@@ -44,19 +58,6 @@ html_table(
     {"category": "Category", "expected": "Planned", "actual": "Actual", "shortfall": "Shortfall / surplus"},
     formats={"category": pretty_category, "expected": inr_short, "actual": inr_short, "shortfall": inr_short},
 )
-st.write("")
-
-asc = pva.sort_values("expected")
-f = go.Figure()
-f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], name="Planned",
-          orientation="h", marker_color=MULBERRY)
-f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name="Actual",
-          orientation="h", marker_color=TEAL)
-f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
-style_fig(f)
-f.update_xaxes(showgrid=True, gridcolor=grid_color())
-f.update_yaxes(showgrid=False)
-st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 section("Fill in")
 

@@ -6,8 +6,8 @@ import streamlit as st
 
 import compute
 from ui import (
-    MULBERRY, ON_TRACK_PCT as ON_TRACK, SAND, TEAL, grid_color, inr_short,
-    load_all, metric_tile, page_header, pretty_category, style_fig,
+    MULBERRY, ON_TRACK_PCT as ON_TRACK, SAND, TEAL, inr_short, load_all,
+    metric_tile, page_header, pretty_category, style_fig,
 )
 
 d = load_all()
@@ -18,11 +18,6 @@ years = compute.available_years(d.income, d.contributions)
 if not years:
     st.info("Start on the Income page. Everything grows from there.")
     st.stop()
-
-this_year = dt.date.today().year
-default_year = this_year if this_year in years else years[-1]
-yc, _ = st.columns([1, 5])
-year = yc.selectbox("Year", years, index=years.index(default_year))
 
 # Derive each selected person's budget once, then reuse everywhere (DRY).
 budgets = {p.key: compute.budget_series(p, d.income) for p in selected}
@@ -37,7 +32,36 @@ def tv(col, yr):
     return float(s.sum()) if not s.empty else 0.0
 
 
-# --- year snapshot -----------------------------------------------------------
+# --- hero chart first: earning more, investing a bigger slice ----------------
+st.markdown("<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.2rem 0 .4rem'>Earning more, investing a bigger slice</div>", unsafe_allow_html=True)
+if trend.empty:
+    st.caption("Add income to see the trajectory.")
+else:
+    yr = trend["year"].astype(int).astype(str)
+    rate_line = (100 * trend["investment"] / trend["total_income"]).round(0)
+    inc_growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in trend["total_income"].pct_change() * 100]
+    f = go.Figure()
+    f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND,
+              text=inc_growth, textposition="outside", textfont=dict(size=11, color="#6b7280"))
+    f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=TEAL)
+    f.add_trace(go.Scatter(
+        x=yr, y=rate_line, name="Invest rate", yaxis="y2", mode="lines+markers+text",
+        text=[f"{v:.0f}%" for v in rate_line], textposition="top center",
+        textfont=dict(size=11, color=MULBERRY), line=dict(color=MULBERRY, width=3), marker=dict(size=8)))
+    f.update_traces(cliponaxis=False, selector=dict(type="bar"))
+    f.update_layout(barmode="group", yaxis=dict(tickprefix="₹", tickformat="~s"),
+                    yaxis2=dict(overlaying="y", side="right", range=[0, max(60, rate_line.max() + 15)],
+                                ticksuffix="%", showgrid=False))
+    style_fig(f, height=380)
+    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+    st.caption("Grey labels: income growth year on year. Mulberry line: % of income invested (the rising slice).")
+
+# --- year-specific snapshot --------------------------------------------------
+this_year = dt.date.today().year
+default_year = this_year if this_year in years else years[-1]
+yc, _ = st.columns([1, 5])
+year = yc.selectbox("Year", years, index=years.index(default_year))
+
 hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
 target, invested = hh["expected"].sum(), hh["actual"].sum()
 progress = compute.pct_goal_achieved(hh) if not hh.empty else 0.0
@@ -65,52 +89,6 @@ st.markdown(
     f"<div style='font-size:1.4rem;font-weight:700;color:var(--strip-text)'>{inr_short(invested_to_date)}</div></div>",
     unsafe_allow_html=True,
 )
-
-
-def chart_title(text):
-    st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:1rem 0 .4rem'>{text}</div>",
-                unsafe_allow_html=True)
-
-
-# --- hero chart: earning more, investing a bigger slice (full width) ---------
-chart_title("Earning more, investing a bigger slice")
-if trend.empty:
-    st.caption("Add income to see the trajectory.")
-else:
-    yr = trend["year"].astype(int).astype(str)
-    rate_line = (100 * trend["investment"] / trend["total_income"]).round(0)
-    inc_growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in trend["total_income"].pct_change() * 100]
-    f = go.Figure()
-    f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND,
-              text=inc_growth, textposition="outside", textfont=dict(size=11, color="#6b7280"))
-    f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=TEAL)
-    f.add_trace(go.Scatter(
-        x=yr, y=rate_line, name="Invest rate", yaxis="y2", mode="lines+markers+text",
-        text=[f"{v:.0f}%" for v in rate_line], textposition="top center",
-        textfont=dict(size=11, color=MULBERRY), line=dict(color=MULBERRY, width=3), marker=dict(size=8)))
-    f.update_traces(cliponaxis=False, selector=dict(type="bar"))
-    f.update_layout(barmode="group", yaxis=dict(tickprefix="₹", tickformat="~s"),
-                    yaxis2=dict(overlaying="y", side="right", range=[0, max(60, rate_line.max() + 15)],
-                                ticksuffix="%", showgrid=False))
-    style_fig(f, height=380)
-    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-    st.caption("Grey labels: income growth year on year. Mulberry line: % of income invested (the rising slice).")
-
-# --- plan vs actual by bucket (below) ----------------------------------------
-chart_title(f"Plan vs actual, by bucket · {year}")
-if hh.empty:
-    st.caption("No plan for this year yet.")
-else:
-    gp = hh.sort_values("expected")
-    cats = [pretty_category(x) for x in gp["category"]]
-    f = go.Figure()
-    f.add_bar(y=cats, x=gp["expected"], name="Planned", orientation="h", marker_color=MULBERRY)
-    f.add_bar(y=cats, x=gp["actual"], name="Actual", orientation="h", marker_color=TEAL)
-    f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
-    style_fig(f, height=300)
-    f.update_xaxes(showgrid=True, gridcolor=grid_color())
-    f.update_yaxes(showgrid=False)
-    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 # --- takeaways (dynamic) -----------------------------------------------------
 bullets = []

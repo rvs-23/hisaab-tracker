@@ -66,19 +66,8 @@ for profile in visible:
         st.caption(f"No income for {profile.name} yet. Add it on the Income page.")
         continue
 
-    # This year's split.
-    row = bs[bs["year"] == year]
-    if not row.empty:
-        r = row.iloc[0]
-        pct = compute.split_pct(r)
-        section(f"Monthly split · {year}")
-        cols = st.columns(3)
-        metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
-        metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=MULBERRY, big=True)
-        metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=TEAL, big=True)
-
-    # The slice shifting over the actual years (100% stacked), with the
-    # investment segment labelled with both its % and the raw yearly rupees.
+    # Graph first: the slice shifting over the actual years (100% stacked), with
+    # the investment segment labelled with both its % and the raw yearly rupees.
     actual = bs[~bs["is_projected"]]
     yr = actual["year"].astype(int).astype(str)
     tot = actual["total_income"]
@@ -94,8 +83,19 @@ for profile in visible:
               textfont=dict(color="white", size=11), insidetextanchor="middle")
     f.update_layout(barmode="stack", yaxis=dict(ticksuffix="%", range=[0, 100]))
     style_fig(f, height=300)
-    st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.4rem 0 .4rem'>The investment slice, year by year (label shows % and ₹/yr invested)</div>", unsafe_allow_html=True)
+    st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.2rem 0 .4rem'>The investment slice, year by year (label shows % and ₹/yr invested)</div>", unsafe_allow_html=True)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+
+    # Then this year's split.
+    row = bs[bs["year"] == year]
+    if not row.empty:
+        r = row.iloc[0]
+        pct = compute.split_pct(r)
+        section(f"Monthly split · {year}")
+        cols = st.columns(3)
+        metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
+        metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=MULBERRY, big=True)
+        metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=TEAL, big=True)
 
     with st.expander("Full detail (all years + projections)"):
         st.caption("Current year highlighted; projected years in muted italics.")
