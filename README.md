@@ -22,6 +22,10 @@ or Drive), pointed to by `DATA_DIR` in `.env`. It's never committed. You enter
 everything **through the app**, working down the sidebar in order — each page
 edits its own files in place, and the app re-reads from disk on every refresh.
 
+The sidebar has a **Profile switch**: the app shows **one person at a time**
+(routing), so each of you fills your own data with no overlap. (A combined
+household view is planned, but kept separate.)
+
 1. **Income** — pick a year and fill the 12 months (`salary`, `bonus`, `other` —
    put RSU vesting or an FD/RD maturing under *other*); tick *job change* if you
    switched jobs that year. Everything else is derived from this.
@@ -31,8 +35,10 @@ edits its own files in place, and the app re-reads from disk on every refresh.
    and ₹/month fill in automatically from that year's investment amount.
 4. **Actuals** — record what you **actually** invested per instrument, and your
    emergency-fund goal. The page shows planned vs actual and your % of goal.
-5. **Dashboard** — the summary: this year's goal progress, income, savings rate,
-   and how you're tracking over time. Nothing to edit.
+5. **Dashboard** — the consolidated **journey** (not one year): the earning/
+   investing trajectory, lifetime cards (potential net worth, invested to date,
+   overall goal achieved, savings rate), a net-worth chart (invested vs projected
+   value, with a 5-year projection), and planned-vs-actual per year. Read-only.
 
 Prefer a text editor? Every file is plain CSV/YAML, so you can edit them
 directly and refresh the app. The files:
@@ -59,6 +65,10 @@ the minimum to start; the CSVs are created as you save from the app.
 - **The goal** for a year is that year's investment amount split by the target:
   `expected[category] = investment × target%[category]`. Per-year target
   overrides carry forward until a newer one replaces them.
+- **Potential net worth** is a projection (no live market value): each
+  contribution compounded at a conservative per-category return (`EXPECTED_RETURNS`
+  in `config.py`), plus the emergency fund. The dashboard shows actual invested
+  vs this potential, and projects it ~5 years out.
 - **% goal achieved** = total actual ÷ total expected. `storage.py` validates
   every file on load and refuses bad hand-edits.
 
