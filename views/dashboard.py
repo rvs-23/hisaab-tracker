@@ -6,35 +6,31 @@ import streamlit as st
 
 import compute
 from ui import (
-    MULBERRY, ON_TRACK_PCT as ON_TRACK, SAND, TEAL, inr_short, load_all,
-    metric_tile, page_header, pretty_category, style_fig,
+    MULBERRY, ON_TRACK_PCT, SAND, TEAL, inr_short, load_all, metric_tile,
+    page_header, pretty_category, style_fig,
 )
+
+GRAY_LINE = "#9aa0a6"
 
 d = load_all()
 profile = page_header("Dashboard", d.profiles)
-selected = [profile]
-scope = [profile.key]
+today_year = dt.date.today().year
 
-years = compute.available_years(d.income, d.contributions)
-if not years:
-    st.info("Start on the Income page. Everything grows from there.")
+contrib = d.contributions[d.contributions["profile"] == profile.key]
+bs = compute.budget_series(profile, d.income)
+trend = bs[~bs["is_projected"]]
+if trend.empty and contrib.empty:
+    st.info(f"Nothing for {profile.name} yet. Start on the Income page.")
     st.stop()
 
-# Derive each selected person's budget once, then reuse everywhere (DRY).
-budgets = {p.key: compute.budget_series(p, d.income) for p in selected}
-trend = pd.concat(
-    [b[~b["is_projected"]][["year", "total_income", "investment"]] for b in budgets.values() if not b.empty]
-).groupby("year", as_index=False)[["total_income", "investment"]].sum().sort_values("year") \
-    if any(not b.empty for b in budgets.values()) else pd.DataFrame(columns=["year", "total_income", "investment"])
+
+def chart_title(text):
+    st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.5rem 0 .4rem'>{text}</div>",
+                unsafe_allow_html=True)
 
 
-def tv(col, yr):
-    s = trend.loc[trend["year"] == yr, col]
-    return float(s.sum()) if not s.empty else 0.0
-
-
-# --- hero chart first: earning more, investing a bigger slice ----------------
-st.markdown("<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.2rem 0 .4rem'>Earning more, investing a bigger slice</div>", unsafe_allow_html=True)
+# --- hero: earning more, investing a bigger slice ----------------------------
+chart_title("Earning more, investing a bigger slice")
 if trend.empty:
     st.caption("Add income to see the trajectory.")
 else:
@@ -50,66 +46,101 @@ else:
         text=[f"{v:.0f}%" for v in rate_line], textposition="top center",
         textfont=dict(size=11, color=MULBERRY), line=dict(color=MULBERRY, width=3), marker=dict(size=8)))
     f.update_traces(cliponaxis=False, selector=dict(type="bar"))
-    f.update_layout(barmode="group", yaxis=dict(tickprefix="₹", tickformat="~s"),
+    f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"),
                     yaxis2=dict(overlaying="y", side="right", range=[0, max(60, rate_line.max() + 15)],
                                 ticksuffix="%", showgrid=False))
-    style_fig(f, height=380)
+    style_fig(f, height=360)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
     st.caption("Grey labels: income growth year on year. Mulberry line: % of income invested (the rising slice).")
 
-# --- year-specific snapshot --------------------------------------------------
-this_year = dt.date.today().year
-default_year = this_year if this_year in years else years[-1]
-yc, _ = st.columns([1, 5])
-year = yc.selectbox("Year", years, index=years.index(default_year))
+# --- lifetime cards ----------------------------------------------------------
+nw_actual, nw_potential = compute.net_worth_to_date(profile, d.contributions, d.goals, today_year)
+invested = float(contrib["amount"].sum())
+nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, d.goals, today_year)
 
-hh = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
-target, invested = hh["expected"].sum(), hh["actual"].sum()
-progress = compute.pct_goal_achieved(hh) if not hh.empty else 0.0
-pending = max(target - invested, 0.0)
-inc_now, inc_prev = tv("total_income", year), tv("total_income", year - 1)
-yoy = f"{100 * (inc_now - inc_prev) / inc_prev:+.0f}% vs {year - 1}" if inc_prev else "first year"
-rate = 100 * tv("investment", year) / inc_now if inc_now else 0.0
-
-st.markdown(f"<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em'>Snapshot · {year}</div>", unsafe_allow_html=True)
-c = st.columns(3)
-metric_tile(c[0], "Goal progress", f"{progress:.0f}%", f"{inr_short(invested)} of {inr_short(target)}",
-            color=TEAL if progress >= ON_TRACK else MULBERRY, big=True,
-            help="How much of this year's investment plan you have actually put in so far. 100% means you are exactly on plan.")
-metric_tile(c[1], "Income", inr_short(inc_now), yoy, big=True,
-            help="Your total income this year, and the change versus last year.")
-metric_tile(c[2], "Savings rate", f"{rate:.0f}%", "of income invested", big=True,
-            help="The share of your income your plan puts into investing. It rises as you earn more.")
-
-invested_to_date = d.contributions[d.contributions["profile"].isin(scope)]["amount"].sum()
-st.markdown(
-    f"<div title='Total you have actually invested across every year on record.' "
-    f"style='border:1px solid var(--strip-border);background:var(--strip-bg);border-radius:12px;padding:11px 18px;"
-    f"margin-top:.6rem;display:flex;justify-content:space-between;align-items:center'>"
-    f"<div style='color:var(--strip-text);font-size:.72rem;text-transform:uppercase;letter-spacing:.05em'>All time · invested to date &#9432;</div>"
-    f"<div style='font-size:1.4rem;font-weight:700;color:var(--strip-text)'>{inr_short(invested_to_date)}</div></div>",
-    unsafe_allow_html=True,
+contrib_years = sorted(contrib["year"].dropna().astype(int).unique())
+lifetime_planned = sum(sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in contrib_years)
+overall = 100 * invested / lifetime_planned if lifetime_planned else 0.0
+on_track = sum(
+    1 for y in contrib_years
+    if compute.pct_goal_achieved(compute.plan_vs_actual(profile, d.income, d.targets, d.contributions, y)) >= ON_TRACK_PCT
 )
+latest = trend.iloc[-1] if not trend.empty else None
+rate = 100 * latest["investment"] / latest["total_income"] if latest is not None and latest["total_income"] else 0.0
 
-# --- takeaways (dynamic) -----------------------------------------------------
+st.markdown("<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-top:.6rem'>Lifetime</div>", unsafe_allow_html=True)
+c = st.columns(4)
+metric_tile(c[0], "Potential net worth", inr_short(nw_potential), f"≈ {inr_short(nw_potential - nw_actual)} growth",
+            color=TEAL, big=True,
+            help="What your contributions could be worth today, compounded at conservative per-category returns, plus your emergency fund.")
+metric_tile(c[1], "Invested to date", inr_short(invested), "actual, all years", big=True,
+            help="Total you have actually put in across every year (cost basis, no growth).")
+metric_tile(c[2], "Overall goal", f"{overall:.0f}%", "invested of planned", big=True,
+            color=TEAL if overall >= ON_TRACK_PCT else MULBERRY,
+            help="Across the years you've been investing, how much of the planned amount you actually invested.")
+metric_tile(c[3], "Savings rate", f"{rate:.0f}%", "of income, latest year", big=True,
+            help="Share of your income the plan puts into investing. It rises as you earn more.")
+
+# --- net worth: invested vs projected value ----------------------------------
+chart_title("Net worth — invested vs projected value")
+if nw.empty:
+    st.caption("Record contributions on the Actuals page to project net worth.")
+else:
+    nyr = nw["year"].astype(int).astype(str)
+    past = nw[~nw["is_projected"]]
+    proj = nw[nw["year"] >= today_year]
+    f = go.Figure()
+    f.add_trace(go.Scatter(x=nyr, y=nw["cost_basis"], name="Invested (cost)",
+                           mode="lines", line=dict(color=GRAY_LINE, width=2)))
+    f.add_trace(go.Scatter(x=past["year"].astype(int).astype(str), y=past["potential"],
+                           name="Net worth", mode="lines+markers", line=dict(color=TEAL, width=3)))
+    if len(proj) > 1:
+        f.add_trace(go.Scatter(x=proj["year"].astype(int).astype(str), y=proj["potential"],
+                               name="Projected", mode="lines", line=dict(color=TEAL, width=3, dash="dash")))
+    f.update_layout(xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
+    style_fig(f, height=320)
+    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+    st.caption("Solid: contributions compounded at conservative returns. Dashed: if you keep investing the plan. Grey: money put in (no growth).")
+
+# --- execution: planned vs actual invested per year --------------------------
+ex_years = [y for y in compute.available_years(d.income, d.contributions) if y <= today_year]
+if ex_years:
+    chart_title("Did you hit the plan, year by year?")
+    planned = [sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in ex_years]
+    actual = [float(contrib.loc[contrib["year"] == y, "amount"].sum()) for y in ex_years]
+    xs = [str(y) for y in ex_years]
+    f = go.Figure()
+    f.add_bar(x=xs, y=planned, name="Planned", marker_color=MULBERRY)
+    f.add_bar(x=xs, y=actual, name="Actual", marker_color=TEAL)
+    f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
+    style_fig(f, height=300)
+    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+
+# --- takeaways ---------------------------------------------------------------
 bullets = []
-if target > 0:
-    if pending > 0:
-        bullets.append(f"<b>{inr_short(pending)}</b> still to invest in {year}. "
-                       f"That's about <b>{inr_short(pending / 12)}/month</b> to reach your goal.")
-    else:
-        bullets.append(f"Goal met for {year}: <b>{inr_short(invested)}</b> invested of {inr_short(target)}.")
-gaps = hh[hh["shortfall"] < 0].sort_values("shortfall").head(2) if not hh.empty else hh
-if not gaps.empty:
-    parts = [f"<b>{pretty_category(r['category'])}</b> ({inr_short(-r['shortfall'])} behind)" for _, r in gaps.iterrows()]
-    bullets.append("Biggest gaps: " + ", ".join(parts) + ".")
-if not bullets:
-    bullets.append(f"Add income and a target to see what to invest for {year}.")
-
-items = "".join(f"<li style='margin:.25rem 0'>{b}</li>" for b in bullets)
-st.markdown(
-    f"<div style='margin-top:1.2rem'>"
-    f"<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem'>Takeaways · {year}</div>"
-    f"<ul style='color:var(--text);margin:0;padding-left:1.1rem'>{items}</ul></div>",
-    unsafe_allow_html=True,
-)
+if contrib_years:
+    bullets.append(f"On track in <b>{on_track} of {len(contrib_years)}</b> years (75%+ of plan); "
+                   f"overall you've invested <b>{overall:.0f}%</b> of what you planned.")
+gaps = []
+for y in contrib_years:
+    exp = compute.expected_contributions(profile, d.income, d.targets, y)
+    act = contrib[contrib["year"] == y].groupby("category")["amount"].sum().to_dict()
+    for cat in set(exp) | set(act):
+        gaps.append((cat, act.get(cat, 0) - exp.get(cat, 0)))
+if gaps:
+    agg = pd.DataFrame(gaps, columns=["category", "gap"]).groupby("category")["gap"].sum()
+    behind = agg[agg < 0].sort_values().head(2)
+    if not behind.empty:
+        parts = [f"<b>{pretty_category(c)}</b> ({inr_short(-g)} behind)" for c, g in behind.items()]
+        bullets.append("Biggest gaps over time: " + ", ".join(parts) + ".")
+if not nw.empty:
+    bullets.append(f"Potential net worth <b>{inr_short(nw_potential)}</b> today, heading toward "
+                   f"<b>{inr_short(int(nw['potential'].iloc[-1]))}</b> by {int(nw['year'].iloc[-1])} if you keep to plan.")
+if bullets:
+    items = "".join(f"<li style='margin:.25rem 0'>{b}</li>" for b in bullets)
+    st.markdown(
+        f"<div style='margin-top:1rem'>"
+        f"<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem'>Takeaways</div>"
+        f"<ul style='color:var(--text);margin:0;padding-left:1.1rem'>{items}</ul></div>",
+        unsafe_allow_html=True,
+    )
