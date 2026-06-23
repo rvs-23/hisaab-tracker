@@ -29,6 +29,15 @@ INCREMENT_SPLIT = {"needs": 20, "wants": 30, "investment": 50}
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 
+# Conservative expected annual returns per category, for the net-worth
+# projection (base estimates + 0.5%). Tune here. The emergency fund is treated
+# as held cash (no growth).
+EXPECTED_RETURNS = {
+    "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
+    "ppf_nps": 8.0, "bonds_gsec_aif": 7.5, "fixed_deposit": 7.0,
+}
+NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
+
 # The components that sum to a year's total income. "other" catches anything
 # beyond salary and bonus (RSU vesting, an FD/RD maturing, and so on).
 INCOME_COMPONENTS = ["salary", "bonus", "other"]

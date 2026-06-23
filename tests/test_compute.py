@@ -161,6 +161,30 @@ def test_available_years(income, contributions):
     assert compute.available_years(income, contributions) == [2023, 2024, 2025, 2026]
 
 
+def test_net_worth_compounds_at_category_return(rv):
+    contrib = pd.DataFrame([{"year": 2020, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None}])
+    goals = pd.DataFrame(columns=storage.GOALS_COLUMNS)
+    actual, potential = compute.net_worth_to_date(rv, contrib, goals, today_year=2025)
+    assert actual == 100000  # cost basis, no emergency fund
+    assert potential == round(100000 * 1.115 ** 5)  # mfs at 11.5% for 5 years
+
+
+def test_net_worth_adds_emergency_fund(rv):
+    contrib = pd.DataFrame([{"year": 2025, "profile": "rv", "category": "mfs", "amount": 50000, "notes": None}])
+    goals = pd.DataFrame([{"year": 2025, "profile": "rv", "emergency_fund_goal": 200000}])
+    actual, potential = compute.net_worth_to_date(rv, contrib, goals, today_year=2025)
+    assert actual == 250000  # 50k invested + 200k EF, no growth yet (same year)
+    assert potential == 250000
+
+
+def test_net_worth_series_projects_ahead(rv, income, targets, contributions):
+    s = compute.net_worth_series(rv, income, contributions, targets,
+                                 pd.DataFrame(columns=storage.GOALS_COLUMNS), today_year=2025, ahead=5)
+    assert int(s["year"].max()) == 2030  # 2025 + 5
+    assert s["is_projected"].sum() == 5
+    assert (s["potential"] >= s["cost_basis"]).all()  # growth never below cost
+
+
 def test_inr_indian_grouping():
     assert inr(1234567) == "₹12,34,567"
     assert inr(999) == "₹999"
