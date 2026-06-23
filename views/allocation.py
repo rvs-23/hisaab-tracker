@@ -18,8 +18,8 @@ from ui import (
 )
 
 d = load_all()
-scope = page_header("Allocation", d.profiles)
-selected = [p for p in d.profiles if p.key in scope]
+active = page_header("Allocation", d.profiles)
+selected = [active]
 ss = st.session_state
 CURRENT_YEAR = dt.date.today().year
 

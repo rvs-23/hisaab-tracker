@@ -11,8 +11,9 @@ from ui import (
 )
 
 d = load_all()
-scope = page_header("Income", d.profiles)
-selected = [p for p in d.profiles if p.key in scope]
+profile = page_header("Income", d.profiles)
+selected = [profile]
+scope = [profile.key]
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 names = {p.key: p.name for p in d.profiles}

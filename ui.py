@@ -240,15 +240,18 @@ def edit_card(title: str):
         yield
 
 
-def page_header(title: str, profiles) -> list[str]:
-    """Renders the page title and the top-right person multiselect.
+def page_header(title: str, profiles):
+    """Renders the page title and the global Profile switch in the sidebar.
+
+    Routing is per person: one active profile at a time, so each page renders a
+    single person's data (no overlaying or combining). Defaults to the
+    alphabetically-first name (Brownie).
 
     Returns:
-        The selected profile keys; an empty selection means everyone.
+        The active Profile.
     """
     inject_theme()
-    left, right = st.columns([3, 1], vertical_alignment="bottom")
-    left.title(title)
-    names = [p.name for p in profiles]
-    selected = right.multiselect("View", names, default=names, key="scope")
-    return [p.key for p in profiles if p.name in selected] or [p.key for p in profiles]
+    st.title(title)
+    names = sorted(p.name for p in profiles)
+    choice = st.sidebar.radio("Profile", names, key="active_profile")
+    return next(p for p in profiles if p.name == choice)

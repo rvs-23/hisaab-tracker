@@ -12,7 +12,8 @@ from ui import (
 CURRENT_YEAR = dt.date.today().year
 
 d = load_all()
-scope = page_header("Budget", d.profiles)
+active = page_header("Budget", d.profiles)
+scope = [active.key]
 st.caption(
     "How income splits, derived from the plan. The anchor year is 50/30/20 "
     "(needs/wants/investment). After that only each year's raise splits 20/30/50, "

@@ -9,7 +9,8 @@ from ui import (
 )
 
 d = load_all()
-scope = page_header("Actuals", d.profiles)
+active = page_header("Actuals", d.profiles)
+scope = [active.key]
 st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested.")
 
 years = compute.available_years(d.income, d.contributions)
