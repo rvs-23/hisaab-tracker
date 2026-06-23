@@ -4,7 +4,7 @@ import streamlit as st
 
 from ui import inject_theme
 
-st.set_page_config(page_title="CBSE Finances", page_icon=":material/savings:", layout="wide")
+st.set_page_config(page_title="Personal Finances Tracker", page_icon=":material/savings:", layout="wide")
 st.logo(str(Path(__file__).parent / "logo.svg"), size="large")
 inject_theme()  # font + theme-aware variables; dark mode via ☰ → Settings → Theme
 

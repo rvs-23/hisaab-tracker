@@ -1,4 +1,4 @@
-# CBSE Finances
+# Personal Finances Tracker
 
 A local Streamlit app for two people that replaces a finance-tracking Excel. It
 answers one question — *did we invest what the plan said this year?* — so it's a

@@ -1,4 +1,4 @@
-"""Central configuration for CBSE Finances.
+"""Central configuration for the Personal Finances Tracker.
 
 Holds every tunable value in one place: the colour palette, the budget-model
 constants, the income components, and the category labels. Other modules import
