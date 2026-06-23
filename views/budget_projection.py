@@ -82,7 +82,7 @@ for profile in visible:
     f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=TEAL,
               text=inv_label, textposition="inside",
               textfont=dict(color="white", size=11), insidetextanchor="middle")
-    f.update_layout(barmode="stack", yaxis=dict(ticksuffix="%", range=[0, 100]))
+    f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
     style_fig(f, height=300)
     st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.2rem 0 .4rem'>The investment slice, year by year (label shows % and ₹/yr invested)</div>", unsafe_allow_html=True)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})

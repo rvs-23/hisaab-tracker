@@ -40,9 +40,10 @@ if not visible.empty:
         f.add_trace(go.Scatter(
             x=[str(y) for y in jc_years], y=[totals[y] for y in jc_years],
             mode="markers", name="Job change",
-            marker=dict(symbol="star", size=15, color=MULBERRY, line=dict(width=1, color="white")),
+            marker=dict(symbol="triangle-down", size=10, color="#64748b", line=dict(width=1, color="white")),
             hovertext="Job change", hoverinfo="text+x"))
-    f.update_layout(barmode="stack", yaxis=dict(tickprefix="₹", tickformat="~s"))
+    f.update_layout(barmode="stack", xaxis=dict(type="category"),
+                    yaxis=dict(tickprefix="₹", tickformat="~s"))
     style_fig(f, height=280)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
