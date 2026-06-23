@@ -197,6 +197,30 @@ def section(label: str) -> None:
     )
 
 
+def resync(grid_key: str, version_key: str, recomputed, derived_cols: list[str]) -> None:
+    """Keeps a data_editor's disabled/derived columns live.
+
+    A disabled column shows the value from the editor's data argument, which lags
+    a user's edit by one rerun. Call this right after the editor with the grid
+    whose derived columns you've recomputed from the edits; if any changed, it
+    stores the new grid and bumps the widget key so the editor re-renders with
+    the fresh values immediately.
+
+    Args:
+        grid_key: Session key holding the editor's data grid.
+        version_key: Session key holding the editor's version (suffix its key).
+        recomputed: The edited grid with derived columns recomputed.
+        derived_cols: Columns to compare to detect a change.
+    """
+    if grid_key in st.session_state and any(
+        list(recomputed[c]) != list(st.session_state[grid_key][c]) for c in derived_cols
+    ):
+        st.session_state[grid_key] = recomputed
+        st.session_state[version_key] += 1
+        st.rerun()
+    st.session_state[grid_key] = recomputed
+
+
 @contextmanager
 def edit_card(title: str):
     """A bordered card with a teal heading that marks an editable 'fill here' zone.

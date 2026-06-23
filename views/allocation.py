@@ -13,12 +13,14 @@ import streamlit as st
 import compute
 import storage
 from ui import (
-    MULBERRY, TEAL, edit_card, inr_short, load_all, metric_tile, page_header, pretty_category, section,
+    MULBERRY, TEAL, edit_card, inr_short, load_all, metric_tile, page_header,
+    pretty_category, resync, section,
 )
 
 d = load_all()
 scope = page_header("Allocation", d.profiles)
 selected = [p for p in d.profiles if p.key in scope]
+ss = st.session_state
 CURRENT_YEAR = dt.date.today().year
 
 income_years = sorted(d.income["year"].dropna().astype(int).unique()) or [CURRENT_YEAR]
@@ -45,16 +47,24 @@ for profile in selected:
     investment = investment_for(profile)
     target = compute.resolve_target(profile, d.targets, year)
 
-    grid = pd.DataFrame({"category": d.config.categories})
-    grid["label"] = grid["category"].map(pretty_category)
-    grid["pct"] = [target.get(c, 0.0) for c in d.config.categories]
-    grid["per_year"] = grid["pct"] / 100 * investment
-    grid["per_month"] = grid["per_year"] / 12
+    def derive(df):  # recompute the ₹ columns from the % column
+        out = df.copy()
+        out["per_year"] = out["pct"] / 100 * investment
+        out["per_month"] = out["per_year"] / 12
+        return out
+
+    base = f"alloc_{profile.key}_{year}"
+    gkey, vkey = f"{base}__grid", f"{base}__ver"
+    if gkey not in ss:
+        g = pd.DataFrame({"category": d.config.categories})
+        g["label"] = g["category"].map(pretty_category)
+        g["pct"] = [target.get(c, 0.0) for c in d.config.categories]
+        ss[gkey] = derive(g[["label", "pct"]].assign(per_year=0.0, per_month=0.0))
+        ss[vkey] = 0
 
     with edit_card(f"{profile.name} — {year}"):
         edited = st.data_editor(
-            grid[["label", "pct", "per_year", "per_month"]],
-            hide_index=True, width="stretch", key=f"alloc_{profile.key}_{year}",
+            ss[gkey], hide_index=True, width="stretch", key=f"{base}__{ss[vkey]}",
             column_config={
                 "label": st.column_config.TextColumn("Instrument", disabled=True),
                 "pct": st.column_config.NumberColumn("Target %", min_value=0, max_value=100, required=True),
@@ -62,6 +72,7 @@ for profile in selected:
                 "per_month": st.column_config.NumberColumn("₹ / month", disabled=True, format="%.0f"),
             },
         )
+        resync(gkey, vkey, derive(edited), ["per_year", "per_month"])
         total_pct = edited["pct"].sum()
         ok = abs(total_pct - 100) < 0.01
         msg = f"Total <b>{total_pct:.0f}%</b>" + ("  ·  ready to save" if ok else "  ·  must sum to 100")
@@ -78,6 +89,7 @@ for profile in selected:
             try:
                 storage.validate_targets(merged, d.config, d.profiles)
                 storage.save_targets(d.root, merged)
+                del ss[gkey]
                 st.success("Saved.")
                 st.rerun()
             except Exception as exc:

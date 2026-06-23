@@ -7,7 +7,7 @@ import streamlit as st
 import storage
 from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
-    MULBERRY, TEAL, edit_card, inr_short, load_all, page_header, section, style_fig,
+    MULBERRY, TEAL, edit_card, inr_short, load_all, page_header, resync, section, style_fig,
 )
 
 d = load_all()
@@ -31,6 +31,16 @@ if not visible.empty:
     f = go.Figure()
     for i, col in enumerate(by_year.columns):
         f.add_bar(x=yr, y=by_year[col], name=col, marker_color=accents[i % 2])
+    # Mark job-change years with a star above the bar.
+    jc = visible.groupby("year")["job_change"].max()
+    jc_years = [int(y) for y in jc.index if jc.loc[y] > 0]
+    if jc_years:
+        totals = visible.assign(t=visible[COMPONENTS].sum(axis=1)).groupby("year")["t"].sum()
+        f.add_trace(go.Scatter(
+            x=[str(y) for y in jc_years], y=[totals[y] for y in jc_years],
+            mode="markers", name="Job change",
+            marker=dict(symbol="star", size=15, color=MULBERRY, line=dict(width=1, color="white")),
+            hovertext="Job change", hoverinfo="text+x"))
     f.update_layout(barmode="stack", yaxis=dict(tickprefix="₹", tickformat="~s"))
     style_fig(f, height=280)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
@@ -38,10 +48,12 @@ if not visible.empty:
 section("Enter income")
 st.caption("Pick a year and fill the 12 months. Salary, bonus, and anything else (RSU vesting, an FD or RD maturing) under Other.")
 
+this_year = dt.date.today().year
 existing_years = sorted(d.income["year"].dropna().astype(int).unique())
-default_year = existing_years[-1] if existing_years else dt.date.today().year
+year_options = sorted(set(existing_years) | set(range(this_year - 7, this_year + 2)))
+default_year = this_year if this_year in year_options else (existing_years[-1] if existing_years else this_year)
 c1, _ = st.columns([1, 3])
-year = int(c1.number_input("Year", min_value=2000, max_value=2100, value=int(default_year), step=1))
+year = int(c1.selectbox("Year", year_options, index=year_options.index(default_year)))
 
 
 def annual(profile_key, yr):
@@ -87,8 +99,8 @@ for profile in selected:
                 "Total": st.column_config.NumberColumn("Total (₹)", disabled=True),
             },
         )
-        # Keep the (disabled) Total in sync with edits for the next render.
-        ss[gkey] = edited.assign(Total=edited[COMPONENTS].sum(axis=1))
+        # Recompute the (disabled) Total live as the user types.
+        resync(gkey, vkey, edited.assign(Total=edited[COMPONENTS].sum(axis=1)), ["Total"])
 
         job_change = st.checkbox("Job change this year?", value=saved_job_change(profile.key, year),
                                  key=f"{base}_jc")
