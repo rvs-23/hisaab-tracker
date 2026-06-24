@@ -189,3 +189,49 @@ def test_inr_indian_grouping():
     assert inr(1234567) == "₹12,34,567"
     assert inr(999) == "₹999"
     assert inr(-45000) == "-₹45,000"
+
+
+# --- storage validation guards (hand-edit safety) --------------------------
+
+@pytest.fixture
+def config():
+    from models import Config
+    return Config(usd_inr_rate=84.0, usd_inr_as_of=dt.date(2026, 6, 1),
+                  categories=["mfs", "gold_metals", "indian_stocks", "us_market",
+                              "ppf_nps", "bonds_gsec_aif", "fixed_deposit"])
+
+
+def test_load_missing_csvs_returns_empty(tmp_path, rv, config):
+    """A fresh folder with no history CSVs loads as empty, not a crash."""
+    assert storage.load_income(tmp_path, [rv]).empty
+    assert storage.load_contributions(tmp_path, config, [rv]).empty
+    assert storage.load_goals(tmp_path, [rv]).empty
+    assert storage.load_targets(tmp_path, config, [rv]).empty
+
+
+def test_income_rejects_negative_and_duplicates(rv):
+    base = {"profile": "rv", "year": 2024, "month": 1, "salary": 100, "bonus": 0, "other": 0, "job_change": 0}
+    with pytest.raises(ValueError, match="negative"):
+        storage.validate_income(pd.DataFrame([{**base, "salary": -1}]), [rv])
+    with pytest.raises(ValueError, match="duplicate"):
+        storage.validate_income(pd.DataFrame([base, dict(base)]), [rv])
+
+
+def test_contributions_reject_negative_amount(rv, config):
+    df = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": -5, "notes": None}])
+    with pytest.raises(ValueError, match="negative"):
+        storage.validate_contributions(df, config, [rv])
+
+
+def test_goals_reject_duplicate_year(rv):
+    df = pd.DataFrame([{"year": 2024, "profile": "rv", "emergency_fund_goal": 100},
+                       {"year": 2024, "profile": "rv", "emergency_fund_goal": 200}])
+    with pytest.raises(ValueError, match="duplicate"):
+        storage.validate_goals(df, [rv])
+
+
+def test_targets_reject_duplicate_category(rv, config):
+    df = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 50},
+                       {"profile": "rv", "year": 2024, "category": "mfs", "pct": 50}])
+    with pytest.raises(ValueError, match="duplicate"):
+        storage.validate_targets(df, config, [rv])

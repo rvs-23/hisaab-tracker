@@ -90,6 +90,9 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
     bad_cat = set(df["category"].dropna()) - set(config.categories)
     if bad_cat:
         raise ValueError(f"targets.csv uses categories not in config.yaml: {sorted(bad_cat)}")
+    if (df["pct"] < 0).any() or (df["pct"] > 100).any():
+        raise ValueError("targets.csv has pct outside 0–100")
+    _check_no_duplicates(df, ["profile", "year", "category"], "targets.csv")
     for (profile, year), g in df.groupby(["profile", "year"]):
         total = g["pct"].sum()
         if abs(total - 100) > 0.01:
@@ -99,7 +102,7 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
 # --- income ---------------------------------------------------------------
 
 def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
-    df = pd.read_csv(root / "income.csv")
+    df = _read_optional(root / "income.csv", INCOME_COLUMNS)
     if "job_change" not in df.columns:  # tolerate older files without the flag
         df["job_change"] = 0
     validate_income(df, profiles)
@@ -109,16 +112,20 @@ def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
 def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
     _check_columns(df, INCOME_COLUMNS, "income.csv")
     _check_profiles(df, profiles, "income.csv")
+    if df.empty:
+        return
     if df["year"].isna().any() or df["salary"].isna().any():
         raise ValueError("income.csv has rows with a missing year or salary")
-    if not df.empty and not df["month"].between(1, 12).all():
+    if not df["month"].between(1, 12).all():
         raise ValueError("income.csv has rows with month outside 1–12")
+    _check_non_negative(df, INCOME_COMPONENTS, "income.csv")
+    _check_no_duplicates(df, ["profile", "year", "month"], "income.csv")
 
 
 # --- contributions --------------------------------------------------------
 
 def load_contributions(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
-    df = pd.read_csv(root / "contributions.csv")
+    df = _read_optional(root / "contributions.csv", CONTRIB_COLUMNS)
     validate_contributions(df, config, profiles)
     return df
 
@@ -126,17 +133,20 @@ def load_contributions(root: Path, config: Config, profiles: list[Profile]) -> p
 def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Profile]) -> None:
     _check_columns(df, CONTRIB_COLUMNS, "contributions.csv")
     _check_profiles(df, profiles, "contributions.csv")
+    if df.empty:
+        return
     if df["year"].isna().any() or df["amount"].isna().any():
         raise ValueError("contributions.csv has rows with a missing year or amount")
     bad = set(df["category"].dropna()) - set(config.categories)
     if bad:
         raise ValueError(f"contributions.csv uses categories not in config.yaml: {sorted(bad)}")
+    _check_non_negative(df, ["amount"], "contributions.csv")
 
 
 # --- goals ----------------------------------------------------------------
 
 def load_goals(root: Path, profiles: list[Profile]) -> pd.DataFrame:
-    df = pd.read_csv(root / "goals.csv")
+    df = _read_optional(root / "goals.csv", GOALS_COLUMNS)
     validate_goals(df, profiles)
     return df
 
@@ -144,6 +154,10 @@ def load_goals(root: Path, profiles: list[Profile]) -> pd.DataFrame:
 def validate_goals(df: pd.DataFrame, profiles: list[Profile]) -> None:
     _check_columns(df, GOALS_COLUMNS, "goals.csv")
     _check_profiles(df, profiles, "goals.csv")
+    if df.empty:
+        return
+    _check_non_negative(df, ["emergency_fund_goal"], "goals.csv")
+    _check_no_duplicates(df, ["profile", "year"], "goals.csv")
 
 
 # --- savers ---------------------------------------------------------------
@@ -166,6 +180,17 @@ def save_targets(root: Path, df: pd.DataFrame) -> None:
 
 # --- helpers --------------------------------------------------------------
 
+def _read_optional(path: Path, columns: list[str]) -> pd.DataFrame:
+    """Reads a CSV, or returns an empty frame with ``columns`` if it's absent.
+
+    A fresh data folder only needs ``config.yaml`` + ``profiles/``; the history
+    CSVs are created on first save, so a missing one means "nothing entered yet".
+    """
+    if not path.exists():
+        return pd.DataFrame(columns=columns)
+    return pd.read_csv(path)
+
+
 def _check_columns(df: pd.DataFrame, expected: list[str], filename: str) -> None:
     missing = [c for c in expected if c not in df.columns]
     if missing:
@@ -176,3 +201,16 @@ def _check_profiles(df: pd.DataFrame, profiles: list[Profile], filename: str) ->
     bad = set(df["profile"].dropna()) - {p.key for p in profiles}
     if bad:
         raise ValueError(f"{filename} has unknown profiles: {sorted(bad)}")
+
+
+def _check_non_negative(df: pd.DataFrame, columns: list[str], filename: str) -> None:
+    for col in columns:
+        if (pd.to_numeric(df[col], errors="coerce") < 0).any():
+            raise ValueError(f"{filename} has negative values in {col}")
+
+
+def _check_no_duplicates(df: pd.DataFrame, keys: list[str], filename: str) -> None:
+    dups = df[df.duplicated(keys, keep=False)]
+    if not dups.empty:
+        sample = dups[keys].drop_duplicates().head(3).to_dict("records")
+        raise ValueError(f"{filename} has duplicate rows for {keys}: {sample}")

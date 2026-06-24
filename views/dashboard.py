@@ -58,11 +58,14 @@ nw_actual, nw_potential = compute.net_worth_to_date(profile, d.contributions, d.
 invested = float(contrib["amount"].sum())
 nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, d.goals, today_year)
 
-contrib_years = sorted(contrib["year"].dropna().astype(int).unique())
-lifetime_planned = sum(sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in contrib_years)
-overall = 100 * invested / lifetime_planned if lifetime_planned else 0.0
+# Evaluate against every planned year up to today, not just years with a
+# contribution row — a year you invested nothing is a miss, not an absence.
+eval_years = [y for y in compute.available_years(d.income, d.contributions) if y <= today_year]
+lifetime_planned = sum(sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in eval_years)
+invested_in_plan = float(contrib.loc[contrib["year"].isin(eval_years), "amount"].sum())
+overall = 100 * invested_in_plan / lifetime_planned if lifetime_planned else 0.0
 on_track = sum(
-    1 for y in contrib_years
+    1 for y in eval_years
     if compute.pct_goal_achieved(compute.plan_vs_actual(profile, d.income, d.targets, d.contributions, y)) >= ON_TRACK_PCT
 )
 latest = trend.iloc[-1] if not trend.empty else None
@@ -103,12 +106,11 @@ else:
     st.caption("Solid: contributions compounded at conservative returns. Dashed: if you keep investing the plan. Grey: money put in (no growth).")
 
 # --- execution: planned vs actual invested per year --------------------------
-ex_years = [y for y in compute.available_years(d.income, d.contributions) if y <= today_year]
-if ex_years:
+if eval_years:
     chart_title("Did you hit the plan, year by year?")
-    planned = [sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in ex_years]
-    actual = [float(contrib.loc[contrib["year"] == y, "amount"].sum()) for y in ex_years]
-    xs = [str(y) for y in ex_years]
+    planned = [sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in eval_years]
+    actual = [float(contrib.loc[contrib["year"] == y, "amount"].sum()) for y in eval_years]
+    xs = [str(y) for y in eval_years]
     f = go.Figure()
     f.add_bar(x=xs, y=planned, name="Planned", marker_color=MULBERRY)
     f.add_bar(x=xs, y=actual, name="Actual", marker_color=TEAL)
@@ -118,11 +120,11 @@ if ex_years:
 
 # --- takeaways ---------------------------------------------------------------
 bullets = []
-if contrib_years:
-    bullets.append(f"On track in <b>{on_track} of {len(contrib_years)}</b> years (75%+ of plan); "
+if eval_years:
+    bullets.append(f"On track in <b>{on_track} of {len(eval_years)}</b> years (75%+ of plan); "
                    f"overall you've invested <b>{overall:.0f}%</b> of what you planned.")
 gaps = []
-for y in contrib_years:
+for y in eval_years:
     exp = compute.expected_contributions(profile, d.income, d.targets, y)
     act = contrib[contrib["year"] == y].groupby("category")["amount"].sum().to_dict()
     for cat in set(exp) | set(act):

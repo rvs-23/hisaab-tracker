@@ -1,3 +1,4 @@
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -62,14 +63,25 @@ html_table(
 
 section("Fill in")
 
+def merge_back(edited, others, columns, key):
+    """Combines this person's edited rows with the other profiles' untouched rows.
+
+    The page is scoped to one person, so the editors hide the profile column and
+    only show ``active``'s rows; on save we stamp the active key back on and keep
+    everyone else's rows intact.
+    """
+    edited = edited.assign(profile=key)
+    return pd.concat([others, edited], ignore_index=True)[columns]
+
+
 with edit_card("Record what you actually invested"):
-    st.caption("One row per person / year / instrument. Add rows as you invest.")
+    st.caption(f"One row per year / instrument for {active.name}. Add rows as you invest.")
+    mine = d.contributions[d.contributions["profile"] == active.key].drop(columns=["profile"])
     edited = st.data_editor(
-        d.contributions.sort_values(["year", "profile", "category"]).reset_index(drop=True),
+        mine.sort_values(["year", "category"]).reset_index(drop=True),
         num_rows="dynamic", hide_index=True, width="stretch", key="contrib_editor",
         column_config={
             "year": st.column_config.NumberColumn("Year", format="%d", required=True),
-            "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
             "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
             "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
             "notes": "Notes",
@@ -77,28 +89,32 @@ with edit_card("Record what you actually invested"):
     )
     if st.button("Save contributions", type="primary"):
         try:
-            storage.validate_contributions(edited, d.config, d.profiles)
-            storage.save_contributions(d.root, edited)
+            others = d.contributions[d.contributions["profile"] != active.key]
+            combined = merge_back(edited, others, storage.CONTRIB_COLUMNS, active.key)
+            storage.validate_contributions(combined, d.config, d.profiles)
+            storage.save_contributions(d.root, combined)
             st.success("Saved.")
             st.rerun()
         except Exception as exc:
             st.error(f"Not saved: {exc}")
 
 with edit_card("Emergency-fund goal"):
-    st.caption("The cash buffer you're aiming for, per person / year.")
+    st.caption(f"The cash buffer {active.name} is aiming for, per year.")
+    mine_goals = d.goals[d.goals["profile"] == active.key].drop(columns=["profile"])
     edited_goals = st.data_editor(
-        d.goals.sort_values(["year", "profile"]).reset_index(drop=True),
+        mine_goals.sort_values(["year"]).reset_index(drop=True),
         num_rows="dynamic", hide_index=True, width="stretch", key="goals_editor",
         column_config={
             "year": st.column_config.NumberColumn("Year", format="%d", required=True),
-            "profile": st.column_config.SelectboxColumn("Person", options=[p.key for p in d.profiles], required=True),
             "emergency_fund_goal": st.column_config.NumberColumn("Goal (₹)", required=True),
         },
     )
     if st.button("Save goals", type="primary"):
         try:
-            storage.validate_goals(edited_goals, d.profiles)
-            storage.save_goals(d.root, edited_goals)
+            others = d.goals[d.goals["profile"] != active.key]
+            combined = merge_back(edited_goals, others, storage.GOALS_COLUMNS, active.key)
+            storage.validate_goals(combined, d.profiles)
+            storage.save_goals(d.root, combined)
             st.success("Saved.")
             st.rerun()
         except Exception as exc:
