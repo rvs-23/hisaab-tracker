@@ -241,17 +241,34 @@ def edit_card(title: str):
 
 
 def page_header(title: str, profiles):
-    """Renders the page title and the global Profile switch in the sidebar.
+    """Renders the page title and the per-person URL router.
 
-    Routing is per person: one active profile at a time, so each page renders a
-    single person's data (no overlaying or combining). Defaults to the
-    alphabetically-first name (Brownie).
+    Routing is per person via the ``?profile=<key>`` query param: one active
+    profile at a time, so each page renders a single person's data (no overlay).
+    Switching is a link that changes the URL; session state mirrors it so the
+    choice survives page navigation. Defaults to the alphabetically-first name
+    (Brownie).
 
     Returns:
         The active Profile.
     """
     inject_theme()
+    ordered = sorted(profiles, key=lambda p: p.name)
+    keys = [p.key for p in ordered]
+    default = keys[0]
+
+    if st.query_params.get("profile") in keys:
+        active = st.query_params["profile"]
+        st.session_state["active_profile"] = active
+    else:
+        active = st.session_state.get("active_profile", default)
+        st.query_params["profile"] = active  # keep the URL in sync across pages
+
     st.title(title)
-    names = sorted(p.name for p in profiles)
-    choice = st.sidebar.radio("Profile", names, key="active_profile")
-    return next(p for p in profiles if p.name == choice)
+    links = " &nbsp;·&nbsp; ".join(
+        f"<a href='?profile={p.key}' target='_self' style='text-decoration:none;"
+        f"color:{TEAL if p.key == active else MUTED};font-weight:{700 if p.key == active else 500}'>{p.name}</a>"
+        for p in ordered
+    )
+    st.markdown(f"<div style='margin:-.6rem 0 .6rem;font-size:.95rem'>{links}</div>", unsafe_allow_html=True)
+    return next(p for p in profiles if p.key == active)
