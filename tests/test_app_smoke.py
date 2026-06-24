@@ -34,8 +34,8 @@ def fake_data_dir(tmp_path, monkeypatch):
     (profiles / "rv.yaml").write_text(
         "name: Rv\nbirth_year: 1998\nforward_increment_pct: 10\n" + TARGET
     )
-    (profiles / "partner.yaml").write_text(
-        "name: Partner\nbirth_year: 1998\nforward_increment_pct: 10\n" + TARGET
+    (profiles / "cheeni.yaml").write_text(
+        "name: Cheeni\nbirth_year: 1998\nforward_increment_pct: 10\n" + TARGET
     )
     (tmp_path / "income.csv").write_text(
         "profile,year,month,salary,bonus,other,job_change\n"

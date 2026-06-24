@@ -119,6 +119,8 @@ def inject_theme() -> None:
         f".ht tr.proj td{{color:var(--muted);font-style:italic}}"
         # slimmer sidebar
         f"section[data-testid='stSidebar']{{width:212px!important;min-width:212px!important}}"
+        # bigger brand: st.logo caps the height; let it grow (stacked logo fits the slim rail)
+        f"[data-testid='stLogo'],[data-testid='stSidebarLogo']{{height:3rem!important;width:auto!important}}"
         f"</style>",
         unsafe_allow_html=True,
     )
@@ -241,34 +243,35 @@ def edit_card(title: str):
 
 
 def page_header(title: str, profiles):
-    """Renders the page title and the per-person URL router.
+    """Renders the page title and resolves the active person from the URL.
 
     Routing is per person via the ``?profile=<key>`` query param: one active
     profile at a time, so each page renders a single person's data (no overlay).
-    Switching is a link that changes the URL; session state mirrors it so the
-    choice survives page navigation. Defaults to the alphabetically-first name
-    (Brownie).
+    There's deliberately **no on-page switcher** — you pick a person by setting
+    the URL once (e.g. ``?profile=cheeni``) and it sticks across pages via session
+    state, so the whole app follows your choice. Defaults to the alphabetically-
+    first name (Brownie). The active name shows as a small, muted subtitle.
 
     Returns:
         The active Profile.
     """
     inject_theme()
-    ordered = sorted(profiles, key=lambda p: p.name)
-    keys = [p.key for p in ordered]
-    default = keys[0]
+    keys = [p.key for p in profiles]
+    default = min(profiles, key=lambda p: p.name).key
 
     if st.query_params.get("profile") in keys:
         active = st.query_params["profile"]
-        st.session_state["active_profile"] = active
     else:
         active = st.session_state.get("active_profile", default)
-        st.query_params["profile"] = active  # keep the URL in sync across pages
+    if active not in keys:
+        active = default
+    st.session_state["active_profile"] = active
+    st.query_params["profile"] = active  # keep the URL shareable/bookmarkable
 
+    profile = next(p for p in profiles if p.key == active)
     st.title(title)
-    links = " &nbsp;·&nbsp; ".join(
-        f"<a href='?profile={p.key}' target='_self' style='text-decoration:none;"
-        f"color:{TEAL if p.key == active else MUTED};font-weight:{700 if p.key == active else 500}'>{p.name}</a>"
-        for p in ordered
+    st.markdown(
+        f"<div style='margin:-.6rem 0 .8rem;color:{TEAL};font-weight:600;font-size:.95rem'>{profile.name}</div>",
+        unsafe_allow_html=True,
     )
-    st.markdown(f"<div style='margin:-.6rem 0 .6rem;font-size:.95rem'>{links}</div>", unsafe_allow_html=True)
-    return next(p for p in profiles if p.key == active)
+    return profile

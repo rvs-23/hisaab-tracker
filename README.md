@@ -22,10 +22,11 @@ or Drive), pointed to by `DATA_DIR` in `.env`. It's never committed. You enter
 everything **through the app**, working down the sidebar in order — each page
 edits its own files in place, and the app re-reads from disk on every refresh.
 
-Each page shows **one person at a time** (routing): a switch under the page
-title flips between people and sets `?profile=<key>` in the URL, so each of you
-fills your own data with no overlap (and the URL is bookmarkable). A combined
-household view is planned, but kept separate.
+Each page shows **one person at a time** (routing) via the `?profile=<key>` URL
+param — `?profile=rv` (Brownie) or `?profile=cheeni`. There's no on-page
+switcher to clutter things: you set the profile in the URL once and it sticks
+across every page (the active name shows under each title), so you fill your own
+data with no overlap. A combined household view is planned, but kept separate.
 
 1. **Income** — pick a year and fill the 12 months (`salary`, `bonus`, `other` —
    put RSU vesting or an FD/RD maturing under *other*); tick *job change* if you
