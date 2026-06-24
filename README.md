@@ -35,12 +35,15 @@ data with no overlap. A combined household view is planned, but kept separate.
    and how the investment slice grows. Nothing to fill here; change it on Income.
 3. **Allocation** — set the **%** per instrument (must sum to 100); the ₹/year
    and ₹/month fill in automatically from that year's investment amount.
-4. **Actuals** — record what you **actually** invested per instrument, and your
-   emergency-fund goal. The page shows planned vs actual and your % of goal.
+4. **Actuals** — record what you **actually** invested per instrument. The page
+   shows planned vs actual, your % of goal, and the year's emergency-fund target
+   (derived: 6 months of needs).
 5. **Dashboard** — the consolidated **journey** (not one year): the earning/
-   investing trajectory, lifetime cards (potential net worth, invested to date,
-   overall goal achieved, savings rate), a net-worth chart (invested vs projected
-   value, with a 5-year projection), and planned-vs-actual per year. Read-only.
+   investing trajectory (with year-on-year income growth), lifetime cards
+   (potential net worth, invested to date, overall goal achieved, savings rate),
+   a **catch-up** figure (what to invest today to pull level with the plan), a
+   net-worth chart (invested vs projected value, with a 5-year projection), and
+   planned-vs-actual per year. Read-only.
 
 Prefer a text editor? Every file is plain CSV/YAML, so you can edit them
 directly and refresh the app. The files:
@@ -50,7 +53,6 @@ directly and refresh the app. The files:
 | `income.csv` | `profile, year, month (1–12), salary, bonus, other, job_change`. Monthly rows; `job_change` is a per-year 0/1 flag. |
 | `targets.csv` | `profile, year, category, pct`. Per-year allocation overrides; each `(profile, year)` sums to 100. Optional — the profile's `default_target` is the fallback. |
 | `contributions.csv` | `year, profile, category, amount, notes` — what was actually invested. |
-| `goals.csv` | `year, profile, emergency_fund_goal`. |
 | `config.yaml` | `usd_inr_rate, usd_inr_as_of, categories` (the asset classes). |
 | `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target` (a `{category: percent}` map summing to 100). The filename stem is the `profile` key used across the CSVs. |
 
@@ -71,8 +73,15 @@ the minimum to start; the CSVs are created as you save from the app.
   contribution compounded at a conservative per-category return (`EXPECTED_RETURNS`
   in `config.py`), plus the emergency fund. The dashboard shows actual invested
   vs this potential, and projects it ~5 years out.
+- **The emergency fund is derived**, not entered: `EMERGENCY_FUND_MONTHS` (6) ×
+  that year's monthly needs. It's added to net worth as held cash.
+- **Catch-up amount** = what to invest *today* to pull level with the planned
+  trajectory. Each year's per-category shortfall (planned − actual) is grown to
+  today at the category's expected return and summed (surpluses net against it);
+  the result is the lump sum that makes your portfolio worth what it would have
+  been had every plan been met. It's fine to invest more and overshoot the goal.
 - **% goal achieved** = total actual ÷ total expected. `storage.py` validates
-  every file on load and refuses bad hand-edits.
+  every file on load and refuses bad hand-edits (non-numeric, negative, dupes).
 
 ## Code structure
 

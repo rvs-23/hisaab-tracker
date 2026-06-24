@@ -38,6 +38,10 @@ EXPECTED_RETURNS = {
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 
+# Emergency fund = this many months of the needs bucket (6 months of essential
+# spending). Derived from income like the rest of the budget — never entered.
+EMERGENCY_FUND_MONTHS = 6
+
 # The components that sum to a year's total income. "other" catches anything
 # beyond salary and bonus (RSU vesting, an FD/RD maturing, and so on).
 INCOME_COMPONENTS = ["salary", "bonus", "other"]

@@ -161,28 +161,70 @@ def test_available_years(income, contributions):
     assert compute.available_years(income, contributions) == [2023, 2024, 2025, 2026]
 
 
+def test_available_years_scopes_to_profile(income, contributions):
+    """After routing, a caller can ask for just one person's years."""
+    inc2 = pd.concat([income, income.assign(profile="cheeni", year=2099)], ignore_index=True)
+    assert compute.available_years(inc2, contributions, "rv") == [2023, 2024, 2025, 2026]
+    assert compute.available_years(inc2, contributions, "cheeni") == [2099]
+    assert 2099 in compute.available_years(inc2, contributions)  # unscoped sees both
+
+
+def test_emergency_fund_is_six_months_of_needs(rv, income):
+    bs = compute.budget_series(rv, income).set_index("year")
+    assert compute.emergency_fund_target(rv, income, 2024) == pytest.approx(6 * bs.loc[2024, "monthly_needs"])
+    # No income → no budget → no emergency fund.
+    assert compute.emergency_fund_target(rv, pd.DataFrame(columns=storage.INCOME_COLUMNS)) == 0.0
+
+
 def test_net_worth_compounds_at_category_return(rv):
     contrib = pd.DataFrame([{"year": 2020, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None}])
-    goals = pd.DataFrame(columns=storage.GOALS_COLUMNS)
-    actual, potential = compute.net_worth_to_date(rv, contrib, goals, today_year=2025)
+    no_income = pd.DataFrame(columns=storage.INCOME_COLUMNS)  # → emergency fund 0
+    actual, potential = compute.net_worth_to_date(rv, no_income, contrib, today_year=2025)
     assert actual == 100000  # cost basis, no emergency fund
     assert potential == round(100000 * 1.115 ** 5)  # mfs at 11.5% for 5 years
 
 
-def test_net_worth_adds_emergency_fund(rv):
-    contrib = pd.DataFrame([{"year": 2025, "profile": "rv", "category": "mfs", "amount": 50000, "notes": None}])
-    goals = pd.DataFrame([{"year": 2025, "profile": "rv", "emergency_fund_goal": 200000}])
-    actual, potential = compute.net_worth_to_date(rv, contrib, goals, today_year=2025)
-    assert actual == 250000  # 50k invested + 200k EF, no growth yet (same year)
-    assert potential == 250000
+def test_net_worth_adds_derived_emergency_fund(rv, income):
+    contrib = pd.DataFrame([{"year": 2026, "profile": "rv", "category": "mfs", "amount": 50000, "notes": None}])
+    ef = compute.emergency_fund_target(rv, income, 2026)
+    actual, potential = compute.net_worth_to_date(rv, income, contrib, today_year=2026)
+    assert actual == round(50000 + ef)   # 50k invested + EF, no growth yet (same year)
+    assert potential == round(50000 + ef)
 
 
 def test_net_worth_series_projects_ahead(rv, income, targets, contributions):
-    s = compute.net_worth_series(rv, income, contributions, targets,
-                                 pd.DataFrame(columns=storage.GOALS_COLUMNS), today_year=2025, ahead=5)
+    s = compute.net_worth_series(rv, income, contributions, targets, today_year=2025, ahead=5)
     assert int(s["year"].max()) == 2030  # 2025 + 5
     assert s["is_projected"].sum() == 5
     assert (s["potential"] >= s["cost_basis"]).all()  # growth never below cost
+
+
+# --- catch-up amount -------------------------------------------------------
+
+def _one_year(salary=1000000):
+    income = pd.DataFrame([{"profile": "rv", "year": 2024, "month": 1,
+                            "salary": salary, "bonus": 0, "other": 0, "job_change": 0}])
+    targets = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 100}])
+    return income, targets  # anchor year → investment is 20% of salary, all in mfs
+
+
+def test_catch_up_grows_shortfall_to_today(rv):
+    income, targets = _one_year()  # 2024 investment 200000, all mfs, nothing invested
+    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
+    cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026)
+    assert cu == pytest.approx(200000 * 1.115 ** 2, rel=1e-6)  # shortfall grown 2 yrs at 11.5%
+
+
+def test_catch_up_zero_when_plan_met(rv):
+    income, targets = _one_year()
+    contrib = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": 200000, "notes": None}])
+    assert compute.catch_up_amount(rv, income, targets, contrib, today_year=2026) == 0.0
+
+
+def test_catch_up_zero_when_overshot(rv):
+    income, targets = _one_year()
+    contrib = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": 500000, "notes": None}])
+    assert compute.catch_up_amount(rv, income, targets, contrib, today_year=2026) == 0.0
 
 
 def test_inr_indian_grouping():
@@ -205,7 +247,6 @@ def test_load_missing_csvs_returns_empty(tmp_path, rv, config):
     """A fresh folder with no history CSVs loads as empty, not a crash."""
     assert storage.load_income(tmp_path, [rv]).empty
     assert storage.load_contributions(tmp_path, config, [rv]).empty
-    assert storage.load_goals(tmp_path, [rv]).empty
     assert storage.load_targets(tmp_path, config, [rv]).empty
 
 
@@ -223,11 +264,11 @@ def test_contributions_reject_negative_amount(rv, config):
         storage.validate_contributions(df, config, [rv])
 
 
-def test_goals_reject_duplicate_year(rv):
-    df = pd.DataFrame([{"year": 2024, "profile": "rv", "emergency_fund_goal": 100},
-                       {"year": 2024, "profile": "rv", "emergency_fund_goal": 200}])
-    with pytest.raises(ValueError, match="duplicate"):
-        storage.validate_goals(df, [rv])
+def test_contributions_reject_non_numeric_amount(rv, config):
+    """A typo in a hand-edited amount must fail loudly, not coerce to NaN."""
+    df = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": "abc", "notes": None}])
+    with pytest.raises(ValueError, match="non-numeric"):
+        storage.validate_contributions(df, config, [rv])
 
 
 def test_targets_reject_duplicate_category(rv, config):
@@ -235,3 +276,23 @@ def test_targets_reject_duplicate_category(rv, config):
                        {"profile": "rv", "year": 2024, "category": "mfs", "pct": 50}])
     with pytest.raises(ValueError, match="duplicate"):
         storage.validate_targets(df, config, [rv])
+
+
+def test_save_contributions_preserves_other_profile(tmp_path, rv, config):
+    """The Actuals merge-back: editing one person must not drop the other's rows."""
+    cheeni = Profile(key="cheeni", name="Cheeni", birth_year=1998,
+                     forward_increment_pct=5, default_target=rv.default_target)
+    existing = pd.DataFrame([
+        {"year": 2024, "profile": "rv", "category": "mfs", "amount": 100, "notes": None},
+        {"year": 2024, "profile": "cheeni", "category": "mfs", "amount": 200, "notes": None},
+    ])
+    storage.save_contributions(tmp_path, existing)
+    # rv edits only their own row (the editor hides the profile column); merge back.
+    edited = pd.DataFrame([{"year": 2024, "category": "mfs", "amount": 150, "notes": None}]).assign(profile="rv")
+    others = existing[existing["profile"] != "rv"]
+    combined = pd.concat([others, edited], ignore_index=True)[storage.CONTRIB_COLUMNS]
+    storage.validate_contributions(combined, config, [rv, cheeni])
+    storage.save_contributions(tmp_path, combined)
+    reloaded = storage.load_contributions(tmp_path, config, [rv, cheeni])
+    assert reloaded.loc[reloaded["profile"] == "cheeni", "amount"].iloc[0] == 200  # untouched
+    assert reloaded.loc[reloaded["profile"] == "rv", "amount"].iloc[0] == 150       # updated

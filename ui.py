@@ -25,14 +25,13 @@ class Data:
     next refresh.
     """
 
-    def __init__(self, root, config, profiles, income, targets, contributions, goals):
+    def __init__(self, root, config, profiles, income, targets, contributions):
         self.root = root
         self.config = config
         self.profiles = profiles
         self.income = income
         self.targets = targets
         self.contributions = contributions
-        self.goals = goals
 
 
 def load_all() -> Data:
@@ -48,11 +47,10 @@ def load_all() -> Data:
         income = storage.load_income(root, profiles)
         targets = storage.load_targets(root, config, profiles)
         contributions = storage.load_contributions(root, config, profiles)
-        goals = storage.load_goals(root, profiles)
     except Exception as exc:
         st.error(f"Could not load data: {exc}")
         st.stop()
-    return Data(root, config, profiles, income, targets, contributions, goals)
+    return Data(root, config, profiles, income, targets, contributions)
 
 
 # --- formatting ------------------------------------------------------------

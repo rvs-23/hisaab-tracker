@@ -23,7 +23,7 @@ selected = [active]
 ss = st.session_state
 CURRENT_YEAR = dt.date.today().year
 
-income_years = sorted(d.income["year"].dropna().astype(int).unique()) or [CURRENT_YEAR]
+income_years = sorted(d.income.loc[d.income["profile"] == active.key, "year"].dropna().astype(int).unique()) or [CURRENT_YEAR]
 default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
 yc, _ = st.columns([1, 5])
 year = int(yc.selectbox("Year", income_years, index=income_years.index(default_year)))

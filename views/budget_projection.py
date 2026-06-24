@@ -27,7 +27,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-income_years = sorted(d.income["year"].dropna().astype(int).unique())
+income_years = sorted(d.income.loc[d.income["profile"] == active.key, "year"].dropna().astype(int).unique())
 if not income_years:
     st.info("No income entered yet. Add it on the Income page.")
     st.stop()

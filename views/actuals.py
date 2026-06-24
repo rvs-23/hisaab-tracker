@@ -14,19 +14,20 @@ active = page_header("Actuals", d.profiles)
 scope = [active.key]
 st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested.")
 
-years = compute.available_years(d.income, d.contributions)
+years = compute.available_years(d.income, d.contributions, active.key)
 if not years:
     st.info("No data yet — add income first.")
     st.stop()
 
-contrib_years = sorted(d.contributions["year"].dropna().astype(int).unique())
+contrib_years = sorted(
+    d.contributions.loc[d.contributions["profile"] == active.key, "year"].dropna().astype(int).unique()
+)
 default = contrib_years[-1] if contrib_years else years[-1]
 yc, _ = st.columns([1, 5])
 year = int(yc.selectbox("Year", years, index=years.index(default)))
 
-selected = [p for p in d.profiles if p.key in scope]
-pva = compute.household_plan_vs_actual(selected, d.income, d.targets, d.contributions, year)
-goal_rows = d.goals[(d.goals["year"] == year) & (d.goals["profile"].isin(scope))]
+pva = compute.plan_vs_actual(active, d.income, d.targets, d.contributions, year)
+emergency_fund = compute.emergency_fund_target(active, d.income, year)
 
 if pva.empty:
     st.info("No plan for this selection/year yet.")
@@ -50,8 +51,8 @@ section(f"How {year} is tracking")
 cols = st.columns(3)
 metric_tile(cols[0], "Goal achieved", f"{compute.pct_goal_achieved(pva):.0f}%", f"of {year}'s plan",
             color=TEAL if compute.pct_goal_achieved(pva) >= ON_TRACK_PCT else MULBERRY, big=True)
-if not goal_rows.empty:
-    metric_tile(cols[1], "Emergency-fund goal", inr_short(goal_rows["emergency_fund_goal"].sum()), f"for {year}", big=True)
+metric_tile(cols[1], "Emergency-fund goal", inr_short(emergency_fund), f"6 months of {year} needs", big=True,
+            help="Derived, not entered: 6 months of that year's needs bucket (6 × monthly needs).")
 st.write("")
 
 ordered = pva.sort_values("expected", ascending=False)
@@ -98,24 +99,4 @@ with edit_card("Record what you actually invested"):
         except Exception as exc:
             st.error(f"Not saved: {exc}")
 
-with edit_card("Emergency-fund goal"):
-    st.caption(f"The cash buffer {active.name} is aiming for, per year.")
-    mine_goals = d.goals[d.goals["profile"] == active.key].drop(columns=["profile"])
-    edited_goals = st.data_editor(
-        mine_goals.sort_values(["year"]).reset_index(drop=True),
-        num_rows="dynamic", hide_index=True, width="stretch", key="goals_editor",
-        column_config={
-            "year": st.column_config.NumberColumn("Year", format="%d", required=True),
-            "emergency_fund_goal": st.column_config.NumberColumn("Goal (₹)", required=True),
-        },
-    )
-    if st.button("Save goals", type="primary"):
-        try:
-            others = d.goals[d.goals["profile"] != active.key]
-            combined = merge_back(edited_goals, others, storage.GOALS_COLUMNS, active.key)
-            storage.validate_goals(combined, d.profiles)
-            storage.save_goals(d.root, combined)
-            st.success("Saved.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Not saved: {exc}")
+st.caption("The emergency-fund goal above is derived from your budget (6 months of needs), so there's nothing to enter for it.")

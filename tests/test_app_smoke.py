@@ -48,9 +48,6 @@ def fake_data_dir(tmp_path, monkeypatch):
         "2024,rv,us_market,39345.5,\n"
         "2024,rv,mfs,169766,\n"
     )
-    (tmp_path / "goals.csv").write_text(
-        "year,profile,emergency_fund_goal\n2024,rv,196689\n"
-    )
     monkeypatch.setattr(storage, "data_dir", lambda: tmp_path)
     return tmp_path
 

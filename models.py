@@ -1,6 +1,6 @@
 """Pydantic schemas for the YAML inputs (config.yaml and profiles/*.yaml).
 
-The numeric history (budget rows, contributions, goals) lives in CSVs and is
+The numeric history (income, contributions, targets) lives in CSVs and is
 validated in storage.py — these models cover only the hand-edited YAML.
 """
 

@@ -54,13 +54,15 @@ else:
     st.caption("Grey labels: income growth year on year. Mulberry line: % of income invested (the rising slice).")
 
 # --- lifetime cards ----------------------------------------------------------
-nw_actual, nw_potential = compute.net_worth_to_date(profile, d.contributions, d.goals, today_year)
+nw_actual, nw_potential = compute.net_worth_to_date(profile, d.income, d.contributions, today_year)
 invested = float(contrib["amount"].sum())
-nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, d.goals, today_year)
+nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year)
+catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
 
 # Evaluate against every planned year up to today, not just years with a
 # contribution row — a year you invested nothing is a miss, not an absence.
-eval_years = [y for y in compute.available_years(d.income, d.contributions) if y <= today_year]
+# Scoped to the active person so the other profile's years don't leak in.
+eval_years = [y for y in compute.available_years(d.income, d.contributions, profile.key) if y <= today_year]
 lifetime_planned = sum(sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in eval_years)
 invested_in_plan = float(contrib.loc[contrib["year"].isin(eval_years), "amount"].sum())
 overall = 100 * invested_in_plan / lifetime_planned if lifetime_planned else 0.0
@@ -75,7 +77,7 @@ st.markdown("<div style='color:var(--muted);font-size:.78rem;text-transform:uppe
 c = st.columns(4)
 metric_tile(c[0], "Potential net worth", inr_short(nw_potential), f"≈ {inr_short(nw_potential - nw_actual)} growth",
             color=TEAL, big=True,
-            help="What your contributions could be worth today, compounded at conservative per-category returns, plus your emergency fund.")
+            help="What your contributions could be worth today, compounded at conservative per-category returns, plus your emergency fund (6 months of needs).")
 metric_tile(c[1], "Invested to date", inr_short(invested), "actual, all years", big=True,
             help="Total you have actually put in across every year (cost basis, no growth).")
 metric_tile(c[2], "Overall goal", f"{overall:.0f}%", "invested of planned", big=True,
@@ -83,6 +85,26 @@ metric_tile(c[2], "Overall goal", f"{overall:.0f}%", "invested of planned", big=
             help="Across the years you've been investing, how much of the planned amount you actually invested.")
 metric_tile(c[3], "Savings rate", f"{rate:.0f}%", "of income, latest year", big=True,
             help="Share of your income the plan puts into investing. It rises as you earn more.")
+
+# --- catch-up: one number, one action ----------------------------------------
+if catch_up > 0:
+    st.markdown(
+        f"<div style='border:1px solid {MULBERRY}33;background:{MULBERRY}0d;border-radius:12px;"
+        f"padding:14px 18px;margin-top:.7rem;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
+        f"<span style='font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
+        f"Catch up in {today_year}</span>"
+        f"<span style='font-size:1.7rem;font-weight:700;color:{MULBERRY}'>{inr_short(catch_up)}</span>"
+        f"<span style='font-size:.85rem;color:var(--muted)'>invest this much extra today and you're level with "
+        f"every year you fell short (grown at expected returns). Overshooting is fine.</span></div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"<div style='border:1px solid {TEAL}33;background:{TEAL}0d;border-radius:12px;"
+        f"padding:12px 18px;margin-top:.7rem;color:{TEAL};font-weight:600;font-size:.92rem'>"
+        f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
+        unsafe_allow_html=True,
+    )
 
 # --- net worth: invested vs projected value ----------------------------------
 chart_title("Net worth — invested vs projected value")

@@ -4,12 +4,12 @@ The data folder is the database: it lives outside the repo (path in .env) and
 every loader re-reads from disk — no caching anywhere. The numeric history is
 three tidy CSVs, all keyed by (year, profile):
 
-  income.csv         one row per person per year — salary + bonus + other
+  income.csv         monthly rows per person — salary + bonus + other
   contributions.csv  what was actually invested, per person/year/category
-  goals.csv          emergency-fund goal, per person/year
   targets.csv        per-year target-allocation overrides (optional)
 
-The budget (needs/wants/investment) is *derived* from income, not stored.
+The budget (needs/wants/investment) and the emergency fund (6 months of needs)
+are *derived* from income, not stored.
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 # per-year 0/1 flag (repeated across the year's rows) marking a job switch.
 INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
-GOALS_COLUMNS = ["year", "profile", "emergency_fund_goal"]
 TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
 
 
@@ -90,6 +89,7 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
     bad_cat = set(df["category"].dropna()) - set(config.categories)
     if bad_cat:
         raise ValueError(f"targets.csv uses categories not in config.yaml: {sorted(bad_cat)}")
+    _check_numeric(df, ["year", "pct"], "targets.csv")
     if (df["pct"] < 0).any() or (df["pct"] > 100).any():
         raise ValueError("targets.csv has pct outside 0–100")
     _check_no_duplicates(df, ["profile", "year", "category"], "targets.csv")
@@ -114,6 +114,7 @@ def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
     _check_profiles(df, profiles, "income.csv")
     if df.empty:
         return
+    _check_numeric(df, ["year", "month", *INCOME_COMPONENTS], "income.csv")
     if df["year"].isna().any() or df["salary"].isna().any():
         raise ValueError("income.csv has rows with a missing year or salary")
     if not df["month"].between(1, 12).all():
@@ -135,29 +136,13 @@ def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Prof
     _check_profiles(df, profiles, "contributions.csv")
     if df.empty:
         return
+    _check_numeric(df, ["year", "amount"], "contributions.csv")
     if df["year"].isna().any() or df["amount"].isna().any():
         raise ValueError("contributions.csv has rows with a missing year or amount")
     bad = set(df["category"].dropna()) - set(config.categories)
     if bad:
         raise ValueError(f"contributions.csv uses categories not in config.yaml: {sorted(bad)}")
     _check_non_negative(df, ["amount"], "contributions.csv")
-
-
-# --- goals ----------------------------------------------------------------
-
-def load_goals(root: Path, profiles: list[Profile]) -> pd.DataFrame:
-    df = _read_optional(root / "goals.csv", GOALS_COLUMNS)
-    validate_goals(df, profiles)
-    return df
-
-
-def validate_goals(df: pd.DataFrame, profiles: list[Profile]) -> None:
-    _check_columns(df, GOALS_COLUMNS, "goals.csv")
-    _check_profiles(df, profiles, "goals.csv")
-    if df.empty:
-        return
-    _check_non_negative(df, ["emergency_fund_goal"], "goals.csv")
-    _check_no_duplicates(df, ["profile", "year"], "goals.csv")
 
 
 # --- savers ---------------------------------------------------------------
@@ -168,10 +153,6 @@ def save_income(root: Path, df: pd.DataFrame) -> None:
 
 def save_contributions(root: Path, df: pd.DataFrame) -> None:
     df.sort_values(["year", "profile", "category"]).to_csv(root / "contributions.csv", index=False)
-
-
-def save_goals(root: Path, df: pd.DataFrame) -> None:
-    df.sort_values(["year", "profile"]).to_csv(root / "goals.csv", index=False)
 
 
 def save_targets(root: Path, df: pd.DataFrame) -> None:
@@ -201,6 +182,19 @@ def _check_profiles(df: pd.DataFrame, profiles: list[Profile], filename: str) ->
     bad = set(df["profile"].dropna()) - {p.key for p in profiles}
     if bad:
         raise ValueError(f"{filename} has unknown profiles: {sorted(bad)}")
+
+
+def _check_numeric(df: pd.DataFrame, columns: list[str], filename: str) -> None:
+    """Rejects hand-edited cells that aren't numbers (e.g. ``amount = "abc"``).
+
+    A value that won't coerce becomes NaN; flag any column where coercion turns a
+    present value into NaN, so a typo fails loudly instead of silently passing the
+    non-negative check.
+    """
+    for col in columns:
+        coerced = pd.to_numeric(df[col], errors="coerce")
+        if (coerced.isna() & df[col].notna()).any():
+            raise ValueError(f"{filename} has non-numeric values in {col}")
 
 
 def _check_non_negative(df: pd.DataFrame, columns: list[str], filename: str) -> None:

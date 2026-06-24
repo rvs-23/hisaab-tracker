@@ -32,6 +32,13 @@ if not visible.empty:
     f = go.Figure()
     for i, col in enumerate(by_year.columns):
         f.add_bar(x=yr, y=by_year[col], name=col, marker_color=accents[i % 2])
+    # YoY income growth above each bar, so the raise is visible at a glance.
+    year_totals = by_year.sum(axis=1)
+    growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in year_totals.pct_change() * 100]
+    f.add_trace(go.Scatter(
+        x=yr, y=year_totals, mode="text", text=growth, textposition="top center",
+        textfont=dict(size=11, color="#6b7280"), showlegend=False, hoverinfo="skip",
+        cliponaxis=False))
     # Mark job-change years with a star above the bar.
     jc = visible.groupby("year")["job_change"].max()
     jc_years = [int(y) for y in jc.index if jc.loc[y] > 0]
@@ -51,7 +58,7 @@ section("Enter income")
 st.caption("Pick a year and fill the 12 months. Salary, bonus, and anything else (RSU vesting, an FD or RD maturing) under Other.")
 
 this_year = dt.date.today().year
-existing_years = sorted(d.income["year"].dropna().astype(int).unique())
+existing_years = sorted(d.income.loc[d.income["profile"] == profile.key, "year"].dropna().astype(int).unique())
 year_options = sorted(set(existing_years) | set(range(this_year - 7, this_year + 2)))
 default_year = this_year if this_year in year_options else (existing_years[-1] if existing_years else this_year)
 c1, _ = st.columns([1, 3])

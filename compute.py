@@ -23,8 +23,8 @@ import datetime as dt
 import pandas as pd
 
 from config import (
-    BASE_SPLIT, EXPECTED_RETURNS, INCOME_COMPONENTS, INCREMENT_SPLIT,
-    NETWORTH_PROJECTION_YEARS, PROJECTION_YEARS_AHEAD,
+    BASE_SPLIT, EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
+    INCREMENT_SPLIT, NETWORTH_PROJECTION_YEARS, PROJECTION_YEARS_AHEAD,
 )
 from models import Profile
 
@@ -198,18 +198,38 @@ def pct_goal_achieved(pva: pd.DataFrame) -> float:
     return 100 * pva["actual"].sum() / expected if expected else 0.0
 
 
-def available_years(income: pd.DataFrame, contributions: pd.DataFrame) -> list[int]:
-    years = pd.concat([income["year"], contributions["year"]]).dropna().astype(int)
+def available_years(income: pd.DataFrame, contributions: pd.DataFrame,
+                    profile: str | None = None) -> list[int]:
+    """Sorted years that have income or contribution rows.
+
+    Pass ``profile`` (a profile key) to scope to one person — after per-person
+    routing, callers want only the active person's years, not everyone's.
+    """
+    inc, con = income, contributions
+    if profile is not None:
+        inc = inc[inc["profile"] == profile]
+        con = con[con["profile"] == profile]
+    years = pd.concat([inc["year"], con["year"]]).dropna().astype(int)
     return sorted(years.unique().tolist())
 
 
-def emergency_fund_held(profile: Profile, goals: pd.DataFrame) -> float:
-    """Returns the latest emergency-fund goal for a person (held cash, no growth)."""
-    g = goals[goals["profile"] == profile.key]
-    return float(g.sort_values("year").iloc[-1]["emergency_fund_goal"]) if not g.empty else 0.0
+def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None) -> float:
+    """The emergency-fund buffer: ``EMERGENCY_FUND_MONTHS`` months of the needs
+    bucket (6 × monthly needs). Derived from income like the rest of the budget,
+    never entered. Defaults to the latest non-projected year."""
+    bs = budget_series(profile, income)
+    if bs.empty:
+        return 0.0
+    pool = bs[~bs["is_projected"]]
+    if pool.empty:
+        pool = bs
+    row = pool[pool["year"] == year] if year is not None else pool.iloc[[-1]]
+    if row.empty:
+        row = pool.iloc[[-1]]
+    return float(row.iloc[0]["monthly_needs"]) * EMERGENCY_FUND_MONTHS
 
 
-def net_worth_to_date(profile: Profile, contributions: pd.DataFrame, goals: pd.DataFrame,
+def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
                       today_year: int) -> tuple[int, int]:
     """Returns (actual, potential) net worth as of ``today_year``.
 
@@ -223,12 +243,37 @@ def net_worth_to_date(profile: Profile, contributions: pd.DataFrame, goals: pd.D
         float(r.amount) * (1 + EXPECTED_RETURNS.get(r.category, 0) / 100) ** max(0, today_year - int(r.year))
         for r in c.itertuples()
     )
-    ef = emergency_fund_held(profile, goals)
+    ef = emergency_fund_target(profile, income, today_year)
     return round(invested + ef), round(grown + ef)
 
 
+def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
+                    contributions: pd.DataFrame, today_year: int) -> float:
+    """Lump sum to invest today to pull level with the planned trajectory.
+
+    For every planned year up to today, the per-category shortfall (planned −
+    actual) is grown to today at that category's expected return; surpluses in
+    other years/categories net against it. The result is how much, invested
+    *today* (already at today's value), would make the portfolio worth what it
+    would have been worth had every year's plan been met. Never below zero, and
+    investing more than this (overshooting the goal) is fine.
+    """
+    c = contributions[contributions["profile"] == profile.key]
+    planned_fv = actual_fv = 0.0
+    for y in available_years(income, contributions, profile.key):
+        if y > today_year:
+            continue
+        exp = expected_contributions(profile, income, targets, y)
+        act = c[c["year"] == y].groupby("category")["amount"].sum().to_dict()
+        for cat in set(exp) | set(act):
+            grow = (1 + EXPECTED_RETURNS.get(cat, 0) / 100) ** (today_year - y)
+            planned_fv += exp.get(cat, 0.0) * grow
+            actual_fv += act.get(cat, 0.0) * grow
+    return max(0.0, planned_fv - actual_fv)
+
+
 def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
-                     targets: pd.DataFrame, goals: pd.DataFrame, today_year: int,
+                     targets: pd.DataFrame, today_year: int,
                      ahead: int = NETWORTH_PROJECTION_YEARS) -> pd.DataFrame:
     """Net worth year by year, actual past plus a projected future.
 
@@ -253,7 +298,7 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
         invest_y = cur_invest * (1 + profile.forward_increment_pct / 100) ** i
         streams[today_year + i] = {cat: invest_y * pct / 100 for cat, pct in target.items()}
 
-    ef = emergency_fund_held(profile, goals)
+    ef = emergency_fund_target(profile, income, today_year)
     rows = []
     for horizon in range(first, today_year + ahead + 1):
         potential = basis = ef
