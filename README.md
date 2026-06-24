@@ -1,107 +1,85 @@
 # Personal Finances Tracker
 
 A local Streamlit app for two people that replaces a finance-tracking Excel. It
-answers one question — *did we invest what the plan said this year?* — so it's a
-**contributions-vs-goal** tracker, not a net-worth one. Income drives a derived
-budget, a target allocation, and a planned-vs-actual comparison.
+answers one question — *did we invest what the plan said this year?* — so it
+tracks **contributions vs goal**, not net worth. Income drives a derived budget,
+a target allocation, and a planned-vs-actual comparison.
 
-## Getting started
+## Run it
+
+**`app.py` is the entry point** — it defines the pages via `st.navigation`:
 
 ```sh
 uv sync
-cp .env.example .env          # then set DATA_DIR to your data folder
-uv run streamlit run app.py   # opens http://localhost:8501
+cp .env.example .env          # set DATA_DIR to your data folder
+uv run streamlit run app.py   # http://localhost:8501
 ```
 
 Requires Python ≥ 3.14. Tests: `uv run pytest`.
 
-## Using the app & feeding in data
+## Entering data
 
-Your data lives in a **plain CSV/YAML folder outside the repo** (e.g. in iCloud
-or Drive), pointed to by `DATA_DIR` in `.env`. It's never committed. You enter
-everything **through the app**, working down the sidebar in order — each page
-edits its own files in place, and the app re-reads from disk on every refresh.
+**All data is entered by hand** — there is no bank, broker, or statement import.
+You type it through the app (or edit the CSVs directly); each page edits its own
+files in place and the app re-reads from disk on every refresh. Data lives in a
+plain **CSV/YAML folder outside the repo** (`DATA_DIR` in `.env`, never
+committed). The minimum to start is a folder with `config.yaml` and a `profiles/`
+directory — the CSVs are created as you save.
 
-Each page shows **one person at a time** (routing) via the `?profile=<key>` URL
-param — `?profile=rv` (Brownie) or `?profile=cheeni`. There's no on-page
-switcher to clutter things: you set the profile in the URL once and it sticks
-across every page (the active name shows under each title), so you fill your own
-data with no overlap. A combined household view is planned, but kept separate.
+Each page shows **one person at a time** via the `?profile=<key>` URL — `rv`
+(Brownie) or `cheeni`. Set it once and it sticks across pages (no on-page
+switcher). Work down the sidebar:
 
-1. **Income** — pick a year and fill the 12 months (`salary`, `bonus`, `other` —
-   put RSU vesting or an FD/RD maturing under *other*); tick *job change* if you
-   switched jobs that year. Everything else is derived from this.
-2. **Budget** — read-only. Shows how income splits into needs/wants/investment
-   and how the investment slice grows. Nothing to fill here; change it on Income.
-3. **Allocation** — set the **%** per instrument (must sum to 100); the ₹/year
-   and ₹/month fill in automatically from that year's investment amount.
-4. **Actuals** — record what you **actually** invested per instrument. The page
-   shows planned vs actual, your % of goal, and the year's emergency-fund target
-   (derived: 6 months of needs).
-5. **Dashboard** — the consolidated **journey** (not one year): the earning/
-   investing trajectory (with year-on-year income growth), lifetime cards
-   (potential net worth, invested to date, overall goal achieved, savings rate),
-   a **catch-up** figure (what to invest today to pull level with the plan), a
-   net-worth chart (invested vs projected value, with a 5-year projection), and
-   planned-vs-actual per year. Read-only.
+1. **Income** — pick a year, fill the 12 months (`salary`, `bonus`, `other`; put
+   RSU/FD/RD under *other*), tick *job change* if you switched jobs. Year pickers
+   are locked to **2022 → now** (2022 is a zero baseline; tracking starts 2023).
+   Everything else derives from this.
+2. **Budget** *(read-only)* — how income splits into needs/wants/investment, and
+   how the investment slice grows. Change it on Income.
+3. **Allocation** — set the **%** per instrument (sum to 100); ₹/year and ₹/month
+   follow from that year's investment.
+4. **Actuals** — record what you **actually** invested per instrument; see
+   planned vs actual, % of goal, and the derived emergency-fund target.
+5. **Dashboard** *(read-only)* — the consolidated journey: earning/investing
+   trajectory, lifetime cards, a **catch-up** figure, a net-worth projection, and
+   planned-vs-actual per year.
 
-Prefer a text editor? Every file is plain CSV/YAML, so you can edit them
-directly and refresh the app. The files:
+The files (all plain text, hand-editable):
 
-| File | Columns / shape |
-|------|-----------------|
-| `income.csv` | `profile, year, month (1–12), salary, bonus, other, job_change`. Monthly rows; `job_change` is a per-year 0/1 flag. |
-| `targets.csv` | `profile, year, category, pct`. Per-year allocation overrides; each `(profile, year)` sums to 100. Optional — the profile's `default_target` is the fallback. |
-| `contributions.csv` | `year, profile, category, amount, notes` — what was actually invested. |
-| `config.yaml` | `usd_inr_rate, usd_inr_as_of, categories` (the asset classes). |
-| `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target` (a `{category: percent}` map summing to 100). The filename stem is the `profile` key used across the CSVs. |
-
-A `.env` pointing at a folder with `config.yaml` and a `profiles/` directory is
-the minimum to start; the CSVs are created as you save from the app.
+| File | Shape |
+|------|-------|
+| `income.csv` | `profile, year, month (1–12), salary, bonus, other, job_change` — monthly rows; `job_change` a per-year 0/1 flag |
+| `targets.csv` | `profile, year, category, pct` — optional per-year allocation overrides (sum to 100; else `default_target`) |
+| `contributions.csv` | `year, profile, category, amount, notes` — what was actually invested |
+| `config.yaml` | `usd_inr_rate, usd_inr_as_of, categories` |
+| `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target`; the filename stem is the `profile` key |
 
 ## How the numbers work
 
-- **Budget** is *derived* from income, never stored. A person's **anchor year**
-  (earliest) splits income **50/30/20** across needs/wants/investment; every
-  later year carries the previous rupees forward and splits only the income
-  **increment 20/30/50**, so raises flow mostly to investing. Beyond the entered
-  years it projects to *current year + 3* at `forward_increment_pct` (default 5%).
-- **The goal** for a year is that year's investment amount split by the target:
-  `expected[category] = investment × target%[category]`. Per-year target
-  overrides carry forward until a newer one replaces them.
-- **Potential net worth** is a projection (no live market value): each
-  contribution compounded at a conservative per-category return (`EXPECTED_RETURNS`
-  in `config.py`), plus the emergency fund. The dashboard shows actual invested
-  vs this potential, and projects it ~5 years out.
-- **The emergency fund is derived**, not entered: `EMERGENCY_FUND_MONTHS` (6) ×
-  that year's monthly needs. It's added to net worth as held cash.
-- **Catch-up amount** = what to invest *today* to pull level with the planned
-  trajectory. Each year's per-category shortfall (planned − actual) is grown to
-  today at the category's expected return and summed (surpluses net against it);
-  the result is the lump sum that makes your portfolio worth what it would have
-  been had every plan been met. It's fine to invest more and overshoot the goal.
-- **% goal achieved** = total actual ÷ total expected. `storage.py` validates
-  every file on load and refuses bad hand-edits (non-numeric, negative, dupes).
+- **Budget** is derived from income, never stored: the anchor (earliest) year
+  splits income **50/30/20**; each later year splits only the **increment 20/30/50**,
+  so raises flow to investing. Projects to *current + 3* at `forward_increment_pct`.
+- **Goal** for a year = its investment amount split by the target:
+  `expected[cat] = investment × target%`.
+- **Potential net worth** — contributions compounded at conservative per-category
+  returns (`EXPECTED_RETURNS`), plus the **emergency fund** (derived: 6 months of
+  needs). A projection, not a live valuation.
+- **Catch-up** = the lump sum to invest *today* to pull level with the plan (each
+  year's shortfall grown to today at expected returns; overshooting is fine).
+- `storage.py` validates every file on load and rejects bad hand-edits.
 
-## Code structure
+## Layout
 
-Flat — modules at the root, page scripts in `views/`:
+Flat — modules at the root, pages in `views/`:
 
-- **`config.py`** — palette, budget-model constants (`BASE_SPLIT`,
-  `INCREMENT_SPLIT`, `PROJECTION_YEARS_AHEAD`, `ON_TRACK_PCT`),
-  `INCOME_COMPONENTS`, `CATEGORY_LABELS`.
-- **`models.py`** — pydantic schemas (`Config`, `Profile`) for the YAML.
-- **`storage.py`** — load/save + validation for the data folder; `.env`
-  `DATA_DIR` resolution.
-- **`compute.py`** — the financial model as pure functions (`budget_series`,
-  `expected_contributions`, `plan_vs_actual`, `resolve_target`, …).
-- **`ui.py`** — Streamlit presentation: `load_all`, formatting, and the shared
-  styling helpers (`metric_tile`, `html_table`, `style_fig`, `edit_card`, …).
-- **`views/*.py`** — the five pages. **`app.py`** — config, logo, `st.navigation`.
-- **`tests/`** — `test_compute.py` (golden figures) and `test_app_smoke.py`
-  (renders every page headlessly).
+- **`app.py`** — entry point: page config, logo, `st.navigation`.
+- **`config.py`** palette + model constants · **`models.py`** pydantic YAML schemas.
+- **`storage.py`** CSV/YAML load/save + validation · **`compute.py`** the financial
+  model as pure functions.
+- **`ui.py`** Streamlit helpers (`load_all`, `metric_tile`, …) · **`views/*.py`**
+  the five pages · **`tests/`** golden + headless render tests.
 
 ## Non-goals
 
-Live prices/FX, broker APIs, market-value/net-worth tracking, auth, multi-device
-sync, mobile, cloud hosting. Local only — no server, no database, no live data.
+Live prices/FX, broker APIs, net-worth/market-value tracking, auth, multi-device
+sync, mobile, cloud. Local only — no server, no database, no live data.

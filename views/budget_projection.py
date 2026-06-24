@@ -27,10 +27,10 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-income_years = sorted(d.income.loc[d.income["profile"] == active.key, "year"].dropna().astype(int).unique())
-if not income_years:
+if d.income[d.income["profile"] == active.key].empty:
     st.info("No income entered yet. Add it on the Income page.")
     st.stop()
+income_years = compute.selectable_years(d.income, d.contributions, active.key)
 default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
 yc, _ = st.columns([1, 5])
 year = yc.selectbox("Year", income_years, index=income_years.index(default_year))

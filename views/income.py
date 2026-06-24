@@ -4,6 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
+import compute
 import storage
 from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
@@ -58,9 +59,8 @@ section("Enter income")
 st.caption("Pick a year and fill the 12 months. Salary, bonus, and anything else (RSU vesting, an FD or RD maturing) under Other.")
 
 this_year = dt.date.today().year
-existing_years = sorted(d.income.loc[d.income["profile"] == profile.key, "year"].dropna().astype(int).unique())
-year_options = sorted(set(existing_years) | set(range(this_year - 7, this_year + 2)))
-default_year = this_year if this_year in year_options else (existing_years[-1] if existing_years else this_year)
+year_options = compute.selectable_years(d.income, d.contributions, profile.key)
+default_year = this_year if this_year in year_options else year_options[-1]
 c1, _ = st.columns([1, 3])
 year = int(c1.selectbox("Year", year_options, index=year_options.index(default_year)))
 

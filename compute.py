@@ -23,8 +23,9 @@ import datetime as dt
 import pandas as pd
 
 from config import (
-    BASE_SPLIT, EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
-    INCREMENT_SPLIT, NETWORTH_PROJECTION_YEARS, PROJECTION_YEARS_AHEAD,
+    BASE_SPLIT, BASELINE_YEAR, EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS,
+    INCOME_COMPONENTS, INCREMENT_SPLIT, NETWORTH_PROJECTION_YEARS,
+    PROJECTION_YEARS_AHEAD,
 )
 from models import Profile
 
@@ -211,6 +212,17 @@ def available_years(income: pd.DataFrame, contributions: pd.DataFrame,
         con = con[con["profile"] == profile]
     years = pd.concat([inc["year"], con["year"]]).dropna().astype(int)
     return sorted(years.unique().tolist())
+
+
+def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
+                     profile: str | None = None, today: dt.date | None = None) -> list[int]:
+    """The locked year range every page selector offers: a contiguous span from
+    ``BASELINE_YEAR`` (2022, the zero floor) up to the current year — or the
+    latest year that has data, if somehow later. Profile-scoped when a key is
+    given. Always non-empty, so a selector never collapses."""
+    cur = (today or dt.date.today()).year
+    top = max([cur, *available_years(income, contributions, profile)])
+    return list(range(BASELINE_YEAR, top + 1))
 
 
 def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None) -> float:

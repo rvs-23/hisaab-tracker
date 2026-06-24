@@ -14,10 +14,10 @@ active = page_header("Actuals", d.profiles)
 scope = [active.key]
 st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested.")
 
-years = compute.available_years(d.income, d.contributions, active.key)
-if not years:
+if d.income[d.income["profile"] == active.key].empty:
     st.info("No data yet — add income first.")
     st.stop()
+years = compute.selectable_years(d.income, d.contributions, active.key)
 
 contrib_years = sorted(
     d.contributions.loc[d.contributions["profile"] == active.key, "year"].dropna().astype(int).unique()

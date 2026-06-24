@@ -29,6 +29,10 @@ INCREMENT_SPLIT = {"needs": 20, "wants": 30, "investment": 50}
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 
+# The earliest year any selector offers: a locked zero baseline. Real tracking
+# starts 2023, so 2022 sits below it as an empty floor.
+BASELINE_YEAR = 2022
+
 # Conservative expected annual returns per category, for the net-worth
 # projection (base estimates + 0.5%). Tune here. The emergency fund is treated
 # as held cash (no growth).

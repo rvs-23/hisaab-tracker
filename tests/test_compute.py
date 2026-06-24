@@ -169,6 +169,12 @@ def test_available_years_scopes_to_profile(income, contributions):
     assert 2099 in compute.available_years(inc2, contributions)  # unscoped sees both
 
 
+def test_selectable_years_locked_from_baseline(income, contributions):
+    """Every selector offers a locked range from 2022 up to the current year."""
+    yrs = compute.selectable_years(income, contributions, "rv", today=dt.date(2026, 6, 1))
+    assert yrs == list(range(2022, 2027))  # 2022 floor, 2026 current
+
+
 def test_emergency_fund_is_six_months_of_needs(rv, income):
     bs = compute.budget_series(rv, income).set_index("year")
     assert compute.emergency_fund_target(rv, income, 2024) == pytest.approx(6 * bs.loc[2024, "monthly_needs"])
