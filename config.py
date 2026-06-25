@@ -5,8 +5,10 @@ constants, the income components, and the category labels. Other modules import
 from here rather than hard-coding values.
 """
 
-# Palette: a grayscale base plus two accents. Teal marks actuals and the current
-# year; mulberry marks planned, projected, and target figures.
+# Palette: a grayscale base plus two accents. The accent *roles* are fixed —
+# primary = actuals / current year, secondary = planned / projected / target —
+# but the actual hues are per person, so the colour scheme alone tells whose data
+# you're looking at (no name label needed). See PROFILE_ACCENTS below.
 INK = "#2b2b2b"
 TEAL = "#0F766E"
 MULBERRY = "#86198F"
@@ -20,6 +22,17 @@ STRIP_TEXT = TEAL
 SAND = "#dfe4e8"  # neutral income bar
 NEEDS = "#b9c0c7"  # the "needs" slice of the budget split
 FONT = "Inter"
+
+# Per-person accent pair: (primary = actuals/current, secondary = planned/
+# projected). Profiles are told apart by colour, not a name. Picked to read on
+# both light and dark backgrounds; the shared grays stay the neutral base.
+#   rv     → teal + mulberry
+#   cheeni → pink + indigo
+PROFILE_ACCENTS = {
+    "rv": (TEAL, MULBERRY),
+    "cheeni": ("#DB2777", "#6366F1"),
+}
+DEFAULT_ACCENTS = (TEAL, MULBERRY)
 
 # Budget model. The anchor year (a person's first) splits income 50/30/20 across
 # needs/wants/investment; every later year splits only the income *increment*

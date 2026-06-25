@@ -5,12 +5,13 @@ import streamlit as st
 import compute
 import storage
 from ui import (
-    MULBERRY, ON_TRACK_PCT, TEAL, edit_card, grid_color, html_table, inr_short, load_all,
-    metric_tile, page_header, pretty_category, section, style_fig,
+    ON_TRACK_PCT, accent_primary, accent_secondary, edit_card, grid_color, html_table,
+    inr_short, load_all, metric_tile, page_header, pretty_category, section, style_fig,
 )
 
 d = load_all()
 active = page_header("Actuals", d.profiles)
+PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 scope = [active.key]
 st.caption("What actually went in, against the plan. Planned (mulberry) vs actual (teal) per category; negative shortfall = under-invested.")
 
@@ -38,9 +39,9 @@ st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);mar
 asc = pva.sort_values("expected")
 f = go.Figure()
 f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], name="Planned",
-          orientation="h", marker_color=MULBERRY)
+          orientation="h", marker_color=SECONDARY)
 f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name="Actual",
-          orientation="h", marker_color=TEAL)
+          orientation="h", marker_color=PRIMARY)
 f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
 style_fig(f)
 f.update_xaxes(showgrid=True, gridcolor=grid_color())
@@ -50,7 +51,7 @@ st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 section(f"How {year} is tracking")
 cols = st.columns(3)
 metric_tile(cols[0], "Goal achieved", f"{compute.pct_goal_achieved(pva):.0f}%", f"of {year}'s plan",
-            color=TEAL if compute.pct_goal_achieved(pva) >= ON_TRACK_PCT else MULBERRY, big=True)
+            color=PRIMARY if compute.pct_goal_achieved(pva) >= ON_TRACK_PCT else SECONDARY, big=True)
 metric_tile(cols[1], "Emergency-fund goal", inr_short(emergency_fund), f"6 months of {year} needs", big=True,
             help="Derived, not entered: 6 months of that year's needs bucket (6 × monthly needs).")
 st.write("")

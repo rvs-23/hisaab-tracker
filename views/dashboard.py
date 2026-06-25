@@ -6,14 +6,15 @@ import streamlit as st
 
 import compute
 from ui import (
-    MULBERRY, ON_TRACK_PCT, SAND, TEAL, inr_short, load_all, metric_tile,
-    page_header, pretty_category, style_fig,
+    ON_TRACK_PCT, SAND, accent_primary, accent_secondary, inr_short, load_all,
+    metric_tile, page_header, pretty_category, style_fig,
 )
 
 GRAY_LINE = "#9aa0a6"
 
 d = load_all()
 profile = page_header("Dashboard", d.profiles)
+PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 today_year = dt.date.today().year
 
 contrib = d.contributions[d.contributions["profile"] == profile.key]
@@ -40,18 +41,18 @@ else:
     f = go.Figure()
     f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND,
               text=inc_growth, textposition="outside", textfont=dict(size=11, color="#6b7280"))
-    f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=TEAL)
+    f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=PRIMARY)
     f.add_trace(go.Scatter(
         x=yr, y=rate_line, name="Invest rate", yaxis="y2", mode="lines+markers+text",
         text=[f"{v:.0f}%" for v in rate_line], textposition="top center",
-        textfont=dict(size=11, color=MULBERRY), line=dict(color=MULBERRY, width=3), marker=dict(size=8)))
+        textfont=dict(size=11, color=SECONDARY), line=dict(color=SECONDARY, width=3), marker=dict(size=8)))
     f.update_traces(cliponaxis=False, selector=dict(type="bar"))
     f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"),
                     yaxis2=dict(overlaying="y", side="right", range=[0, max(60, rate_line.max() + 15)],
                                 ticksuffix="%", showgrid=False))
     style_fig(f, height=360)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-    st.caption("Grey labels: income growth year on year. Mulberry line: % of income invested (the rising slice).")
+    st.caption("Grey labels: income growth year on year. Coloured line: % of income invested (the rising slice).")
 
 # --- lifetime cards ----------------------------------------------------------
 nw_actual, nw_potential = compute.net_worth_to_date(profile, d.income, d.contributions, today_year)
@@ -76,12 +77,12 @@ rate = 100 * latest["investment"] / latest["total_income"] if latest is not None
 st.markdown("<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-top:.6rem'>Lifetime</div>", unsafe_allow_html=True)
 c = st.columns(4)
 metric_tile(c[0], "Potential net worth", inr_short(nw_potential), f"≈ {inr_short(nw_potential - nw_actual)} growth",
-            color=TEAL, big=True,
+            color=PRIMARY, big=True,
             help="What your contributions could be worth today, compounded at conservative per-category returns, plus your emergency fund (6 months of needs).")
 metric_tile(c[1], "Invested to date", inr_short(invested), "actual, all years", big=True,
             help="Total you have actually put in across every year (cost basis, no growth).")
 metric_tile(c[2], "Overall goal", f"{overall:.0f}%", "invested of planned", big=True,
-            color=TEAL if overall >= ON_TRACK_PCT else MULBERRY,
+            color=PRIMARY if overall >= ON_TRACK_PCT else SECONDARY,
             help="Across the years you've been investing, how much of the planned amount you actually invested.")
 metric_tile(c[3], "Savings rate", f"{rate:.0f}%", "of income, latest year", big=True,
             help="Share of your income the plan puts into investing. It rises as you earn more.")
@@ -89,19 +90,19 @@ metric_tile(c[3], "Savings rate", f"{rate:.0f}%", "of income, latest year", big=
 # --- catch-up: one number, one action ----------------------------------------
 if catch_up > 0:
     st.markdown(
-        f"<div style='border:1px solid {MULBERRY}33;background:{MULBERRY}0d;border-radius:12px;"
+        f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
         f"padding:14px 18px;margin-top:.7rem;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
         f"<span style='font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
         f"Catch up in {today_year}</span>"
-        f"<span style='font-size:1.7rem;font-weight:700;color:{MULBERRY}'>{inr_short(catch_up)}</span>"
+        f"<span style='font-size:1.7rem;font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
         f"<span style='font-size:.85rem;color:var(--muted)'>invest this much extra today and you're level with "
         f"every year you fell short (grown at expected returns). Overshooting is fine.</span></div>",
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
-        f"<div style='border:1px solid {TEAL}33;background:{TEAL}0d;border-radius:12px;"
-        f"padding:12px 18px;margin-top:.7rem;color:{TEAL};font-weight:600;font-size:.92rem'>"
+        f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
+        f"padding:12px 18px;margin-top:.7rem;color:{PRIMARY};font-weight:600;font-size:.92rem'>"
         f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
         unsafe_allow_html=True,
     )
@@ -118,10 +119,10 @@ else:
     f.add_trace(go.Scatter(x=nyr, y=nw["cost_basis"], name="Invested (cost)",
                            mode="lines", line=dict(color=GRAY_LINE, width=2)))
     f.add_trace(go.Scatter(x=past["year"].astype(int).astype(str), y=past["potential"],
-                           name="Net worth", mode="lines+markers", line=dict(color=TEAL, width=3)))
+                           name="Net worth", mode="lines+markers", line=dict(color=PRIMARY, width=3)))
     if len(proj) > 1:
         f.add_trace(go.Scatter(x=proj["year"].astype(int).astype(str), y=proj["potential"],
-                               name="Projected", mode="lines", line=dict(color=TEAL, width=3, dash="dash")))
+                               name="Projected", mode="lines", line=dict(color=PRIMARY, width=3, dash="dash")))
     f.update_layout(xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
     style_fig(f, height=320)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
@@ -134,8 +135,8 @@ if eval_years:
     actual = [float(contrib.loc[contrib["year"] == y, "amount"].sum()) for y in eval_years]
     xs = [str(y) for y in eval_years]
     f = go.Figure()
-    f.add_bar(x=xs, y=planned, name="Planned", marker_color=MULBERRY)
-    f.add_bar(x=xs, y=actual, name="Actual", marker_color=TEAL)
+    f.add_bar(x=xs, y=planned, name="Planned", marker_color=SECONDARY)
+    f.add_bar(x=xs, y=actual, name="Actual", marker_color=PRIMARY)
     f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
     style_fig(f, height=300)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})

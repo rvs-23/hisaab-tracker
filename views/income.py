@@ -8,11 +8,13 @@ import compute
 import storage
 from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
-    MULBERRY, TEAL, edit_card, inr_short, load_all, page_header, resync, section, style_fig,
+    accent_primary, accent_secondary, edit_card, inr_short, load_all, page_header,
+    resync, section, style_fig,
 )
 
 d = load_all()
 profile = page_header("Income", d.profiles)
+PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 selected = [profile]
 scope = [profile.key]
 
@@ -29,7 +31,7 @@ if not visible.empty:
         .groupby(["year", "profile"])["total"].sum().unstack("profile").rename(columns=names)
     )
     yr = by_year.index.astype(int).astype(str)
-    accents = [TEAL, MULBERRY]
+    accents = [PRIMARY, SECONDARY]
     f = go.Figure()
     for i, col in enumerate(by_year.columns):
         f.add_bar(x=yr, y=by_year[col], name=col, marker_color=accents[i % 2])

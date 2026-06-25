@@ -13,12 +13,13 @@ import streamlit as st
 import compute
 import storage
 from ui import (
-    MULBERRY, TEAL, edit_card, inr_short, load_all, metric_tile, page_header,
-    pretty_category, resync, section,
+    accent_primary, accent_secondary, edit_card, inr_short, load_all, metric_tile,
+    page_header, pretty_category, resync, section,
 )
 
 d = load_all()
 active = page_header("Allocation", d.profiles)
+PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 selected = [active]
 ss = st.session_state
 CURRENT_YEAR = dt.date.today().year
@@ -76,7 +77,7 @@ for profile in selected:
         total_pct = edited["pct"].sum()
         ok = abs(total_pct - 100) < 0.01
         msg = f"Total <b>{total_pct:.0f}%</b>" + ("  ·  ready to save" if ok else "  ·  must sum to 100")
-        st.markdown(f"<span style='color:{TEAL if ok else MULBERRY};font-weight:600'>{msg}</span>",
+        st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
                     unsafe_allow_html=True)
 
         if st.button(f"Save {profile.name} · {year}", key=f"save_alloc_{profile.key}_{year}",

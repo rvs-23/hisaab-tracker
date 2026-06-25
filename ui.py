@@ -13,8 +13,9 @@ import streamlit as st
 
 import storage
 from config import (  # re-exported for views
-    CARD_BG, CARD_BORDER, CATEGORY_LABELS, GRID, INK, MULBERRY, MUTED,
-    NEEDS, ON_TRACK_PCT, SAND, STRIP_BORDER, STRIP_BG, STRIP_TEXT, TEAL,
+    CARD_BG, CARD_BORDER, CATEGORY_LABELS, DEFAULT_ACCENTS, GRID, INK,
+    MULBERRY, MUTED, NEEDS, ON_TRACK_PCT, PROFILE_ACCENTS, SAND,
+    STRIP_BORDER, STRIP_BG, STRIP_TEXT, TEAL,
 )
 
 
@@ -90,6 +91,25 @@ def pretty_category(category: str) -> str:
 def grid_color() -> str:
     """Returns the chart gridline colour."""
     return GRID
+
+
+# --- per-profile accents ---------------------------------------------------
+
+def accent_primary() -> str:
+    """The active person's primary accent (actuals / current year)."""
+    return st.session_state.get("_accent_primary", DEFAULT_ACCENTS[0])
+
+
+def accent_secondary() -> str:
+    """The active person's secondary accent (planned / projected / target)."""
+    return st.session_state.get("_accent_secondary", DEFAULT_ACCENTS[1])
+
+
+def _set_accents(profile_key: str) -> None:
+    """Stores the active person's accent pair so views and helpers can read it."""
+    primary, secondary = PROFILE_ACCENTS.get(profile_key, DEFAULT_ACCENTS)
+    st.session_state["_accent_primary"] = primary
+    st.session_state["_accent_secondary"] = secondary
 
 
 # --- styling ---------------------------------------------------------------
@@ -233,7 +253,7 @@ def edit_card(title: str):
     """
     with st.container(border=True):
         st.markdown(
-            f"<div style='font-weight:700;color:{TEAL};font-size:.95rem;margin-bottom:.4rem'>"
+            f"<div style='font-weight:700;color:{accent_primary()};font-size:.95rem;margin-bottom:.4rem'>"
             f"{title}</div>",
             unsafe_allow_html=True,
         )
@@ -248,7 +268,9 @@ def page_header(title: str, profiles):
     There's deliberately **no on-page switcher** — you pick a person by setting
     the URL once (e.g. ``?profile=cheeni``) and it sticks across pages via session
     state, so the whole app follows your choice. Defaults to the alphabetically-
-    first name (Brownie). The active name shows as a small, muted subtitle.
+    first name (Brownie). No name is shown; the person is told apart by the
+    page's **accent colour scheme** (a small bar in that accent sits under the
+    title).
 
     Returns:
         The active Profile.
@@ -265,11 +287,14 @@ def page_header(title: str, profiles):
         active = default
     st.session_state["active_profile"] = active
     st.query_params["profile"] = active  # keep the URL shareable/bookmarkable
+    _set_accents(active)
 
     profile = next(p for p in profiles if p.key == active)
     st.title(title)
     st.markdown(
-        f"<div style='margin:-.6rem 0 .8rem;color:{TEAL};font-weight:600;font-size:.95rem'>{profile.name}</div>",
+        f"<div style='margin:-.6rem 0 .9rem'>"
+        f"<span style='display:inline-block;width:34px;height:5px;border-radius:3px;"
+        f"background:{accent_primary()}'></span></div>",
         unsafe_allow_html=True,
     )
     return profile

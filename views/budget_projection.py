@@ -6,13 +6,15 @@ import streamlit as st
 
 import compute
 from ui import (
-    MULBERRY, NEEDS, TEAL, html_table, inr_short, load_all, metric_tile, page_header, section, style_fig,
+    NEEDS, accent_primary, accent_secondary, html_table, inr_short, load_all,
+    metric_tile, page_header, section, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
 
 d = load_all()
 active = page_header("Budget", d.profiles)
+PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 scope = [active.key]
 st.caption(
     "How income splits, derived from the plan. The anchor year is 50/30/20 "
@@ -78,8 +80,8 @@ for profile in visible:
     inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
     f = go.Figure()
     f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
-    f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=MULBERRY)
-    f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=TEAL,
+    f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SECONDARY)
+    f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=PRIMARY,
               text=inv_label, textposition="inside",
               textfont=dict(color="white", size=11), insidetextanchor="middle")
     f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
@@ -95,8 +97,8 @@ for profile in visible:
         section(f"Monthly split · {year}")
         cols = st.columns(3)
         metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
-        metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=MULBERRY, big=True)
-        metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=TEAL, big=True)
+        metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=SECONDARY, big=True)
+        metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=PRIMARY, big=True)
 
     with st.expander("Full detail (all years + projections)"):
         st.caption("Current year highlighted; projected years in muted italics.")
