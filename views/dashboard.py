@@ -7,7 +7,7 @@ import streamlit as st
 import compute
 from ui import (
     ON_TRACK_PCT, SAND, accent_primary, accent_secondary, inr_short, load_all,
-    metric_tile, page_header, pretty_category, style_fig,
+    metric_tile, page_header, style_fig,
 )
 
 GRAY_LINE = "#9aa0a6"
@@ -25,8 +25,10 @@ if trend.empty and contrib.empty:
     st.stop()
 
 
-def chart_title(text):
-    st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.5rem 0 .4rem'>{text}</div>",
+def chart_title(text, help=""):
+    info = (f" <span title='{help}' style='cursor:help;font-weight:400;font-size:.82em;"
+            f"color:var(--muted)'>&#9432;</span>") if help else ""
+    st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.5rem 0 .4rem'>{text}{info}</div>",
                 unsafe_allow_html=True)
 
 
@@ -67,10 +69,6 @@ eval_years = [y for y in compute.available_years(d.income, d.contributions, prof
 lifetime_planned = sum(sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in eval_years)
 invested_in_plan = float(contrib.loc[contrib["year"].isin(eval_years), "amount"].sum())
 overall = 100 * invested_in_plan / lifetime_planned if lifetime_planned else 0.0
-on_track = sum(
-    1 for y in eval_years
-    if compute.pct_goal_achieved(compute.plan_vs_actual(profile, d.income, d.targets, d.contributions, y)) >= ON_TRACK_PCT
-)
 latest = trend.iloc[-1] if not trend.empty else None
 rate = 100 * latest["investment"] / latest["total_income"] if latest is not None and latest["total_income"] else 0.0
 
@@ -108,7 +106,10 @@ else:
     )
 
 # --- net worth: invested vs projected value ----------------------------------
-chart_title("Net worth — invested vs projected value")
+chart_title("Net worth — invested vs projected value",
+            help="An estimate, not your real portfolio value. It compounds what you've "
+                 "contributed at conservative per-category expected returns (plus the emergency "
+                 "fund) — it does not read live prices or what your holdings are actually worth today.")
 if nw.empty:
     st.caption("Record contributions on the Actuals page to project net worth.")
 else:
@@ -140,32 +141,3 @@ if eval_years:
     f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
     style_fig(f, height=300)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-
-# --- takeaways ---------------------------------------------------------------
-bullets = []
-if eval_years:
-    bullets.append(f"On track in <b>{on_track} of {len(eval_years)}</b> years (75%+ of plan); "
-                   f"overall you've invested <b>{overall:.0f}%</b> of what you planned.")
-gaps = []
-for y in eval_years:
-    exp = compute.expected_contributions(profile, d.income, d.targets, y)
-    act = contrib[contrib["year"] == y].groupby("category")["amount"].sum().to_dict()
-    for cat in set(exp) | set(act):
-        gaps.append((cat, act.get(cat, 0) - exp.get(cat, 0)))
-if gaps:
-    agg = pd.DataFrame(gaps, columns=["category", "gap"]).groupby("category")["gap"].sum()
-    behind = agg[agg < 0].sort_values().head(2)
-    if not behind.empty:
-        parts = [f"<b>{pretty_category(c)}</b> ({inr_short(-g)} behind)" for c, g in behind.items()]
-        bullets.append("Biggest gaps over time: " + ", ".join(parts) + ".")
-if not nw.empty:
-    bullets.append(f"Potential net worth <b>{inr_short(nw_potential)}</b> today, heading toward "
-                   f"<b>{inr_short(int(nw['potential'].iloc[-1]))}</b> by {int(nw['year'].iloc[-1])} if you keep to plan.")
-if bullets:
-    items = "".join(f"<li style='margin:.25rem 0'>{b}</li>" for b in bullets)
-    st.markdown(
-        f"<div style='margin-top:1rem'>"
-        f"<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-bottom:.2rem'>Takeaways</div>"
-        f"<ul style='color:var(--text);margin:0;padding-left:1.1rem'>{items}</ul></div>",
-        unsafe_allow_html=True,
-    )
