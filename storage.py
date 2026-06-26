@@ -14,6 +14,9 @@ are *derived* from income, not stored.
 
 from __future__ import annotations
 
+import json
+from collections import Counter
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -21,6 +24,9 @@ import yaml
 
 from config import INCOME_COMPONENTS
 from models import Config, Profile
+
+CHANGES_LOG = "changes.jsonl"  # append-only audit trail of every save
+_LOG_ROW_CAP = 100  # log full rows up to this many; beyond, just the count
 
 REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 
@@ -147,16 +153,73 @@ def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Prof
 
 # --- savers ---------------------------------------------------------------
 
+def _save(root: Path, filename: str, df: pd.DataFrame, sort_cols: list[str],
+          columns: list[str]) -> None:
+    """Writes a history CSV and appends an audit record of what changed.
+
+    The on-disk file is read both before and after the write, so the before/after
+    comparison is between two CSV-normalised frames (no spurious int-vs-float diffs).
+    """
+    path = root / filename
+    before = _read_optional(path, columns)
+    df.sort_values(sort_cols).to_csv(path, index=False)
+    after = _read_optional(path, columns)
+    _log_change(root, filename, before, after, columns)
+
+
 def save_income(root: Path, df: pd.DataFrame) -> None:
-    df.sort_values(["profile", "year", "month"]).to_csv(root / "income.csv", index=False)
+    _save(root, "income.csv", df, ["profile", "year", "month"], INCOME_COLUMNS)
 
 
 def save_contributions(root: Path, df: pd.DataFrame) -> None:
-    df.sort_values(["year", "profile", "category"]).to_csv(root / "contributions.csv", index=False)
+    _save(root, "contributions.csv", df, ["year", "profile", "category"], CONTRIB_COLUMNS)
 
 
 def save_targets(root: Path, df: pd.DataFrame) -> None:
-    df.sort_values(["profile", "year", "category"]).to_csv(root / "targets.csv", index=False)
+    _save(root, "targets.csv", df, ["profile", "year", "category"], TARGETS_COLUMNS)
+
+
+# --- audit log ------------------------------------------------------------
+
+def _row_multiset(df: pd.DataFrame, columns: list[str]) -> Counter:
+    """Rows as a multiset of native-Python tuples (handles duplicate rows)."""
+    if df is None or df.empty:
+        return Counter()
+    rows = []
+    for row in df.reindex(columns=columns).itertuples(index=False):
+        vals = [None if pd.isna(v) else (v.item() if hasattr(v, "item") else v) for v in row]
+        rows.append(tuple(vals))
+    return Counter(rows)
+
+
+def _log_change(root: Path, filename: str, before: pd.DataFrame, after: pd.DataFrame,
+                columns: list[str]) -> None:
+    """Appends one JSON line describing the rows added/removed by a save.
+
+    Logging never blocks or breaks a save: a successful write is what matters, so
+    any failure here is swallowed. A save that changed nothing logs nothing.
+    """
+    try:
+        bc, ac = _row_multiset(before, columns), _row_multiset(after, columns)
+        added = [dict(zip(columns, r)) for r in (ac - bc).elements()]
+        removed = [dict(zip(columns, r)) for r in (bc - ac).elements()]
+        if not added and not removed:
+            return
+        touched = sorted(
+            {(d.get("profile"), int(d["year"])) for d in (added + removed) if d.get("year") is not None},
+            key=lambda t: (str(t[0]), t[1]),
+        )
+        record = {
+            "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
+            "file": filename,
+            "touched": [[p, y] for p, y in touched],
+            "added": added if len(added) <= _LOG_ROW_CAP else len(added),
+            "removed": removed if len(removed) <= _LOG_ROW_CAP else len(removed),
+        }
+        with open(root / CHANGES_LOG, "a") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except Exception:
+        pass  # never let logging corrupt or block a successful save
 
 
 # --- helpers --------------------------------------------------------------

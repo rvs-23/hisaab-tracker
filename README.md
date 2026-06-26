@@ -27,6 +27,11 @@ disk on every refresh. Data lives in a plain **CSV/YAML folder outside the repo*
 (`name, birth_year, forward_increment_pct, default_target`; the filename stem is
 the `profile` key) — the history CSVs are created as you save.
 
+Every Save is appended to **`changes.jsonl`** in that folder — an append-only
+audit log (one JSON line per save: timestamp, file, person/year touched, and the
+exact rows added/removed). Nothing in it is ever overwritten, so it's your full
+edit history; a save that changed nothing logs nothing.
+
 Each page shows **one person at a time** via the `?profile=<key>` URL — `rv`
 (Brownie) or `cheeni`. Set it once and it sticks across pages (no on-page switcher).
 

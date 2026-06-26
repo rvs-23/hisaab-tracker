@@ -1,4 +1,5 @@
 import datetime as dt
+import json
 
 import pandas as pd
 import pytest
@@ -282,6 +283,39 @@ def test_targets_reject_duplicate_category(rv, config):
                        {"profile": "rv", "year": 2024, "category": "mfs", "pct": 50}])
     with pytest.raises(ValueError, match="duplicate"):
         storage.validate_targets(df, config, [rv])
+
+
+def _income_row(salary=100):
+    return pd.DataFrame([{"profile": "rv", "year": 2024, "month": 1, "salary": salary,
+                          "bonus": 0, "other": 0, "job_change": 0}])
+
+
+def test_save_appends_audit_log(tmp_path, rv):
+    storage.save_income(tmp_path, _income_row())
+    lines = (tmp_path / storage.CHANGES_LOG).read_text().splitlines()
+    assert len(lines) == 1
+    rec = json.loads(lines[0])
+    assert rec["file"] == "income.csv"
+    assert rec["touched"] == [["rv", 2024]]
+    assert len(rec["added"]) == 1 and rec["removed"] == []
+    assert "ts" in rec
+
+
+def test_noop_save_logs_nothing(tmp_path, rv):
+    storage.save_income(tmp_path, _income_row())
+    storage.save_income(tmp_path, _income_row())  # identical re-save
+    lines = (tmp_path / storage.CHANGES_LOG).read_text().splitlines()
+    assert len(lines) == 1  # second save changed nothing → not logged
+
+
+def test_edit_logs_added_and_removed(tmp_path, rv):
+    storage.save_income(tmp_path, _income_row(salary=100))
+    storage.save_income(tmp_path, _income_row(salary=200))
+    recs = [json.loads(line) for line in (tmp_path / storage.CHANGES_LOG).read_text().splitlines()]
+    assert len(recs) == 2
+    last = recs[-1]
+    assert last["added"][0]["salary"] == 200
+    assert last["removed"][0]["salary"] == 100
 
 
 def test_save_contributions_preserves_other_profile(tmp_path, rv, config):
