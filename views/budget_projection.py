@@ -64,9 +64,8 @@ visible = sorted((p for p in d.profiles if p.key in scope),
                  key=lambda p: compute.budget_series(p, d.income).empty)
 for profile in visible:
     bs = compute.budget_series(profile, d.income)
-    st.subheader(profile.name)
     if bs.empty:
-        st.caption(f"No income for {profile.name} yet. Add it on the Income page.")
+        st.caption("No income yet. Add it on the Income page.")
         continue
 
     # This year's monthly split first — the headline numbers.

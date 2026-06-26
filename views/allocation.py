@@ -63,7 +63,7 @@ for profile in selected:
         ss[gkey] = derive(g[["label", "pct"]].assign(per_year=0.0, per_month=0.0))
         ss[vkey] = 0
 
-    with edit_card(f"{profile.name} — {year}"):
+    with edit_card(f"Allocation — {year}"):
         edited = st.data_editor(
             ss[gkey], hide_index=True, width="stretch", key=f"{base}__{ss[vkey]}",
             column_config={
@@ -80,7 +80,7 @@ for profile in selected:
         st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
                     unsafe_allow_html=True)
 
-        if st.button(f"Save {profile.name} · {year}", key=f"save_alloc_{profile.key}_{year}",
+        if st.button(f"Save {year}", key=f"save_alloc_{profile.key}_{year}",
                      type="primary", disabled=not ok):
             rows = pd.DataFrame({"profile": profile.key, "year": year,
                                  "category": d.config.categories, "pct": edited["pct"].values})

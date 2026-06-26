@@ -6,6 +6,7 @@ views use so a view imports everything it needs from one place.
 
 from __future__ import annotations
 
+import html
 from contextlib import contextmanager
 
 import pandas as pd
@@ -93,6 +94,17 @@ def grid_color() -> str:
     return GRID
 
 
+def info_icon(text: str) -> str:
+    """Returns an (i) glyph with a native hover tooltip.
+
+    The help text is HTML-escaped so apostrophes/quotes/brackets (e.g. "you've")
+    can't terminate the ``title`` attribute early and silently swallow the tooltip.
+    """
+    safe = html.escape(text, quote=True)
+    return (f" <span title='{safe}' style='cursor:help;font-weight:400;"
+            f"font-size:.85em;color:var(--muted)'>&#9432;</span>")
+
+
 # --- per-profile accents ---------------------------------------------------
 
 def accent_primary() -> str:
@@ -159,8 +171,7 @@ def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = 
         help: Plain-language explanation shown as an (i) hover tooltip.
     """
     size = "1.9rem" if big else "1.35rem"
-    info = (f" <span title='{help}' style='cursor:help;font-weight:400;"
-            f"font-size:.85em'>&#9432;</span>") if help else ""
+    info = info_icon(help) if help else ""
     col.markdown(
         f"<div style='border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;"
         f"background:var(--card-bg);height:100%'>"

@@ -77,7 +77,7 @@ def merge_back(edited, others, columns, key):
 
 
 with edit_card("Record what you actually invested"):
-    st.caption(f"One row per year / instrument for {active.name}. Add rows as you invest.")
+    st.caption("One row per year / instrument. Add rows as you invest.")
     mine = d.contributions[d.contributions["profile"] == active.key].drop(columns=["profile"])
     edited = st.data_editor(
         mine.sort_values(["year", "category"]).reset_index(drop=True),

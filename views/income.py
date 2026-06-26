@@ -19,7 +19,6 @@ selected = [profile]
 scope = [profile.key]
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-names = {p.key: p.name for p in d.profiles}
 ss = st.session_state
 
 # --- income over time, on top --------------------------------------------
@@ -28,13 +27,12 @@ if not visible.empty:
     section("Income over time")
     by_year = (
         visible.assign(total=visible[COMPONENTS].sum(axis=1))
-        .groupby(["year", "profile"])["total"].sum().unstack("profile").rename(columns=names)
+        .groupby(["year", "profile"])["total"].sum().unstack("profile")
     )
     yr = by_year.index.astype(int).astype(str)
-    accents = [PRIMARY, SECONDARY]
     f = go.Figure()
-    for i, col in enumerate(by_year.columns):
-        f.add_bar(x=yr, y=by_year[col], name=col, marker_color=accents[i % 2])
+    for col in by_year.columns:
+        f.add_bar(x=yr, y=by_year[col], name="Income", marker_color=PRIMARY)
     # YoY income growth above each bar, so the raise is visible at a glance.
     year_totals = by_year.sum(axis=1)
     growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in year_totals.pct_change() * 100]
@@ -92,7 +90,7 @@ def fresh_grid(profile_key, yr):
 
 
 for profile in selected:
-    with edit_card(f"{profile.name} · {year}"):
+    with edit_card(f"Enter {year}"):
         base = f"inc_{profile.key}_{year}"
         gkey, vkey = f"{base}_grid", f"{base}_ver"
         if gkey not in ss:

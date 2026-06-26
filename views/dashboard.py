@@ -6,8 +6,8 @@ import streamlit as st
 
 import compute
 from ui import (
-    ON_TRACK_PCT, SAND, accent_primary, accent_secondary, inr_short, load_all,
-    metric_tile, page_header, style_fig,
+    ON_TRACK_PCT, SAND, accent_primary, accent_secondary, info_icon, inr_short,
+    load_all, metric_tile, page_header, style_fig,
 )
 
 GRAY_LINE = "#9aa0a6"
@@ -21,13 +21,12 @@ contrib = d.contributions[d.contributions["profile"] == profile.key]
 bs = compute.budget_series(profile, d.income)
 trend = bs[~bs["is_projected"]]
 if trend.empty and contrib.empty:
-    st.info(f"Nothing for {profile.name} yet. Start on the Income page.")
+    st.info("Nothing here yet. Start on the Income page.")
     st.stop()
 
 
 def chart_title(text, help=""):
-    info = (f" <span title='{help}' style='cursor:help;font-weight:400;font-size:.82em;"
-            f"color:var(--muted)'>&#9432;</span>") if help else ""
+    info = info_icon(help) if help else ""
     st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.5rem 0 .4rem'>{text}{info}</div>",
                 unsafe_allow_html=True)
 
