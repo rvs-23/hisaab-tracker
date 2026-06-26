@@ -1,6 +1,8 @@
 # Data never lives in the repo — only in the folder referenced by .env
 .env
 data/
+changes.jsonl   # append-only audit log; lives in DATA_DIR, ignore if ever local
+*.jsonl
 
 .venv/
 __pycache__/
