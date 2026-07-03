@@ -6,7 +6,7 @@ from ui import inject_theme
 
 st.set_page_config(page_title="Personal Finances Tracker", page_icon=":material/savings:", layout="wide")
 st.logo(str(Path(__file__).parent / "logo.svg"), size="large")
-inject_theme()  # font + theme-aware variables; dark mode via ☰ → Settings → Theme
+inject_theme()  # Inter font + the CSS variables our HTML uses (light theme only)
 
 # Nav reads as the money pipeline: in -> split -> allocate -> record actuals.
 st.navigation(

@@ -6,8 +6,8 @@ import streamlit as st
 
 import compute
 from ui import (
-    ON_TRACK_PCT, SAND, accent_primary, accent_secondary, info_icon, inr_short,
-    load_all, metric_tile, page_header, style_fig,
+    FS_BODY, FS_HERO, FS_LABEL, ON_TRACK_PCT, SAND, accent_primary, accent_secondary,
+    chart_title, inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 
 GRAY_LINE = "#9aa0a6"
@@ -23,12 +23,6 @@ trend = bs[~bs["is_projected"]]
 if trend.empty and contrib.empty:
     st.info("Nothing here yet. Start on the Income page.")
     st.stop()
-
-
-def chart_title(text, help=""):
-    info = info_icon(help) if help else ""
-    st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.5rem 0 .4rem'>{text}{info}</div>",
-                unsafe_allow_html=True)
 
 
 # --- hero: earning more, investing a bigger slice ----------------------------
@@ -71,7 +65,7 @@ overall = 100 * invested_in_plan / lifetime_planned if lifetime_planned else 0.0
 latest = trend.iloc[-1] if not trend.empty else None
 rate = 100 * latest["investment"] / latest["total_income"] if latest is not None and latest["total_income"] else 0.0
 
-st.markdown("<div style='color:var(--muted);font-size:.78rem;text-transform:uppercase;letter-spacing:.05em;margin-top:.6rem'>Lifetime</div>", unsafe_allow_html=True)
+section("Lifetime")
 c = st.columns(4)
 metric_tile(c[0], "Potential net worth", inr_short(nw_potential), f"≈ {inr_short(nw_potential - nw_actual)} growth",
             color=PRIMARY, big=True,
@@ -89,17 +83,17 @@ if catch_up > 0:
     st.markdown(
         f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
         f"padding:14px 18px;margin-top:.7rem;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
-        f"<span style='font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
+        f"<span style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
         f"Catch up in {today_year}</span>"
-        f"<span style='font-size:1.7rem;font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
-        f"<span style='font-size:.85rem;color:var(--muted)'>invest this much extra today and you're level with "
+        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
+        f"<span style='font-size:{FS_BODY};color:var(--muted)'>invest this much extra today and you're level with "
         f"every year you fell short (grown at expected returns). Overshooting is fine.</span></div>",
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
         f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
-        f"padding:12px 18px;margin-top:.7rem;color:{PRIMARY};font-weight:600;font-size:.92rem'>"
+        f"padding:12px 18px;margin-top:.7rem;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
         f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
         unsafe_allow_html=True,
     )

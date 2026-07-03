@@ -55,6 +55,16 @@ def load_all() -> Data:
     return Data(root, config, profiles, income, targets, contributions)
 
 
+# Type scale: the only font sizes custom HTML may use, smallest to largest.
+# One hierarchy level = one size (Material-style), instead of per-spot one-offs.
+FS_LABEL = ".72rem"    # uppercase micro-labels: tile captions, section labels
+FS_CAPTION = ".78rem"  # muted supporting lines under values
+FS_BODY = ".85rem"     # running text, table cells
+FS_TITLE = ".95rem"    # section / chart / card titles
+FS_VALUE = "1.35rem"   # standard KPI value
+FS_HERO = "1.9rem"     # hero KPI value
+
+
 # --- formatting ------------------------------------------------------------
 
 def inr(value: float) -> str:
@@ -87,11 +97,6 @@ def inr_short(value: float) -> str:
 def pretty_category(category: str) -> str:
     """Returns the display label for an asset-class category key."""
     return CATEGORY_LABELS.get(category, category.replace("_", " ").capitalize())
-
-
-def grid_color() -> str:
-    """Returns the chart gridline colour."""
-    return GRID
 
 
 def info_icon(text: str) -> str:
@@ -141,7 +146,7 @@ def inject_theme() -> None:
         f"html, body, .stApp, [class*='css'], button, input, textarea, select "
         f"{{font-family:'Inter',-apple-system,sans-serif !important;}}"
         f"h1,h2,h3{{letter-spacing:-0.01em;}}"
-        f".ht{{border-collapse:collapse;width:100%;font-size:.84rem}}"
+        f".ht{{border-collapse:collapse;width:100%;font-size:{FS_BODY}}}"
         f".ht th{{text-align:right;color:var(--muted);font-weight:600;padding:6px 10px;border-bottom:1px solid var(--card-border)}}"
         f".ht td{{text-align:right;padding:6px 10px;border-bottom:1px solid var(--card-border);color:var(--text)}}"
         f".ht th:first-child,.ht td:first-child{{text-align:left}}"
@@ -170,14 +175,14 @@ def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = 
         big: Use the larger value size for hero tiles.
         help: Plain-language explanation shown as an (i) hover tooltip.
     """
-    size = "1.9rem" if big else "1.35rem"
+    size = FS_HERO if big else FS_VALUE
     info = info_icon(help) if help else ""
     col.markdown(
         f"<div style='border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;"
         f"background:var(--card-bg);height:100%'>"
-        f"<div style='font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>{label}{info}</div>"
+        f"<div style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>{label}{info}</div>"
         f"<div style='font-size:{size};font-weight:700;color:{color or 'var(--text)'};margin-top:3px;line-height:1.1'>{value}</div>"
-        f"<div style='font-size:.76rem;color:var(--muted);margin-top:3px'>{sub}</div></div>",
+        f"<div style='font-size:{FS_CAPTION};color:var(--muted);margin-top:3px'>{sub}</div></div>",
         unsafe_allow_html=True,
     )
 
@@ -222,8 +227,26 @@ def style_fig(fig, height: int = 320):
 def section(label: str) -> None:
     """Renders a small uppercase section label to give a page rhythm."""
     st.markdown(
-        f"<div style='color:var(--muted);font-size:.74rem;text-transform:uppercase;"
+        f"<div style='color:var(--muted);font-size:{FS_LABEL};text-transform:uppercase;"
         f"letter-spacing:.06em;font-weight:600;margin:.9rem 0 .2rem'>{label}</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def chart_title(text: str, help: str = "") -> None:
+    """The one style for chart/section headings inside a page.
+
+    Every view uses this instead of hand-rolled ``st.markdown`` titles, so the
+    same hierarchy level always looks the same.
+
+    Args:
+        text: The heading.
+        help: Optional plain-language note shown as an (i) hover tooltip.
+    """
+    info = info_icon(help) if help else ""
+    st.markdown(
+        f"<div style='font-weight:600;font-size:{FS_TITLE};color:var(--text);"
+        f"margin:.5rem 0 .4rem'>{text}{info}</div>",
         unsafe_allow_html=True,
     )
 
@@ -243,8 +266,10 @@ def resync(grid_key: str, version_key: str, recomputed, derived_cols: list[str])
         recomputed: The edited grid with derived columns recomputed.
         derived_cols: Columns to compare to detect a change.
     """
+    # Series.equals treats NaNs in the same spot as equal — a plain != would see
+    # NaN != NaN and rerun forever.
     if grid_key in st.session_state and any(
-        list(recomputed[c]) != list(st.session_state[grid_key][c]) for c in derived_cols
+        not recomputed[c].equals(st.session_state[grid_key][c]) for c in derived_cols
     ):
         st.session_state[grid_key] = recomputed
         st.session_state[version_key] += 1
@@ -264,7 +289,7 @@ def edit_card(title: str):
     """
     with st.container(border=True):
         st.markdown(
-            f"<div style='font-weight:700;color:{accent_primary()};font-size:.95rem;margin-bottom:.4rem'>"
+            f"<div style='font-weight:700;color:{accent_primary()};font-size:{FS_TITLE};margin-bottom:.4rem'>"
             f"{title}</div>",
             unsafe_allow_html=True,
         )

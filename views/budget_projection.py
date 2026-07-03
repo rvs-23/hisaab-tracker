@@ -6,8 +6,8 @@ import streamlit as st
 
 import compute
 from ui import (
-    NEEDS, accent_primary, accent_secondary, html_table, inr_short, load_all,
-    metric_tile, page_header, section, style_fig,
+    NEEDS, accent_primary, accent_secondary, chart_title, html_table, inr_short,
+    load_all, metric_tile, page_header, section, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -96,7 +96,7 @@ for profile in visible:
               textfont=dict(color="white", size=11), insidetextanchor="middle")
     f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
     style_fig(f, height=300)
-    st.markdown("<div style='font-weight:600;font-size:.92rem;color:var(--text);margin:.6rem 0 .4rem'>The investment slice, year by year (label shows % and ₹/yr invested)</div>", unsafe_allow_html=True)
+    chart_title("The investment slice, year by year (label shows % and ₹/yr invested)")
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
     with st.expander("Full detail (all years + projections)"):

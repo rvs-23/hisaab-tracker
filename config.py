@@ -12,7 +12,7 @@ from here rather than hard-coding values.
 INK = "#2b2b2b"
 TEAL = "#0F766E"
 MULBERRY = "#86198F"
-MUTED = "#7c828c"
+MUTED = "#697077"  # ≈5:1 on white — the old #7c828c failed WCAG AA at small sizes
 CARD_BG = "#ffffff"
 CARD_BORDER = "#e7eaee"
 GRID = "#eef1f3"

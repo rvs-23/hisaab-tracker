@@ -5,8 +5,9 @@ import streamlit as st
 import compute
 import storage
 from ui import (
-    ON_TRACK_PCT, accent_primary, accent_secondary, edit_card, grid_color, html_table,
-    inr_short, load_all, metric_tile, page_header, pretty_category, section, style_fig,
+    GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
+    html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
+    section, style_fig,
 )
 
 d = load_all()
@@ -35,7 +36,7 @@ if pva.empty:
     st.stop()
 
 # Graph first: planned vs actual per bucket.
-st.markdown(f"<div style='font-weight:600;font-size:.95rem;color:var(--text);margin:.2rem 0 .4rem'>Planned vs actual, by bucket · {year}</div>", unsafe_allow_html=True)
+chart_title(f"Planned vs actual, by bucket · {year}")
 asc = pva.sort_values("expected")
 f = go.Figure()
 f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], name="Planned",
@@ -44,7 +45,7 @@ f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name
           orientation="h", marker_color=PRIMARY)
 f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
 style_fig(f)
-f.update_xaxes(showgrid=True, gridcolor=grid_color())
+f.update_xaxes(showgrid=True, gridcolor=GRID)
 f.update_yaxes(showgrid=False)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
