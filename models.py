@@ -6,8 +6,6 @@ validated in storage.py — these models cover only the hand-edited YAML.
 
 from __future__ import annotations
 
-import datetime as dt
-
 from pydantic import BaseModel, model_validator
 
 
@@ -39,9 +37,7 @@ class Profile(BaseModel):
 
 
 class Config(BaseModel):
-    """Household-wide settings from config.yaml. Targets are per-profile now;
-    config only holds the shared category vocabulary and the FX rate."""
+    """Household-wide settings from config.yaml — just the shared category
+    vocabulary. Targets are per-profile; unknown YAML keys are ignored."""
 
-    usd_inr_rate: float
-    usd_inr_as_of: dt.date
     categories: list[str]

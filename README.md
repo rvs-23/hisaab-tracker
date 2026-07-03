@@ -23,7 +23,7 @@ Requires Python ≥ 3.14. Tests: `uv run pytest`.
 You type it through the app (or edit the CSVs directly); the app re-reads from
 disk on every refresh. Data lives in a plain **CSV/YAML folder outside the repo**
 (`DATA_DIR` in `.env`, never committed). The minimum to start is `config.yaml`
-(`usd_inr_rate, usd_inr_as_of, categories`) and a `profiles/<key>.yaml` per person
+(`categories`) and a `profiles/<key>.yaml` per person
 (`name, birth_year, forward_increment_pct, default_target`; the filename stem is
 the `profile` key) — the history CSVs are created as you save.
 

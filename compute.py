@@ -128,10 +128,6 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     return pd.DataFrame(out)
 
 
-# Kept as the name the projection page imports.
-projection = budget_series
-
-
 def split_pct(row) -> dict[str, float]:
     """needs/wants/investment as % of total income, for display."""
     total = row["total_income"]

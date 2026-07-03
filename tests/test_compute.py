@@ -288,8 +288,7 @@ def test_inr_indian_grouping():
 @pytest.fixture
 def config():
     from models import Config
-    return Config(usd_inr_rate=84.0, usd_inr_as_of=dt.date(2026, 6, 1),
-                  categories=["mfs", "gold_metals", "indian_stocks", "us_market",
+    return Config(categories=["mfs", "gold_metals", "indian_stocks", "us_market",
                               "ppf_nps", "bonds_gsec_aif", "fixed_deposit"])
 
 

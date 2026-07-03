@@ -25,8 +25,6 @@ TARGET = (
 @pytest.fixture
 def fake_data_dir(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
-        "usd_inr_rate: 84.0\n"
-        "usd_inr_as_of: 2026-06-01\n"
         "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_aif, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
@@ -56,8 +54,6 @@ def fake_data_dir(tmp_path, monkeypatch):
 def fresh_data_dir(tmp_path, monkeypatch):
     """A brand-new folder: only config.yaml + profiles/, no history CSVs yet."""
     (tmp_path / "config.yaml").write_text(
-        "usd_inr_rate: 84.0\n"
-        "usd_inr_as_of: 2026-06-01\n"
         "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_aif, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
