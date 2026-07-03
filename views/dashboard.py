@@ -25,6 +25,27 @@ if trend.empty and contrib.empty:
     st.stop()
 
 
+# --- catch-up first: the one number you can act on ---------------------------
+catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
+if catch_up > 0:
+    st.markdown(
+        f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
+        f"padding:14px 18px;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
+        f"<span style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
+        f"Catch up in {today_year}</span>"
+        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
+        f"<span style='font-size:{FS_BODY};color:var(--muted)'>invest this much extra today and you're level with "
+        f"every year you fell short (grown at expected returns). Overshooting is fine.</span></div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
+        f"padding:12px 18px;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
+        f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
+        unsafe_allow_html=True,
+    )
+
 # --- hero: earning more, investing a bigger slice ----------------------------
 chart_title("Earning more, investing a bigger slice")
 if trend.empty:
@@ -53,7 +74,6 @@ else:
 nw_actual, nw_potential = compute.net_worth_to_date(profile, d.income, d.contributions, today_year)
 invested = float(contrib["amount"].sum())
 nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year)
-catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
 
 # Evaluate against every planned year up to today, not just years with a
 # contribution row — a year you invested nothing is a miss, not an absence.
@@ -77,26 +97,6 @@ metric_tile(c[2], "Overall goal", f"{overall:.0f}%", "invested of planned", big=
             help="Across the years you've been investing, how much of the planned amount you actually invested.")
 metric_tile(c[3], "Savings rate", f"{rate:.0f}%", "of income, latest year", big=True,
             help="Share of your income the plan puts into investing. It rises as you earn more.")
-
-# --- catch-up: one number, one action ----------------------------------------
-if catch_up > 0:
-    st.markdown(
-        f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
-        f"padding:14px 18px;margin-top:.7rem;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
-        f"<span style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
-        f"Catch up in {today_year}</span>"
-        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
-        f"<span style='font-size:{FS_BODY};color:var(--muted)'>invest this much extra today and you're level with "
-        f"every year you fell short (grown at expected returns). Overshooting is fine.</span></div>",
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
-        f"padding:12px 18px;margin-top:.7rem;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
-        f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
-        unsafe_allow_html=True,
-    )
 
 # --- net worth: invested vs projected value ----------------------------------
 chart_title("Net worth — invested vs projected value",

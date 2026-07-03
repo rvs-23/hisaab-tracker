@@ -71,11 +71,14 @@ def fresh_grid(yr):
     for component in COMPONENTS:
         grid[component] = 0
     mine = d.income[(d.income["profile"] == active.key) & (d.income["year"] == yr)]
+    prev = d.income[(d.income["profile"] == active.key) & (d.income["year"] == yr - 1)]
     if not mine.empty:
         for _, r in mine.iterrows():
             grid.loc[int(r["month"]) - 1, COMPONENTS] = [r[c] for c in COMPONENTS]
-    elif annual(yr - 1):  # new year: carry last year's monthly salary
-        grid["salary"] = round(annual(yr - 1) / 12)
+    elif not prev.empty and prev["salary"].sum():
+        # New year: carry only last year's salary — a bonus or one-off "other"
+        # isn't a recurring monthly amount.
+        grid["salary"] = round(prev["salary"].sum() / 12)
     grid["Total"] = grid[COMPONENTS].sum(axis=1)
     return grid
 
@@ -109,7 +112,9 @@ with edit_card(f"Enter {year}"):
     delta = f"{100 * (total - prev_total) / prev_total:+.0f}% vs {year - 1}" if prev_total else "first year"
 
     b1, b2, b3 = st.columns([1, 1, 2])
-    if b1.button("Copy January down", key=f"{base}_cpy", help="Fill every month with January's values."):
+    # Tertiary: a convenience, not a peer of Save — only one primary action here.
+    if b1.button("Copy January down", key=f"{base}_cpy", type="tertiary",
+                 help="Fill every month with January's values."):
         jan = edited.iloc[0]
         g = edited.copy()
         for c in COMPONENTS:
