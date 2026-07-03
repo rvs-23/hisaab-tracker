@@ -10,15 +10,17 @@ from here rather than hard-coding values.
 # but the actual hues are per person, so the colour scheme alone tells whose data
 # you're looking at (no name label needed). See PROFILE_ACCENTS below.
 INK = "#2b2b2b"
-TEAL = "#0F766E"
-MULBERRY = "#86198F"
+GRAPHITE = "#334155"  # rv primary — dark gunmetal (the "platinum" scheme)
+STEEL = "#64748B"  # rv secondary — lighter steel, so planned recedes
+ROSE = "#DB2777"  # cheeni primary
+BRONZE = "#B45309"  # cheeni secondary — warm metal, no purple
 MUTED = "#697077"  # ≈5:1 on white — the old #7c828c failed WCAG AA at small sizes
 CARD_BG = "#ffffff"
 CARD_BORDER = "#e7eaee"
 GRID = "#eef1f3"
-STRIP_BG = "#f3faf9"
-STRIP_BORDER = "#d4e7e4"
-STRIP_TEXT = TEAL
+STRIP_BG = "#f4f6f8"  # current-year row highlight — neutral (was teal-tinted)
+STRIP_BORDER = "#dde2e8"
+STRIP_TEXT = GRAPHITE
 SAND = "#dfe4e8"  # neutral income bar
 NEEDS = "#b9c0c7"  # the "needs" slice of the budget split
 FONT = "Inter"
@@ -27,13 +29,13 @@ FONT = "Inter"
 # projected). Profiles are told apart by colour, not a name. Picked to read on
 # both light and dark backgrounds *and* to pass WCAG AA (≥4.5:1) as small text
 # on white; the shared grays stay the neutral base.
-#   rv     → teal + mulberry
-#   cheeni → pink + indigo
+#   rv     → platinum monochrome (graphite + steel)
+#   cheeni → warm metals (rose + bronze)
 PROFILE_ACCENTS = {
-    "rv": (TEAL, MULBERRY),
-    "cheeni": ("#DB2777", "#4F46E5"),  # indigo-600; #6366F1 was borderline as text
+    "rv": (GRAPHITE, STEEL),
+    "cheeni": (ROSE, BRONZE),
 }
-DEFAULT_ACCENTS = (TEAL, MULBERRY)
+DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
 # Budget model. The anchor year (a person's first) splits income 50/30/20 across
 # needs/wants/investment; every later year splits only the income *increment*

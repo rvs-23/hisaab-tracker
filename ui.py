@@ -15,8 +15,8 @@ import streamlit as st
 import storage
 from config import (  # re-exported for views
     CARD_BG, CARD_BORDER, CATEGORY_LABELS, DEFAULT_ACCENTS, GRID, INK,
-    MULBERRY, MUTED, NEEDS, ON_TRACK_PCT, PROFILE_ACCENTS, SAND,
-    STRIP_BORDER, STRIP_BG, STRIP_TEXT, TEAL,
+    MUTED, NEEDS, ON_TRACK_PCT, PROFILE_ACCENTS, SAND,
+    STRIP_BORDER, STRIP_BG, STRIP_TEXT,
 )
 
 
@@ -171,7 +171,7 @@ def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = 
         value: The headline figure.
         sub: Muted supporting line below the value.
         color: Value colour; defaults to the body text colour. Pass an accent
-            (teal/mulberry) to highlight.
+            (``accent_primary()``/``accent_secondary()``) to highlight.
         big: Use the larger value size for hero tiles.
         help: Plain-language explanation shown as an (i) hover tooltip.
     """
