@@ -4,6 +4,7 @@ import json
 import pandas as pd
 import pytest
 
+import audit
 import compute
 import storage
 from models import Profile
@@ -334,11 +335,12 @@ def _income_row(salary=100):
 
 def test_save_appends_audit_log(tmp_path, rv):
     storage.save_income(tmp_path, _income_row())
-    lines = (tmp_path / storage.CHANGES_LOG).read_text().splitlines()
+    lines = (tmp_path / audit.CHANGES_LOG).read_text().splitlines()
     assert len(lines) == 1
     rec = json.loads(lines[0])
     assert rec["file"] == "income.csv"
     assert rec["touched"] == [["rv", 2024]]
+    assert rec["rows_after"] == 1
     assert len(rec["added"]) == 1 and rec["removed"] == []
     assert "ts" in rec
 
@@ -346,14 +348,14 @@ def test_save_appends_audit_log(tmp_path, rv):
 def test_noop_save_logs_nothing(tmp_path, rv):
     storage.save_income(tmp_path, _income_row())
     storage.save_income(tmp_path, _income_row())  # identical re-save
-    lines = (tmp_path / storage.CHANGES_LOG).read_text().splitlines()
+    lines = (tmp_path / audit.CHANGES_LOG).read_text().splitlines()
     assert len(lines) == 1  # second save changed nothing → not logged
 
 
 def test_edit_logs_added_and_removed(tmp_path, rv):
     storage.save_income(tmp_path, _income_row(salary=100))
     storage.save_income(tmp_path, _income_row(salary=200))
-    recs = [json.loads(line) for line in (tmp_path / storage.CHANGES_LOG).read_text().splitlines()]
+    recs = [json.loads(line) for line in (tmp_path / audit.CHANGES_LOG).read_text().splitlines()]
     assert len(recs) == 2
     last = recs[-1]
     assert last["added"][0]["salary"] == 200

@@ -9,24 +9,20 @@ three tidy CSVs, all keyed by (year, profile):
   targets.csv        per-year target-allocation overrides (optional)
 
 The budget (needs/wants/investment) and the emergency fund (6 months of needs)
-are *derived* from income, not stored.
+are *derived* from income, not stored. Every save is recorded in the audit log
+(see audit.py).
 """
 
 from __future__ import annotations
 
-import json
-from collections import Counter
-from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
+from audit import log_change
 from config import INCOME_COMPONENTS
 from models import Config, Profile
-
-CHANGES_LOG = "changes.jsonl"  # append-only audit trail of every save
-_LOG_ROW_CAP = 100  # log full rows up to this many; beyond, just the count
 
 REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 
@@ -39,7 +35,7 @@ TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
 
 
 def data_dir() -> Path:
-    """Resolve DATA_DIR from .env at the repo root (parsed by hand to avoid a dependency)."""
+    """Resolves DATA_DIR from .env at the repo root (parsed by hand to avoid a dependency)."""
     env_file = REPO_ROOT / ".env"
     if not env_file.exists():
         raise FileNotFoundError("missing .env — copy .env.example and set DATA_DIR")
@@ -76,8 +72,6 @@ def load_profiles(root: Path, config: Config) -> list[Profile]:
     return profiles
 
 
-# --- targets (per-year overrides) -----------------------------------------
-
 def load_targets(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
     path = root / "targets.csv"
     if not path.exists():
@@ -105,8 +99,6 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
             raise ValueError(f"targets.csv {profile} {int(year)}: pct must sum to 100, got {total}")
 
 
-# --- income ---------------------------------------------------------------
-
 def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
     df = _read_optional(root / "income.csv", INCOME_COLUMNS)
     if "job_change" not in df.columns:  # tolerate older files without the flag
@@ -129,8 +121,6 @@ def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
     _check_no_duplicates(df, ["profile", "year", "month"], "income.csv")
 
 
-# --- contributions --------------------------------------------------------
-
 def load_contributions(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
     df = _read_optional(root / "contributions.csv", CONTRIB_COLUMNS)
     validate_contributions(df, config, profiles)
@@ -151,20 +141,26 @@ def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Prof
     _check_non_negative(df, ["amount"], "contributions.csv")
 
 
-# --- savers ---------------------------------------------------------------
-
 def _save(root: Path, filename: str, df: pd.DataFrame, sort_cols: list[str],
           columns: list[str]) -> None:
     """Writes a history CSV and appends an audit record of what changed.
 
-    The on-disk file is read both before and after the write, so the before/after
-    comparison is between two CSV-normalised frames (no spurious int-vs-float diffs).
+    The on-disk file is read both before and after the write, so the audit
+    comparison is between two CSV-normalised frames (no spurious int-vs-float
+    diffs).
+
+    Args:
+        root: Data folder to write into.
+        filename: Target CSV name.
+        df: Full replacement contents.
+        sort_cols: Column order to sort rows by before writing.
+        columns: Canonical column list for the audit comparison.
     """
     path = root / filename
     before = _read_optional(path, columns)
     df.sort_values(sort_cols).to_csv(path, index=False)
     after = _read_optional(path, columns)
-    _log_change(root, filename, before, after, columns)
+    log_change(root, filename, before, after, columns)
 
 
 def save_income(root: Path, df: pd.DataFrame) -> None:
@@ -178,51 +174,6 @@ def save_contributions(root: Path, df: pd.DataFrame) -> None:
 def save_targets(root: Path, df: pd.DataFrame) -> None:
     _save(root, "targets.csv", df, ["profile", "year", "category"], TARGETS_COLUMNS)
 
-
-# --- audit log ------------------------------------------------------------
-
-def _row_multiset(df: pd.DataFrame, columns: list[str]) -> Counter:
-    """Rows as a multiset of native-Python tuples (handles duplicate rows)."""
-    if df is None or df.empty:
-        return Counter()
-    rows = []
-    for row in df.reindex(columns=columns).itertuples(index=False):
-        vals = [None if pd.isna(v) else (v.item() if hasattr(v, "item") else v) for v in row]
-        rows.append(tuple(vals))
-    return Counter(rows)
-
-
-def _log_change(root: Path, filename: str, before: pd.DataFrame, after: pd.DataFrame,
-                columns: list[str]) -> None:
-    """Appends one JSON line describing the rows added/removed by a save.
-
-    Logging never blocks or breaks a save: a successful write is what matters, so
-    any failure here is swallowed. A save that changed nothing logs nothing.
-    """
-    try:
-        bc, ac = _row_multiset(before, columns), _row_multiset(after, columns)
-        added = [dict(zip(columns, r)) for r in (ac - bc).elements()]
-        removed = [dict(zip(columns, r)) for r in (bc - ac).elements()]
-        if not added and not removed:
-            return
-        touched = sorted(
-            {(d.get("profile"), int(d["year"])) for d in (added + removed) if d.get("year") is not None},
-            key=lambda t: (str(t[0]), t[1]),
-        )
-        record = {
-            "ts": datetime.now().astimezone().isoformat(timespec="seconds"),
-            "file": filename,
-            "touched": [[p, y] for p, y in touched],
-            "added": added if len(added) <= _LOG_ROW_CAP else len(added),
-            "removed": removed if len(removed) <= _LOG_ROW_CAP else len(removed),
-        }
-        with open(root / CHANGES_LOG, "a") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except Exception:
-        pass  # never let logging corrupt or block a successful save
-
-
-# --- helpers --------------------------------------------------------------
 
 def _read_optional(path: Path, columns: list[str]) -> pd.DataFrame:
     """Reads a CSV, or returns an empty frame with ``columns`` if it's absent.
