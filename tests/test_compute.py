@@ -63,6 +63,49 @@ def test_budget_derives_from_income_philosophy(rv, income):
     assert compute.split_pct(bs.loc[2024])["wants"] == pytest.approx(30, abs=0.1)
 
 
+def test_zero_income_year_cannot_steal_the_anchor(rv, income):
+    """An all-zero 2022 row (the pickers offer 2022 as a zero floor) must not
+    become the anchor — 2023 keeps its golden 50/30/20 split."""
+    zeros = pd.DataFrame(
+        [{"profile": "rv", "year": 2022, "month": m, "salary": 0, "bonus": 0, "other": 0, "job_change": 0}
+         for m in range(1, 13)]
+    )
+    bs = compute.budget_series(rv, pd.concat([zeros, income]), today=TODAY).set_index("year")
+    assert 2022 not in bs.index
+    assert bs.loc[2023, "monthly_investment"] == 18456  # unchanged golden anchor
+
+
+def test_mid_series_zero_year_is_skipped(rv):
+    rows = pd.DataFrame([
+        {"profile": "rv", "year": 2023, "month": 1, "salary": 1200000, "bonus": 0, "other": 0, "job_change": 0},
+        {"profile": "rv", "year": 2024, "month": 1, "salary": 0, "bonus": 0, "other": 0, "job_change": 0},
+        {"profile": "rv", "year": 2025, "month": 1, "salary": 1500000, "bonus": 0, "other": 0, "job_change": 0},
+    ])
+    bs = compute.budget_series(rv, rows, today=TODAY).set_index("year")
+    assert 2024 not in bs.index
+    # 2025's increment is measured against 2023, the last earning year.
+    assert bs.loc[2025, "investment"] == round(1200000 * 0.20 + 300000 * 0.50)
+
+
+def test_income_drop_scales_budget_down_proportionally(rv):
+    rows = pd.DataFrame([
+        {"profile": "rv", "year": 2023, "month": 1, "salary": 1000000, "bonus": 0, "other": 0, "job_change": 0},
+        {"profile": "rv", "year": 2024, "month": 1, "salary": 800000, "bonus": 0, "other": 0, "job_change": 0},
+    ])
+    bs = compute.budget_series(rv, rows, today=TODAY).set_index("year")
+    # 20% drop shrinks every bucket by 20% — never negative, still sums to total.
+    assert bs.loc[2024, "needs"] == round(500000 * 0.8)
+    assert bs.loc[2024, "investment"] == round(200000 * 0.8)
+    assert bs.loc[2024, ["needs", "wants", "investment"]].sum() == 800000
+
+
+def test_all_zero_income_gives_empty_budget(rv):
+    zeros = pd.DataFrame(
+        [{"profile": "rv", "year": 2022, "month": 1, "salary": 0, "bonus": 0, "other": 0, "job_change": 0}]
+    )
+    assert compute.budget_series(rv, zeros, today=TODAY).empty
+
+
 def test_budget_projects_to_current_plus_three(rv, income):
     """Entered 2023–26, current year 2026 → projected 2027–29 at 5% growth."""
     bs = compute.budget_series(rv, income, today=TODAY).set_index("year")

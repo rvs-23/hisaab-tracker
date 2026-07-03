@@ -61,11 +61,16 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
 
     Beyond the entered years, projects forward to current year + 3: income grows
     by forward_increment_pct and each projected raise splits 20/30/50 like any
-    other increment. Projected rows carry is_projected=True."""
+    other increment. Projected rows carry is_projected=True.
+
+    Zero-income years get no budget row: the anchor is the first *earning* year
+    (an all-zero 2022 baseline must not steal the 50/30/20 anchor split from the
+    real first year), and a mid-series zero year is skipped like a missing one.
+    A year earning *less* than the last scales the previous buckets down
+    proportionally — the split still sums to the new total and never goes
+    negative."""
     yearly = annual_income(income)
     rows = yearly[yearly["profile"] == profile.key].sort_values("year")
-    if rows.empty:
-        return pd.DataFrame(columns=BUDGET_COLUMNS)
 
     out = []
     prev_total = None
@@ -76,6 +81,8 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
         nonlocal prev_total, prev, cumulative
         if prev_total is None:  # anchor year
             amt = {k: total * BASE_SPLIT[k] / 100 for k in BASE_SPLIT}
+        elif total < prev_total:  # income drop: shrink all buckets proportionally
+            amt = {k: prev[k] * total / prev_total for k in prev}
         else:
             delta = total - prev_total
             amt = {k: prev[k] + delta * INCREMENT_SPLIT[k] / 100 for k in INCREMENT_SPLIT}
@@ -102,8 +109,14 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
         prev_total, prev = total, amt
 
     for _, r in rows.iterrows():
-        add_year(int(r["year"]), total_income(r), projected=False,
+        total = total_income(r)
+        if total <= 0:
+            continue  # no earnings, no budget row (see docstring)
+        add_year(int(r["year"]), total, projected=False,
                  job_change=bool(r.get("job_change", 0)))
+
+    if prev_total is None:  # no earning years at all
+        return pd.DataFrame(columns=BUDGET_COLUMNS)
 
     horizon = (today or dt.date.today()).year + PROJECTION_YEARS_AHEAD
     year, total = int(rows["year"].max()), prev_total
