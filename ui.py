@@ -65,7 +65,7 @@ FS_VALUE = "1.35rem"   # standard KPI value
 FS_HERO = "1.9rem"     # hero KPI value
 
 
-# --- formatting ------------------------------------------------------------
+# Formatting helpers.
 
 def inr(value: float) -> str:
     """Formats rupees with Indian digit grouping, e.g. ``₹12,34,567``."""
@@ -110,7 +110,7 @@ def info_icon(text: str) -> str:
             f"font-size:.85em;color:var(--muted)'>&#9432;</span>")
 
 
-# --- per-profile accents ---------------------------------------------------
+# Per-profile accents.
 
 def accent_primary() -> str:
     """The active person's primary accent (actuals / current year)."""
@@ -129,7 +129,7 @@ def _set_accents(profile_key: str) -> None:
     st.session_state["_accent_secondary"] = secondary
 
 
-# --- styling ---------------------------------------------------------------
+# Styling.
 
 _ROOT_VARS = (
     f"--text:{INK};--muted:{MUTED};--card-bg:{CARD_BG};--card-border:{CARD_BORDER};"

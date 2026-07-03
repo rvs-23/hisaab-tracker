@@ -19,7 +19,7 @@ PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 ss = st.session_state
 
-# --- income over time, on top --------------------------------------------
+# Income over time, on top.
 visible = d.income[d.income["profile"] == active.key]
 if not visible.empty:
     section("Income over time")

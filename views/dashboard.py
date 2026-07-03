@@ -25,7 +25,7 @@ if trend.empty and contrib.empty:
     st.stop()
 
 
-# --- catch-up first: the one number you can act on ---------------------------
+# Catch-up first: the one number you can act on.
 catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
 if catch_up > 0:
     st.markdown(
@@ -46,7 +46,7 @@ else:
         unsafe_allow_html=True,
     )
 
-# --- hero: earning more, investing a bigger slice ----------------------------
+# Hero: earning more, investing a bigger slice.
 chart_title("Earning more, investing a bigger slice")
 if trend.empty:
     st.caption("Add income to see the trajectory.")
@@ -70,7 +70,7 @@ else:
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
     st.caption("Grey labels: income growth year on year. Coloured labels: % of income invested (the rising slice).")
 
-# --- lifetime cards ----------------------------------------------------------
+# Lifetime cards.
 nw_actual, nw_potential = compute.net_worth_to_date(profile, d.income, d.contributions, today_year)
 invested = float(contrib["amount"].sum())
 nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year)
@@ -98,7 +98,7 @@ metric_tile(c[2], "Overall goal", f"{overall:.0f}%", "invested of planned", big=
 metric_tile(c[3], "Savings rate", f"{rate:.0f}%", "of income, latest year", big=True,
             help="Share of your income the plan puts into investing. It rises as you earn more.")
 
-# --- net worth: invested vs projected value ----------------------------------
+# Net worth: invested vs projected value.
 chart_title("Net worth — invested vs projected value",
             help="An estimate, not your real portfolio value. It compounds what you've "
                  "contributed at conservative per-category expected returns (plus the emergency "
@@ -122,7 +122,7 @@ else:
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
     st.caption("Solid: contributions compounded at conservative returns. Dashed: if you keep investing the plan. Grey: money put in (no growth).")
 
-# --- execution: planned vs actual invested per year --------------------------
+# Execution: planned vs actual invested per year.
 if eval_years:
     chart_title("Did you hit the plan, year by year?")
     planned = [sum(compute.expected_contributions(profile, d.income, d.targets, y).values()) for y in eval_years]

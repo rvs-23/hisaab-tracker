@@ -250,7 +250,7 @@ def test_net_worth_series_projects_ahead(rv, income, targets, contributions):
     assert (s["potential"] >= s["cost_basis"]).all()  # growth never below cost
 
 
-# --- catch-up amount -------------------------------------------------------
+# Catch-up amount.
 
 def _one_year(salary=1000000):
     income = pd.DataFrame([{"profile": "rv", "year": 2024, "month": 1,
@@ -284,7 +284,7 @@ def test_inr_indian_grouping():
     assert inr(-45000) == "-₹45,000"
 
 
-# --- storage validation guards (hand-edit safety) --------------------------
+# Storage validation guards (hand-edit safety).
 
 @pytest.fixture
 def config():
