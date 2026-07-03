@@ -25,12 +25,13 @@ FONT = "Inter"
 
 # Per-person accent pair: (primary = actuals/current, secondary = planned/
 # projected). Profiles are told apart by colour, not a name. Picked to read on
-# both light and dark backgrounds; the shared grays stay the neutral base.
+# both light and dark backgrounds *and* to pass WCAG AA (≥4.5:1) as small text
+# on white; the shared grays stay the neutral base.
 #   rv     → teal + mulberry
 #   cheeni → pink + indigo
 PROFILE_ACCENTS = {
     "rv": (TEAL, MULBERRY),
-    "cheeni": ("#DB2777", "#6366F1"),
+    "cheeni": ("#DB2777", "#4F46E5"),  # indigo-600; #6366F1 was borderline as text
 }
 DEFAULT_ACCENTS = (TEAL, MULBERRY)
 

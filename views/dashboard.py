@@ -30,24 +30,24 @@ chart_title("Earning more, investing a bigger slice")
 if trend.empty:
     st.caption("Add income to see the trajectory.")
 else:
+    # One rupee axis only — the invest rate rides as labels on its own bars
+    # instead of a second hidden axis (dual axes hinder honest comparison), and
+    # nothing here wears the secondary (= planned) accent.
     yr = trend["year"].astype(int).astype(str)
-    rate_line = (100 * trend["investment"] / trend["total_income"]).round(0)
+    rate = (100 * trend["investment"] / trend["total_income"]).round(0)
     inc_growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in trend["total_income"].pct_change() * 100]
     f = go.Figure()
     f.add_bar(x=yr, y=trend["total_income"], name="Income", marker_color=SAND,
               text=inc_growth, textposition="outside", textfont=dict(size=11, color="#6b7280"))
-    f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=PRIMARY)
-    f.add_trace(go.Scatter(
-        x=yr, y=rate_line, name="Invest rate", yaxis="y2", mode="lines+markers+text",
-        text=[f"{v:.0f}%" for v in rate_line], textposition="top center",
-        textfont=dict(size=11, color=SECONDARY), line=dict(color=SECONDARY, width=3), marker=dict(size=8)))
+    f.add_bar(x=yr, y=trend["investment"], name="Investment", marker_color=PRIMARY,
+              text=[f"{v:.0f}%" for v in rate], textposition="outside",
+              textfont=dict(size=11, color=PRIMARY))
     f.update_traces(cliponaxis=False, selector=dict(type="bar"))
-    f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"),
-                    yaxis2=dict(overlaying="y", side="right", range=[0, max(60, rate_line.max() + 15)],
-                                ticksuffix="%", showgrid=False))
+    f.update_layout(barmode="group", xaxis=dict(type="category"),
+                    yaxis=dict(tickprefix="₹", tickformat="~s"))
     style_fig(f, height=360)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-    st.caption("Grey labels: income growth year on year. Coloured line: % of income invested (the rising slice).")
+    st.caption("Grey labels: income growth year on year. Coloured labels: % of income invested (the rising slice).")
 
 # --- lifetime cards ----------------------------------------------------------
 nw_actual, nw_potential = compute.net_worth_to_date(profile, d.income, d.contributions, today_year)

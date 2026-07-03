@@ -1,8 +1,9 @@
-# Grayscale base + two accents (see design.md): teal = actuals/current,
-# mulberry = planned/projected. No other colors.
+# Grayscale base only. Streamlit's theme is static per app, but the accents are
+# per *person* (config.PROFILE_ACCENTS) — so native widgets (buttons, checkboxes,
+# focus rings) stay a neutral slate and only charts/tiles carry the identity.
 [theme]
 base = "light"
-primaryColor = "#0F766E"
+primaryColor = "#475569"
 backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f4f4f4"
 textColor = "#1f1f1f"

@@ -6,8 +6,8 @@ import streamlit as st
 
 import compute
 from ui import (
-    NEEDS, accent_primary, accent_secondary, chart_title, html_table, inr_short,
-    load_all, metric_tile, page_header, section, style_fig,
+    NEEDS, SAND, accent_primary, accent_secondary, chart_title, html_table,
+    inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -70,9 +70,11 @@ if not row.empty:
     pct = compute.split_pct(r)
     section(f"Monthly split · {year}")
     cols = st.columns(3)
+    # Everything on this page is *plan*, so only the investment figure wears the
+    # secondary (= planned) accent; needs/wants stay neutral.
     metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
-    metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=SECONDARY, big=True)
-    metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=PRIMARY, big=True)
+    metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", big=True)
+    metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=SECONDARY, big=True)
 
 # Then the slice shifting over the actual years (100% stacked), with the
 # investment segment labelled with both its % and the raw yearly rupees.
@@ -83,10 +85,12 @@ needs_p = (100 * actual["needs"] / tot).round(0)
 wants_p = (100 * actual["wants"] / tot).round(0)
 inv_p = (100 * actual["investment"] / tot).round(0)
 inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
+# Colour roles: the derived investment slice is *planned* money, so it wears
+# the secondary accent; needs/wants are neutral grays (a category is not a role).
 f = go.Figure()
 f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
-f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SECONDARY)
-f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=PRIMARY,
+f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SAND)
+f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=SECONDARY,
           text=inv_label, textposition="inside",
           textfont=dict(color="white", size=11), insidetextanchor="middle")
 f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
