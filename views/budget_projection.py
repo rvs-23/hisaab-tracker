@@ -15,7 +15,6 @@ CURRENT_YEAR = dt.date.today().year
 d = load_all()
 active = page_header("Budget", d.profiles)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
-scope = [active.key]
 st.caption(
     "How income splits, derived from the plan. The anchor year is 50/30/20 "
     "(needs/wants/investment). After that only each year's raise splits 20/30/50, "
@@ -59,46 +58,42 @@ def row_class(r):
     return "cur" if int(r["year"]) == CURRENT_YEAR else ""
 
 
-# People with data first, so an empty placeholder profile doesn't sit on top.
-visible = sorted((p for p in d.profiles if p.key in scope),
-                 key=lambda p: compute.budget_series(p, d.income).empty)
-for profile in visible:
-    bs = compute.budget_series(profile, d.income)
-    if bs.empty:
-        st.caption("No income yet. Add it on the Income page.")
-        continue
+bs = compute.budget_series(active, d.income)
+if bs.empty:  # income rows can exist yet all be zero — no earning year, no budget
+    st.info("No earning year yet. Add income on the Income page.")
+    st.stop()
 
-    # This year's monthly split first — the headline numbers.
-    row = bs[bs["year"] == year]
-    if not row.empty:
-        r = row.iloc[0]
-        pct = compute.split_pct(r)
-        section(f"Monthly split · {year}")
-        cols = st.columns(3)
-        metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
-        metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=SECONDARY, big=True)
-        metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=PRIMARY, big=True)
+# This year's monthly split first — the headline numbers.
+row = bs[bs["year"] == year]
+if not row.empty:
+    r = row.iloc[0]
+    pct = compute.split_pct(r)
+    section(f"Monthly split · {year}")
+    cols = st.columns(3)
+    metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
+    metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", color=SECONDARY, big=True)
+    metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=PRIMARY, big=True)
 
-    # Then the slice shifting over the actual years (100% stacked), with the
-    # investment segment labelled with both its % and the raw yearly rupees.
-    actual = bs[~bs["is_projected"]]
-    yr = actual["year"].astype(int).astype(str)
-    tot = actual["total_income"]
-    needs_p = (100 * actual["needs"] / tot).round(0)
-    wants_p = (100 * actual["wants"] / tot).round(0)
-    inv_p = (100 * actual["investment"] / tot).round(0)
-    inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
-    f = go.Figure()
-    f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
-    f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SECONDARY)
-    f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=PRIMARY,
-              text=inv_label, textposition="inside",
-              textfont=dict(color="white", size=11), insidetextanchor="middle")
-    f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
-    style_fig(f, height=300)
-    chart_title("The investment slice, year by year (label shows % and ₹/yr invested)")
-    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+# Then the slice shifting over the actual years (100% stacked), with the
+# investment segment labelled with both its % and the raw yearly rupees.
+actual = bs[~bs["is_projected"]]
+yr = actual["year"].astype(int).astype(str)
+tot = actual["total_income"]
+needs_p = (100 * actual["needs"] / tot).round(0)
+wants_p = (100 * actual["wants"] / tot).round(0)
+inv_p = (100 * actual["investment"] / tot).round(0)
+inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
+f = go.Figure()
+f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
+f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SECONDARY)
+f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=PRIMARY,
+          text=inv_label, textposition="inside",
+          textfont=dict(color="white", size=11), insidetextanchor="middle")
+f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
+style_fig(f, height=300)
+chart_title("The investment slice, year by year (label shows % and ₹/yr invested)")
+st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-    with st.expander("Full detail (all years + projections)"):
-        st.caption("Current year highlighted; projected years in muted italics.")
-        html_table(bs, HEADERS, formats=FMT, row_class=row_class)
+with st.expander("Full detail (all years + projections)"):
+    st.caption("Current year highlighted; projected years in muted italics.")
+    html_table(bs, HEADERS, formats=FMT, row_class=row_class)
