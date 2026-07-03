@@ -37,8 +37,8 @@ bookmarked:
 - `http://localhost:8501/?profile=cheeni`
 
 There is no switch button and no name on the page — you can tell whose page
-you're on by the **accent colours** (rv: teal; cheeni: pink). Once set, the
-choice sticks as you move between pages.
+you're on by the **accent colours** (rv: platinum grays; cheeni: rose + bronze).
+Once set, the choice sticks as you move between pages.
 
 ## Reading the Dashboard
 
