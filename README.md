@@ -5,6 +5,9 @@ answers one question — *did we invest what the plan said this year?* — so it
 tracks **contributions vs goal**, not net worth. Income drives a derived budget,
 a target allocation, and a planned-vs-actual comparison.
 
+New here? Read **[docs/how-it-works.md](docs/how-it-works.md)** — a 5-minute,
+no-jargon guide to the model and what to fill in when.
+
 ## Run it
 
 **`app.py` is the entry point** — it defines the pages via `st.navigation`:
@@ -25,7 +28,8 @@ disk on every refresh. Data lives in a plain **CSV/YAML folder outside the repo*
 (`DATA_DIR` in `.env`, never committed). The minimum to start is `config.yaml`
 (`categories`) and a `profiles/<key>.yaml` per person
 (`name, birth_year, forward_increment_pct, default_target`; the filename stem is
-the `profile` key) — the history CSVs are created as you save.
+the `profile` key) — the history CSVs are created as you save. To scaffold a
+fresh folder: `uv run python scripts/init_data_dir.py /path/to/FinanceData`.
 
 Every Save is appended to **`changes.jsonl`** in that folder — an append-only
 audit log (one JSON line per save: timestamp, file, person/year touched, and the
@@ -74,14 +78,16 @@ baseline; real tracking starts 2023).
 1. Pick a year; add one row per instrument with the **amount** you actually invested.
 2. See planned vs actual, % of goal, and the year's emergency-fund target (derived:
    6 months of needs — nothing to enter for it).
-3. *Fault tolerance:* the editor shows only the active person; on save your rows merge
-   back with the **other profile's rows left untouched**.
+3. *Fault tolerance:* the editor shows only the active person's picked year; on save
+   your rows merge back with **everyone else's rows — and your other years — untouched**.
 
 ## How the numbers work
 
-- **Budget** is derived from income, never stored: the anchor (earliest) year
-  splits income **50/30/20**; each later year splits only the **increment 20/30/50**,
-  so raises flow to investing. Projects to *current + 3* at `forward_increment_pct`.
+- **Budget** is derived from income, never stored: the anchor (first *earning*)
+  year splits income **50/30/20**; each later year splits only the **increment 20/30/50**,
+  so raises flow to investing. A zero-income year gets no budget row; an income
+  drop scales last year's split down proportionally (never negative). Projects
+  to *current + 3* at `forward_increment_pct`.
 - **Goal** for a year = its investment amount split by the target:
   `expected[cat] = investment × target%`.
 - **Potential net worth** — contributions compounded at conservative per-category
