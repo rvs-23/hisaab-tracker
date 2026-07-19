@@ -24,7 +24,8 @@ Income  →  Budget  →  Allocation  →  Actuals
   You never type a budget; changing income changes it.
 - **Allocation** is where you say how the investment slice spreads across
   instruments (mutual funds 45%, gold 25%, …). Percentages must sum to 100.
-  A year's allocation carries forward until you set a newer one.
+  A year's allocation carries forward until you set a newer one. It's edited
+  right on the **Actuals** page, not a separate stop.
 - **Actuals** is where you record what you really invested, and see it against
   the plan.
 
@@ -44,17 +45,20 @@ Once set, the choice sticks as you move between pages.
 
 Top to bottom:
 
-1. **Catch up** — the one action item. If past years fell short of the plan,
-   this is the lump sum that, invested today, pulls you level. Zero (a calm
-   note) means you're on plan. Investing *more* than planned is always fine.
-2. **Earning more, investing a bigger slice** — income per year, the invested
-   part of it, and the % labels showing that share rising.
-3. **Lifetime cards** — what you've put in, what it could be worth today at
-   conservative growth, and how much of the overall plan you've hit.
-4. **Net worth chart** — an *estimate*: your contributions compounded at
+1. **Four lifetime tiles** — earned to date, invested to date, what it could
+   be worth today at conservative growth, and how far behind the plan you are
+   right now (the current year counts only the fraction of it that's elapsed).
+2. **The journey, year on year** — goal vs actual investment per year, with
+   total income riding along as a line so both trends read at once.
+3. **Net worth chart** — an *estimate*: your contributions compounded at
    conservative expected returns, plus an emergency-fund buffer. Not your real
    portfolio value.
-5. **Did you hit the plan, year by year** — planned vs actual bars per year.
+4. **Allocation today** — everything you've contributed so far, split across
+   instruments.
+5. **Catch up** — the closing action item. If past years fell short of the
+   plan, this is the lump sum that, invested today, pulls you level. Zero (a
+   calm note) means you're on plan. Investing *more* than planned is always
+   fine.
 
 Everywhere in the app, the **primary accent means "what actually happened"**
 and the **secondary accent means "what was planned"**.
@@ -65,8 +69,9 @@ and the **secondary accent means "what was planned"**.
   **Actuals** as you invest beats reconstructing them in December.
 - **When salary lands differently** (raise, bonus, job switch): update that
   year on **Income**. Tick "Job change this year?" if you switched jobs.
-- **Once a year:** check **Allocation** still reflects where you want money to
-  go; glance at **Budget** (nothing to fill — it's derived).
+- **Once a year:** check the target allocation on **Actuals** still reflects
+  where you want money to go; glance at **Budget** (nothing to fill — it's
+  derived).
 
 ## Things that surprise people
 
@@ -78,5 +83,8 @@ and the **secondary accent means "what was planned"**.
   lost.
 - **A year you earned nothing** simply has no budget — it won't distort other
   years.
+- **The current year's goal is pro-rated** — the catch-up figure only counts
+  the year elapsed so far, so you're never "behind" on a raise the calendar
+  hasn't reached yet.
 - The ₹ figures use Indian grouping and short forms: `₹55.8L` is 55.8 lakh,
   `₹3.40Cr` is 3.40 crore.

@@ -42,24 +42,24 @@ Each page shows **one person at a time** via `?profile=<key>` (`rv` or
 ## Pages
 
 **Dashboard** and **Budget** are read-only — they recompute from what you enter
-elsewhere. Dashboard is the consolidated journey: the catch-up figure,
-earning/investing trajectory, lifetime cards, a net-worth projection, and
-planned-vs-actual per year. Budget shows how income splits and how the
-investment slice grows.
+elsewhere. Dashboard opens with four lifetime tiles, then the year-on-year
+journey (goal vs actual investment, income riding as a line), the net-worth
+projection, cumulative allocation by category, and the catch-up callout last.
+Budget shows how income splits and how the investment slice grows.
 
-The three write pages:
+The two write pages:
 
 - **Income** → `income.csv`. Pick a year, fill 12 months of
   `salary / bonus / other` (RSU vesting or a maturing FD goes under *other*);
   tick **Job change** if you switched jobs. A new year pre-fills last year's
   monthly salary; *Copy January down* fills the rest. Everything else derives
   from this.
-- **Allocation** → `targets.csv`. Set the % per instrument; Save enables only
-  at 100%, with ₹/year and ₹/month filling in live. A saved year carries
-  forward until replaced; until then the profile's `default_target` applies.
-- **Actuals** → `contributions.csv`. One row per instrument for the picked
-  year — what you actually invested, shown against the plan and the derived
-  emergency-fund target. Saves never touch other people or other years.
+- **Actuals** → `contributions.csv` and `targets.csv`. One row per instrument
+  for the picked year — what you actually invested, shown against the plan and
+  the derived emergency-fund target. A read-only "Target allocation" table
+  shows the active %-mix; its editor (Save enables only at 100%, ₹/year and
+  ₹/month live) sits in an expander. A saved year carries forward until
+  replaced. Saves never touch other people, other years, or the other file.
 
 ## The numbers
 
@@ -73,14 +73,15 @@ The three write pages:
   per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (6 months
   of needs). A projection, not a valuation.
 - **Catch-up** = the lump sum, invested today, that pulls you level with every
-  missed year (shortfalls grown at expected returns; overshooting is fine).
+  missed year (shortfalls grown at expected returns; the current year counts
+  only its elapsed fraction; overshooting is fine).
 
 ## Layout
 
 Flat: `app.py` (entry) · `config.py` (palette + model constants) · `models.py`
 (pydantic YAML schemas) · `storage.py` (CSV/YAML I/O + validation) · `audit.py`
 (save log) · `compute.py` (pure financial model) · `ui.py` (Streamlit helpers)
-· `views/` (the five pages) · `tests/` (golden + headless render tests).
+· `views/` (the four pages) · `tests/` (golden + headless render tests).
 
 ## Non-goals
 
