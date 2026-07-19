@@ -54,26 +54,37 @@ def contributions():
 
 
 def test_budget_derives_from_income_philosophy(rv, income):
-    """Anchor 50/15/35, then increment 35/15/50 (the 2026-07 household rule)."""
+    """rv's splits: anchor 50/25/25, increment 25/25/50 (per-person since 2026-07-19)."""
     bs = compute.budget_series(rv, income, today=TODAY).set_index("year")
-    assert bs.loc[2023, "monthly_investment"] == 32299   # 1107389*35%/12
-    assert bs.loc[2024, "monthly_investment"] == 45544
-    assert bs.loc[2025, "monthly_investment"] == 134951
-    assert bs.loc[2026, "monthly_investment"] == 218529
-    # wants is a flat 15% in every year under this philosophy
-    assert compute.split_pct(bs.loc[2024])["wants"] == pytest.approx(15, abs=0.1)
+    assert bs.loc[2023, "monthly_investment"] == 23071   # 1107389*25%/12
+    assert bs.loc[2024, "monthly_investment"] == 36316
+    assert bs.loc[2025, "monthly_investment"] == 125723
+    assert bs.loc[2026, "monthly_investment"] == 209301
+    # wants is flat at rv's base share in every year under this philosophy
+    assert compute.split_pct(bs.loc[2024])["wants"] == pytest.approx(25, abs=0.1)
+
+
+def test_splits_are_per_profile(rv):
+    """rv anchors at 25% investment, cheeni at 30% (config.PROFILE_BASE_SPLITS)."""
+    cheeni = Profile(key="cheeni", name="Cheeni", birth_year=1998,
+                     forward_increment_pct=5, default_target={"mfs": 100})
+    row = {"year": 2024, "month": 1, "salary": 1000000, "bonus": 0, "other": 0, "job_change": 0}
+    rv_bs = compute.budget_series(rv, pd.DataFrame([{**row, "profile": "rv"}]), today=TODAY).set_index("year")
+    ch_bs = compute.budget_series(cheeni, pd.DataFrame([{**row, "profile": "cheeni"}]), today=TODAY).set_index("year")
+    assert rv_bs.loc[2024, "investment"] == 250000
+    assert ch_bs.loc[2024, "investment"] == 300000
 
 
 def test_zero_income_year_cannot_steal_the_anchor(rv, income):
     """An all-zero 2022 row (the pickers offer 2022 as a zero floor) must not
-    become the anchor — 2023 keeps its golden 50/15/35 split."""
+    become the anchor — 2023 keeps rv's golden anchor split."""
     zeros = pd.DataFrame(
         [{"profile": "rv", "year": 2022, "month": m, "salary": 0, "bonus": 0, "other": 0, "job_change": 0}
          for m in range(1, 13)]
     )
     bs = compute.budget_series(rv, pd.concat([zeros, income]), today=TODAY).set_index("year")
     assert 2022 not in bs.index
-    assert bs.loc[2023, "monthly_investment"] == 32299  # unchanged golden anchor
+    assert bs.loc[2023, "monthly_investment"] == 23071  # unchanged golden anchor
 
 
 def test_mid_series_zero_year_is_skipped(rv):
@@ -85,7 +96,7 @@ def test_mid_series_zero_year_is_skipped(rv):
     bs = compute.budget_series(rv, rows, today=TODAY).set_index("year")
     assert 2024 not in bs.index
     # 2025's increment is measured against 2023, the last earning year.
-    assert bs.loc[2025, "investment"] == round(1200000 * 0.35 + 300000 * 0.50)
+    assert bs.loc[2025, "investment"] == round(1200000 * 0.25 + 300000 * 0.50)
 
 
 def test_income_drop_scales_budget_down_proportionally(rv):
@@ -96,7 +107,7 @@ def test_income_drop_scales_budget_down_proportionally(rv):
     bs = compute.budget_series(rv, rows, today=TODAY).set_index("year")
     # 20% drop shrinks every bucket by 20% — never negative, still sums to total.
     assert bs.loc[2024, "needs"] == round(500000 * 0.8)
-    assert bs.loc[2024, "investment"] == round(350000 * 0.8)
+    assert bs.loc[2024, "investment"] == round(250000 * 0.8)
     assert bs.loc[2024, ["needs", "wants", "investment"]].sum() == 800000
 
 
@@ -113,7 +124,7 @@ def test_budget_projects_to_current_plus_three(rv, income):
     assert list(bs.index) == [2023, 2024, 2025, 2026, 2027, 2028, 2029]
     assert not bs.loc[2026, "is_projected"]
     assert bs.loc[2027, "is_projected"]
-    # 2027 income = 5576912 * 1.05; the raise splits 35/15/50
+    # 2027 income = 5576912 * 1.05; the raise splits per rv's increment split
     assert bs.loc[2027, "total_income"] == round(5576912 * 1.05)
     raise_ = 5576912 * 0.05
     assert bs.loc[2027, "investment"] == pytest.approx(
@@ -133,7 +144,7 @@ def test_targets_carry_forward(rv, income):
 def test_expected_is_investment_times_target(rv, income, targets):
     """The goal is the year's investment amount split by the target allocation."""
     bs = compute.budget_series(rv, income).set_index("year")
-    investment = bs.loc[2024, "investment"]  # 546533
+    investment = bs.loc[2024, "investment"]  # 435794
     exp = compute.expected_contributions(rv, income, targets, 2024)
     for cat, pct in rv.default_target.items():
         assert exp[cat] == pytest.approx(investment * pct / 100, abs=1.0), cat
@@ -141,24 +152,24 @@ def test_expected_is_investment_times_target(rv, income, targets):
 
 
 def test_pct_goal_achieved_golden(rv, income, targets, contributions):
-    """Anchored to the 50/15/35 philosophy: 2024 expected 546,533 vs 311,789.5 actual."""
+    """Golden for rv's 50/25/25 splits: 2024 expected 435,794 vs 311,789.5 actual."""
     pva = compute.plan_vs_actual(rv, income, targets, contributions, 2024)
-    assert compute.pct_goal_achieved(pva) == pytest.approx(57.05, abs=0.05)
+    assert compute.pct_goal_achieved(pva) == pytest.approx(71.55, abs=0.05)
 
 
 def test_per_year_target_override_changes_expected(rv, income, contributions):
     override = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 100}])
     exp = compute.expected_contributions(rv, income, override, 2024)
     assert exp.get("us_market", 0) == 0  # everything now lands in mfs
-    assert exp["mfs"] == pytest.approx(546533, abs=2)  # the whole 2024 investment
+    assert exp["mfs"] == pytest.approx(435794, abs=2)  # the whole 2024 investment
 
 
 def test_plan_vs_actual_shortfall(rv, income, targets, contributions):
     pva = compute.plan_vs_actual(rv, income, targets, contributions, 2024).set_index("category")
-    # us_market: actual 39345.5 - expected 54653.3 = -15307.8 (shortfall)
-    assert pva.loc["us_market", "shortfall"] == pytest.approx(-15307.8, abs=1.0)
-    # indian_stocks: 95078 - 76514.6 = +18563.4 (surplus)
-    assert pva.loc["indian_stocks", "shortfall"] == pytest.approx(18563.4, abs=1.0)
+    # us_market: actual 39345.5 - expected 43579.4 = -4233.9 (shortfall)
+    assert pva.loc["us_market", "shortfall"] == pytest.approx(-4233.9, abs=1.0)
+    # indian_stocks: 95078 - 61011.2 = +34066.8 (surplus)
+    assert pva.loc["indian_stocks", "shortfall"] == pytest.approx(34066.8, abs=1.0)
 
 
 def test_bonus_counts_toward_income_split(rv, income):
@@ -380,7 +391,7 @@ def test_catch_up_unaffected_by_opening_corpus(rv):
     income, targets = _one_year()
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026)
-    assert cu == pytest.approx(350000 * 1.115 ** 2, rel=1e-6)  # identical to the no-corpus test
+    assert cu == pytest.approx(250000 * 1.115 ** 2, rel=1e-6)  # identical to the no-corpus test
 
 
 # Catch-up amount.
@@ -389,19 +400,19 @@ def _one_year(salary=1000000):
     income = pd.DataFrame([{"profile": "rv", "year": 2024, "month": 1,
                             "salary": salary, "bonus": 0, "other": 0, "job_change": 0}])
     targets = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 100}])
-    return income, targets  # anchor year → investment is 35% of salary, all in mfs
+    return income, targets  # anchor year → investment is 25% of rv's salary, all in mfs
 
 
 def test_catch_up_grows_shortfall_to_today(rv):
-    income, targets = _one_year()  # 2024 investment 350000, all mfs, nothing invested
+    income, targets = _one_year()  # 2024 investment 250000, all mfs, nothing invested
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026)
-    assert cu == pytest.approx(350000 * 1.115 ** 2, rel=1e-6)  # shortfall grown 2 yrs at 11.5%
+    assert cu == pytest.approx(250000 * 1.115 ** 2, rel=1e-6)  # shortfall grown 2 yrs at 11.5%
 
 
 def test_catch_up_zero_when_plan_met(rv):
     income, targets = _one_year()
-    contrib = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": 350000, "notes": None}])
+    contrib = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": 250000, "notes": None}])
     assert compute.catch_up_amount(rv, income, targets, contrib, today_year=2026) == 0.0
 
 
@@ -432,7 +443,7 @@ def test_catch_up_counts_a_year_once_it_is_past(rv):
     income, targets = _one_year()  # shortfall lives in 2024
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2025)
-    assert cu == pytest.approx(350000 * 1.115, rel=1e-6)  # grown one year
+    assert cu == pytest.approx(250000 * 1.115, rel=1e-6)  # grown one year
 
 
 def test_inr_indian_grouping():

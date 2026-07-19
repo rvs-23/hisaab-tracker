@@ -1,12 +1,13 @@
 """The financial model, as pure functions over the loaded data.
 
-Budget is *derived from income*, not entered. The philosophy (from the source
-workbook) is fixed:
+Budget is *derived from income*, not entered. The philosophy is fixed; the
+split percentages are per person (config.PROFILE_BASE_SPLITS / _INCREMENT_SPLITS):
 
   - In a person's anchor year (their first earning year), total income splits
-    50/15/35 across needs / wants / investment.
+    across needs / wants / investment per their base split.
   - Every year after, last year's rupee amounts carry forward and only the
-    *increment* in income splits 35/15/50 — so more of each raise is invested.
+    *increment* in income splits per their increment split — so more of each
+    raise is invested.
 
 Then, for contributions tracking, the goal is that year's investment amount
 split across instruments by the target allocation:
@@ -23,8 +24,9 @@ import datetime as dt
 import pandas as pd
 
 from config import (
-    BASE_SPLIT, BASELINE_YEAR, EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS,
-    INCOME_COMPONENTS, INCREMENT_SPLIT, NETWORTH_PROJECTION_YEARS,
+    BASELINE_YEAR, DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT,
+    EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
+    NETWORTH_PROJECTION_YEARS, PROFILE_BASE_SPLITS, PROFILE_INCREMENT_SPLITS,
     PROJECTION_YEARS_AHEAD,
 )
 from models import Profile
@@ -60,17 +62,20 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     running cumulative invested.
 
     Beyond the entered years, projects forward to current year + 3: income grows
-    by forward_increment_pct and each projected raise splits 35/15/50 like any
+    by forward_increment_pct and each projected raise splits per the person's
+    increment split like any
     other increment. Projected rows carry is_projected=True.
 
     Zero-income years get no budget row: the anchor is the first *earning* year
-    (an all-zero 2022 baseline must not steal the 50/15/35 anchor split from the
+    (an all-zero 2022 baseline must not steal the anchor split from the
     real first year), and a mid-series zero year is skipped like a missing one.
     A year earning *less* than the last scales the previous buckets down
     proportionally — the split still sums to the new total and never goes
     negative."""
     yearly = annual_income(income)
     rows = yearly[yearly["profile"] == profile.key].sort_values("year")
+    base_split = PROFILE_BASE_SPLITS.get(profile.key, DEFAULT_BASE_SPLIT)
+    increment_split = PROFILE_INCREMENT_SPLITS.get(profile.key, DEFAULT_INCREMENT_SPLIT)
 
     out = []
     prev_total = None
@@ -80,12 +85,12 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     def add_year(year: int, total: float, projected: bool, job_change: bool) -> None:
         nonlocal prev_total, prev, cumulative
         if prev_total is None:  # anchor year
-            amt = {k: total * BASE_SPLIT[k] / 100 for k in BASE_SPLIT}
+            amt = {k: total * base_split[k] / 100 for k in base_split}
         elif total < prev_total:  # income drop: shrink all buckets proportionally
             amt = {k: prev[k] * total / prev_total for k in prev}
         else:
             delta = total - prev_total
-            amt = {k: prev[k] + delta * INCREMENT_SPLIT[k] / 100 for k in INCREMENT_SPLIT}
+            amt = {k: prev[k] + delta * increment_split[k] / 100 for k in increment_split}
         cumulative += amt["investment"]
         yoy = (total / prev_total - 1) * 100 if prev_total else None
         out.append(

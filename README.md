@@ -69,15 +69,16 @@ The two write pages:
 ## The numbers
 
 - **Budget** is derived, never stored: the first earning year splits income
-  **50/15/35** (needs/wants/investment); each later year splits only the
-  **increment 35/15/50**, so raises flow to investing. A zero-income year gets
+  per that person's **base split**; each later year splits only the
+  **increment** per their increment split, tilted toward investing (the
+  per-person percentages are constants in `config.py`). A zero-income year gets
   no budget row; an income drop scales the split down proportionally. Projects
   to current + 3 at `forward_increment_pct`.
 - **Goal** for a year = its investment amount × target %, per category.
 - **Potential net worth** = contributions compounded at conservative
   per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (what you
-  actually hold — or, until entered, the derived target of 4 months of needs +
-  wants) plus any **opening corpus**. A projection, not a valuation.
+  actually hold — or, until entered, the derived target of
+  `EMERGENCY_FUND_MONTHS` of needs + wants) plus any **opening corpus**. A projection, not a valuation.
 - **Opening corpus** (optional, set in Dashboard → Adjustments) is money
   invested before tracking began. It's assumed invested at the start of your
   first tracked year and grown at your allocation-weighted expected return; it

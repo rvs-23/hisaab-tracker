@@ -19,8 +19,10 @@ Income  →  Budget  →  Allocation  →  Actuals
 - **Income** is the only money fact you enter. Everything else is computed
   from it or compared against it.
 - **Budget** splits that income into needs / wants / investment. Your first
-  earning year splits 50/15/35; after that, only each year's *raise* splits
-  35/15/50 — so as you earn more, a bigger share of income goes to investing.
+  earning year splits into needs/wants/investment per your own base split;
+  after that, only each year's *raise* is split, tilted toward investing — so
+  as you earn more, a bigger share of income goes to investing. (Each person's
+  exact percentages live in `config.py`; the Budget page shows yours.)
   You never type a budget; changing income changes it.
 - **Allocation** is where you say how the investment slice spreads across
   instruments (mutual funds 45%, gold 25%, …). Percentages must sum to 100.
@@ -87,8 +89,9 @@ and the **secondary accent means "what was planned"**.
 
 ## Things that surprise people
 
-- **The emergency-fund *target* is automatic** — 4 months of your full monthly
-  spending (needs + wants); earn more and the target grows. What you *actually*
+- **The emergency-fund *target* is automatic** — a configured number of months
+  (`EMERGENCY_FUND_MONTHS`) of your full monthly spending (needs + wants); earn
+  more and the target grows. What you *actually*
   hold is entered by hand on the Actuals page and counts in your net worth.
 - **Saving is safe**: every save is checked first (sums, duplicates, negative
   numbers — except income's *other*, which is allowed to go negative) and

@@ -40,13 +40,22 @@ PROFILE_ACCENTS = {
 }
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
-# Budget model. The anchor year (a person's first earning year) splits income
-# 50/15/35 across needs/wants/investment; every later year splits only the
-# income *increment* 35/15/50 (needs and investment mirror, wants held), so
-# raises flow mostly to investing. Decided 2026-07: one shared household rule
-# for both profiles, replacing the earlier 50/30/20 + 20/30/50 pair.
-BASE_SPLIT = {"needs": 50, "wants": 15, "investment": 35}
-INCREMENT_SPLIT = {"needs": 35, "wants": 15, "investment": 50}
+# Budget model, per person. The anchor year (a person's first earning year)
+# splits income needs/wants/investment per their base split; every later year
+# splits only the income *increment* per their increment split (needs and
+# investment mirror, wants held), so raises flow mostly to investing.
+# Per-person since 2026-07-19: rv starts at 25% investment, cheeni at 30%.
+# UI text derives from these dicts — never hard-code the numbers in a caption.
+DEFAULT_BASE_SPLIT = {"needs": 50, "wants": 20, "investment": 30}
+DEFAULT_INCREMENT_SPLIT = {"needs": 30, "wants": 20, "investment": 50}
+PROFILE_BASE_SPLITS = {
+    "rv": {"needs": 50, "wants": 25, "investment": 25},
+    "cheeni": {"needs": 50, "wants": 20, "investment": 30},
+}
+PROFILE_INCREMENT_SPLITS = {
+    "rv": {"needs": 25, "wants": 25, "investment": 50},
+    "cheeni": {"needs": 30, "wants": 20, "investment": 50},
+}
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 
