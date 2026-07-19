@@ -58,12 +58,20 @@ metric_tile(c[2], "Estimated value today", inr_short(nw_potential), f"as of {tod
                  "fund (6 months of needs)."
                  + (f" Includes {inr_short(opening)} invested before tracking, grown from "
                     "its assumed vintage." if opening > 0 else ""))
-metric_tile(c[3], "Catch-up from plan", inr_short(catch_up),
-            "you're on track" if catch_up == 0 else f"in {today_year}",
-            color=SECONDARY if catch_up > 0 else PRIMARY, big=True,
-            help=f"Lump sum, invested today, to be level with the plan across {year_range} "
-                 f"(shortfalls grown at expected returns; {today_year} counts only its "
-                 "elapsed share). Overshooting is fine.")
+# The plan tile leads with the year's full goal; the catch-up piece and what's
+# already gone in ride the sub-line (the callout at the bottom expands on it).
+year_goal = sum(compute.expected_contributions(profile, d.income, d.targets, today_year).values())
+invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
+plan_sub = f"{inr_short(invested_ty)} in · " + (
+    "no catch-up" if catch_up == 0 else f"catch-up {inr_short(catch_up)}"
+)
+metric_tile(c[3], f"Plan for {today_year}", inr_short(year_goal), plan_sub,
+            color=SECONDARY, big=True,
+            help=f"{today_year}'s full investment goal. The sub-line shows what you've "
+                 f"already put in this year, and the catch-up: the lump sum, invested "
+                 f"today, to be level with the plan across {year_range} (shortfalls "
+                 f"grown at expected returns; {today_year} counts only its elapsed "
+                 "share). Overshooting is fine.")
 
 # The journey: income and the goal as bars, actual investment riding along as
 # a line, all on one shared rupee axis (one axis only — dual axes hinder
