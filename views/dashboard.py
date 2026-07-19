@@ -9,7 +9,7 @@ import storage
 from ui import (
     FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary, accent_secondary, chart_title,
     inr_axis, inr_short, load_all, metric_tile, page_header, pretty_category,
-    section, style_fig,
+    section, style_fig, tint,
 )
 
 GRAY_LINE = "#9aa0a6"
@@ -132,9 +132,13 @@ else:
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
     st.caption("Solid: contributions compounded at conservative returns. Dashed: if you keep investing the plan. Grey: money put in (no growth).")
 
-# Allocation today: cumulative contributions to date, by category.
+# Allocation today: cumulative contributions to date, by category — still
+# cumulative across all years, but stacked by the year each rupee went in.
+# Segments tint from the primary accent (oldest year lightest, newest year
+# the accent itself), so the mix's build-up over time reads at a glance.
 chart_title("Allocation today",
-            help="How everything you've contributed so far splits across instruments.")
+            help="How everything you've contributed so far splits across instruments, "
+                 "stacked by the year it went in.")
 by_category = contrib.groupby("category")["amount"].sum()
 by_category = by_category[by_category > 0].sort_values()
 if by_category.empty:
@@ -143,11 +147,23 @@ else:
     total = by_category.sum()
     labels = [pretty_category(cat) for cat in by_category.index]
     share = [f"{100 * v / total:.0f}%" for v in by_category]
+    years = sorted(int(y) for y in contrib["year"].dropna().unique())
+    n_years = len(years)
+
     f = go.Figure()
-    f.add_bar(y=labels, x=by_category.values, orientation="h", marker_color=PRIMARY,
-              text=share, textposition="outside")
-    f.update_traces(cliponaxis=False)  # the largest bar's % label must not clip at the edge
-    f.update_layout(showlegend=False)
+    for i, yr in enumerate(years):
+        # Oldest (i=0) lightest, newest (i=n-1) the accent itself (fraction 0).
+        fraction = 0.0 if n_years <= 1 else 0.65 * (n_years - 1 - i) / (n_years - 1)
+        amounts = [
+            float(contrib.loc[(contrib["category"] == cat) & (contrib["year"] == yr), "amount"].sum())
+            for cat in by_category.index
+        ]
+        f.add_bar(y=labels, x=amounts, orientation="h", name=str(yr),
+                  marker_color=tint(PRIMARY, fraction))
+    f.add_trace(go.Scatter(x=by_category.values, y=labels, mode="text", text=share,
+                           textposition="middle right", showlegend=False, hoverinfo="skip"))
+    f.update_traces(cliponaxis=False, selector=dict(type="bar"))  # the outside % label must not clip
+    f.update_layout(barmode="stack")
     inr_axis(f, by_category.max(), axis="x")
     style_fig(f, height=max(220, 40 * len(labels)))
     f.update_yaxes(showgrid=False)

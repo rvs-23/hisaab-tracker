@@ -132,6 +132,27 @@ def inr_axis(fig, max_value: float, axis: str = "y") -> None:
         fig.update_xaxes(**kwargs)
 
 
+def tint(hex_color: str, fraction: float) -> str:
+    """Lightens a hex colour by mixing it toward white.
+
+    Used to build a same-hue family for chart fills (e.g. one bar segment per
+    year, oldest lightest) — never for text, which must keep its own
+    contrast-checked colour.
+
+    Args:
+        hex_color: A ``#rrggbb`` colour.
+        fraction: How far toward white to mix, 0–1. 0 returns the colour
+            unchanged; 1 returns white. E.g. 0.55 is much lighter.
+
+    Returns:
+        The mixed colour as ``#rrggbb``.
+    """
+    hex_color = hex_color.lstrip("#")
+    r, g, b = (int(hex_color[i:i + 2], 16) for i in (0, 2, 4))
+    mix = lambda c: round(c + (255 - c) * fraction)
+    return f"#{mix(r):02x}{mix(g):02x}{mix(b):02x}"
+
+
 def pretty_category(category: str) -> str:
     """Returns the display label for an asset-class category key."""
     return CATEGORY_LABELS.get(category, category.replace("_", " ").capitalize())
