@@ -78,7 +78,9 @@ and the **secondary accent means "what was planned"**.
 - **Monthly (2 minutes):** nothing required — but recording contributions on
   **Actuals** as you invest beats reconstructing them in December.
 - **When salary lands differently** (raise, bonus, job switch): update that
-  year on **Income**. Tick "Job change this year?" if you switched jobs.
+  year on **Income**. Tick "Job change this year?" if you switched jobs. A tax
+  payment or clawback goes under *other* too — it's the one field allowed to
+  go negative.
 - **Once a year:** check the target allocation on **Actuals** still reflects
   where you want money to go; glance at **Budget** (nothing to fill — it's
   derived).
@@ -88,8 +90,9 @@ and the **secondary accent means "what was planned"**.
 - **The emergency fund is automatic** — 6 months of your "needs" bucket.
   There's nowhere to enter it; earn more, and the target grows.
 - **Saving is safe**: every save is checked first (sums, duplicates, negative
-  numbers) and refused with a message if something's off — and every change is
-  also appended to an audit log (`changes.jsonl`), so nothing is ever silently
+  numbers — except income's *other*, which is allowed to go negative) and
+  refused with a message if something's off — and every change is also
+  appended to an audit log (`changes.jsonl`), so nothing is ever silently
   lost.
 - **A year you earned nothing** simply has no budget — it won't distort other
   years.

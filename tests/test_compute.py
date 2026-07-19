@@ -177,6 +177,17 @@ def test_monthly_rows_aggregate_to_yearly(rv):
     assert bs.loc[2024, "total_income"] == 1200000
 
 
+def test_negative_other_reduces_total_but_still_produces_a_budget_row(rv):
+    """A large tax payment under `other` can go negative for one month; as long
+    as the year's total stays positive, budget_series still produces a row for
+    it, off the reduced total (not skipped like a <=0 year)."""
+    row = {"profile": "rv", "year": 2026, "month": 3, "salary": 5000000, "bonus": 0,
+           "other": -500000, "job_change": 0}
+    bs = compute.budget_series(rv, pd.DataFrame([row])).set_index("year")
+    assert 2026 in bs.index
+    assert bs.loc[2026, "total_income"] == 4500000
+
+
 def test_bonus_and_other_count_as_income(rv):
     row = {"profile": "rv", "year": 2024, "month": 1, "salary": 1000000, "bonus": 100000, "other": 50000, "job_change": 0}
     bs = compute.budget_series(rv, pd.DataFrame([row])).set_index("year")
@@ -441,6 +452,17 @@ def test_income_rejects_negative_and_duplicates(rv):
         storage.validate_income(pd.DataFrame([{**base, "salary": -1}]), [rv])
     with pytest.raises(ValueError, match="duplicate"):
         storage.validate_income(pd.DataFrame([base, dict(base)]), [rv])
+
+
+def test_income_other_may_be_negative(rv):
+    """`other` is the catch-all (tax payments, clawbacks) and may go negative;
+    salary and bonus must stay non-negative."""
+    base = {"profile": "rv", "year": 2024, "month": 1, "salary": 100, "bonus": 0, "other": 0, "job_change": 0}
+    storage.validate_income(pd.DataFrame([{**base, "other": -500000}]), [rv])  # does not raise
+    with pytest.raises(ValueError, match="negative"):
+        storage.validate_income(pd.DataFrame([{**base, "salary": -1}]), [rv])
+    with pytest.raises(ValueError, match="negative"):
+        storage.validate_income(pd.DataFrame([{**base, "bonus": -1}]), [rv])
 
 
 def test_contributions_reject_negative_amount(rv, config):

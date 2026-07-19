@@ -31,6 +31,8 @@ REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 # Income drives everything; the budget split is derived (see compute.py).
 # Entered monthly (month 1–12); compute aggregates to yearly. `job_change` is a
 # per-year 0/1 flag (repeated across the year's rows) marking a job switch.
+# `salary` and `bonus` must be non-negative; `other` is the catch-all (RSU
+# vesting, a maturing FD — or a tax payment/clawback) and may go negative.
 INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
@@ -144,7 +146,9 @@ def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
         raise ValueError("income.csv has rows with a missing year or salary")
     if not df["month"].between(1, 12).all():
         raise ValueError("income.csv has rows with month outside 1–12")
-    _check_non_negative(df, INCOME_COMPONENTS, "income.csv")
+    # `other` is the catch-all (RSU vesting, a maturing FD — or a tax payment
+    # / clawback) and is allowed to go negative; salary and bonus are not.
+    _check_non_negative(df, [c for c in INCOME_COMPONENTS if c != "other"], "income.csv")
     _check_no_duplicates(df, ["profile", "year", "month"], "income.csv")
 
 

@@ -30,10 +30,11 @@ forward_increment_pct, default_target`; the filename stem is the profile key);
 the history CSVs appear as you save. Scaffold a fresh folder with
 `uv run python scripts/init_data_dir.py <path>`.
 
-Every save **validates first** (numeric, non-negative, known
-categories/profiles, no duplicates, %s sum to 100) and refuses bad input with a
-message. Every accepted save appends one JSON line to **`changes.jsonl`** — an
-append-only audit log of exactly which rows were added and removed.
+Every save **validates first** (numeric, non-negative — except income's
+*other*, which may be negative — known categories/profiles, no duplicates, %s
+sum to 100) and refuses bad input with a message. Every accepted save appends
+one JSON line to **`changes.jsonl`** — an append-only audit log of exactly
+which rows were added and removed.
 
 Each page shows **one person at a time** via `?profile=<key>` (`rv` or
 `cheeni`); set it once and it sticks across pages. Year pickers are locked to
@@ -53,10 +54,11 @@ and how the investment slice grows.
 The two write pages:
 
 - **Income** → `income.csv`. Pick a year, fill 12 months of
-  `salary / bonus / other` (RSU vesting or a maturing FD goes under *other*);
-  tick **Job change** if you switched jobs. A new year pre-fills last year's
-  monthly salary; *Copy January down* fills the rest. Everything else derives
-  from this.
+  `salary / bonus / other` (RSU vesting or a maturing FD goes under *other*;
+  *other* may also go negative, e.g. a tax payment or clawback); tick **Job
+  change** if you switched jobs. A new year pre-fills last year's monthly
+  salary; *Copy January down* fills the rest. Everything else derives from
+  this.
 - **Actuals** → `contributions.csv` and `targets.csv`. One row per instrument
   for the picked year — what you actually invested, shown against the plan and
   the derived emergency-fund target. A read-only "Target allocation" table
