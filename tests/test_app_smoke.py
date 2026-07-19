@@ -13,7 +13,6 @@ PAGES = [
     "views/dashboard.py",
     "views/income.py",
     "views/budget_projection.py",
-    "views/allocation.py",
     "views/actuals.py",
 ]
 
