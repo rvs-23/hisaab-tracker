@@ -62,10 +62,10 @@ metric_tile(c[2], "Estimated value today", inr_short(nw_potential), f"as of {tod
 # already gone in ride the sub-line (the callout at the bottom expands on it).
 year_goal = sum(compute.expected_contributions(profile, d.income, d.targets, today_year).values())
 invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
-plan_sub = f"{inr_short(invested_ty)} in · " + (
-    "no catch-up" if catch_up == 0 else f"catch-up {inr_short(catch_up)}"
+plan_sub = f"invested so far: {inr_short(invested_ty)}<br>" + (
+    "no catch-up needed" if catch_up == 0 else f"catch-up to get level: {inr_short(catch_up)}"
 )
-metric_tile(c[3], f"Plan for {today_year}", inr_short(year_goal), plan_sub,
+metric_tile(c[3], f"{today_year} investment goal", inr_short(year_goal), plan_sub,
             color=SECONDARY, big=True,
             help=f"{today_year}'s full investment goal. The sub-line shows what you've "
                  f"already put in this year, and the catch-up: the lump sum, invested "
