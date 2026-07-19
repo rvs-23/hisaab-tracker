@@ -6,7 +6,7 @@ import streamlit as st
 
 import compute
 from ui import (
-    FS_BODY, FS_HERO, FS_LABEL, INK, accent_primary, accent_secondary, chart_title,
+    FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary, accent_secondary, chart_title,
     inr_axis, inr_short, load_all, metric_tile, page_header, pretty_category,
     section, style_fig,
 )
@@ -59,8 +59,9 @@ metric_tile(c[3], "Catch-up from plan", inr_short(catch_up),
                  f"(shortfalls grown at expected returns; {today_year} counts only its "
                  "elapsed share). Overshooting is fine.")
 
-# The journey: goal vs actual investment per year, income riding along as a line
-# on the same rupee axis (one axis only — dual axes hinder honest comparison).
+# The journey: income and the goal as bars, actual investment riding along as
+# a line, all on one shared rupee axis (one axis only — dual axes hinder
+# honest comparison).
 chart_title("The journey, year on year",
             help=f"Goal is that year's planned investment ({today_year} counts only its "
                  "elapsed share so far). Income is total earnings that year.")
@@ -77,23 +78,24 @@ else:
             g *= fraction
         goal.append(g)
     actual_invested = [float(contrib.loc[contrib["year"] == y, "amount"].sum()) for y in yr]
-    income_line = trend["total_income"].tolist()
+    income_bars = trend["total_income"].tolist()
     growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in trend["total_income"].pct_change() * 100]
 
     f = go.Figure()
+    f.add_bar(
+        x=xs, y=income_bars, name="Income", marker_color=SAND,
+        text=growth, textposition="outside", textfont=dict(size=11, color="#6b7280"),
+    )
     f.add_bar(x=xs, y=goal, name="Goal", marker_color=SECONDARY)
-    f.add_bar(x=xs, y=actual_invested, name="Invested", marker_color=PRIMARY)
     f.add_trace(go.Scatter(
-        x=xs, y=income_line, name="Income", mode="lines+markers+text",
-        line=dict(color=INK, width=2), marker=dict(size=6, color=INK),
-        text=growth, textposition="top center", textfont=dict(size=11, color=INK),
+        x=xs, y=actual_invested, name="Invested", mode="lines+markers",
+        line=dict(color=PRIMARY, width=3), marker=dict(size=6, color=PRIMARY),
     ))
     f.update_layout(barmode="group", xaxis=dict(type="category"), showlegend=True)
-    inr_axis(f, max(income_line + goal + actual_invested))
+    inr_axis(f, max(income_bars + goal + actual_invested))
     style_fig(f, height=360)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-    st.caption("Bars: planned goal vs what you actually invested. Line: total income, "
-               "labelled with its year-on-year growth.")
+    st.caption("Bars: income and the planned goal. Line: what you actually invested.")
 
 # Net worth: invested vs projected value.
 nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year)
