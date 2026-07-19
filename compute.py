@@ -268,23 +268,46 @@ def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.
     return round(invested + ef), round(grown + ef)
 
 
+def elapsed_year_fraction(today: dt.date | None = None) -> float:
+    """Returns how far ``today`` is into its calendar year.
+
+    Args:
+        today: The date to measure; defaults to the real today. Pass an
+            explicit date for deterministic tests.
+
+    Returns:
+        Day-of-year ÷ days-in-year (365 or 366), so mid-year is ≈ 0.5 and
+        December 31 is ≈ 1.0.
+    """
+    today = today or dt.date.today()
+    days_in_year = (dt.date(today.year + 1, 1, 1) - dt.date(today.year, 1, 1)).days
+    return today.timetuple().tm_yday / days_in_year
+
+
 def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
-                    contributions: pd.DataFrame, today_year: int) -> float:
+                    contributions: pd.DataFrame, today_year: int,
+                    today: dt.date | None = None) -> float:
     """Lump sum to invest today to pull level with the planned trajectory.
 
     For every planned year up to today, the per-category shortfall (planned −
     actual) is grown to today at that category's expected return; surpluses in
-    other years/categories net against it. The result is how much, invested
-    *today* (already at today's value), would make the portfolio worth what it
-    would have been worth had every year's plan been met. Never below zero, and
+    other years/categories net against it. The current year (``today_year``)
+    counts only its elapsed fraction of the plan (see ``elapsed_year_fraction``)
+    — you can't be behind on a raise the calendar hasn't gotten to yet; every
+    earlier year counts in full. The result is how much, invested *today*
+    (already at today's value), would make the portfolio worth what it would
+    have been worth had every year's plan been met. Never below zero, and
     investing more than this (overshooting the goal) is fine.
     """
     c = contributions[contributions["profile"] == profile.key]
+    fraction = elapsed_year_fraction(today)
     planned_fv = actual_fv = 0.0
     for y in available_years(income, contributions, profile.key):
         if y > today_year:
             continue
         exp = expected_contributions(profile, income, targets, y)
+        if y == today_year:
+            exp = {cat: amt * fraction for cat, amt in exp.items()}
         act = c[c["year"] == y].groupby("category")["amount"].sum().to_dict()
         for cat in set(exp) | set(act):
             grow = (1 + EXPECTED_RETURNS.get(cat, 0) / 100) ** (today_year - y)

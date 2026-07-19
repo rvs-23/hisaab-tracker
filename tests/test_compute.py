@@ -278,6 +278,36 @@ def test_catch_up_zero_when_overshot(rv):
     assert compute.catch_up_amount(rv, income, targets, contrib, today_year=2026) == 0.0
 
 
+def test_elapsed_year_fraction_midyear_is_about_half():
+    assert compute.elapsed_year_fraction(dt.date(2027, 7, 2)) == pytest.approx(0.5, abs=0.01)
+
+
+def test_elapsed_year_fraction_endpoints():
+    assert compute.elapsed_year_fraction(dt.date(2025, 1, 1)) == pytest.approx(1 / 365, abs=1e-6)
+    assert compute.elapsed_year_fraction(dt.date(2025, 12, 31)) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_catch_up_prorates_the_current_year(rv):
+    """A half-elapsed current year should only count half its planned goal."""
+    income, targets = _one_year()  # 2024 investment 200000, all mfs
+    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
+    half_elapsed = dt.date(2024, 7, 2)  # ≈ 0.5 through the year
+    cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2024, today=half_elapsed)
+    assert cu == pytest.approx(200000 * 0.5, rel=0.02)
+
+
+def test_catch_up_past_years_count_in_full_despite_prorating(rv):
+    """The pro-ration only touches today_year; an earlier shortfall is untouched
+    by how far into *this* year we are."""
+    income, targets = _one_year()  # shortfall lives in 2024, a past year
+    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
+    partway_through_2026 = dt.date(2026, 3, 1)
+    cu = compute.catch_up_amount(
+        rv, income, targets, no_contrib, today_year=2026, today=partway_through_2026
+    )
+    assert cu == pytest.approx(200000 * 1.115 ** 2, rel=1e-6)  # same as the full-year test
+
+
 def test_inr_indian_grouping():
     assert inr(1234567) == "₹12,34,567"
     assert inr(999) == "₹999"
