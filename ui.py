@@ -7,6 +7,7 @@ views use so a view imports everything it needs from one place.
 from __future__ import annotations
 
 import html
+import math
 from contextlib import contextmanager
 
 import pandas as pd
@@ -92,6 +93,41 @@ def inr_short(value: float) -> str:
     if magnitude >= 1_00_000:
         return f"{sign}₹{magnitude / 1_00_000:.1f}L"
     return inr(value)
+
+
+def _nice_step(rough_step: float) -> float:
+    """Rounds a raw step up to the nearest 1/2/5×10ⁿ "nice" value."""
+    rough_step = max(rough_step, 1.0)
+    exp = math.floor(math.log10(rough_step))
+    base = rough_step / 10**exp
+    nice = 1 if base <= 1 else 2 if base <= 2 else 5 if base <= 5 else 10
+    return nice * 10**exp
+
+
+def inr_axis(fig, max_value: float, axis: str = "y") -> None:
+    """Sets compact lakh/crore ₹ tick labels on a Plotly axis.
+
+    Plotly's ``tickformat="~s"`` renders ₹ amounts as "2M" — the wrong idiom for
+    Indian rupees. This computes 4–6 round tick values sized to ``max_value``
+    (steps in thousands, lakhs, or crores as the magnitude demands) and sets
+    ``tickvals``/``ticktext`` using ``inr_short`` for the labels.
+
+    Args:
+        fig: The Plotly figure to update in place.
+        max_value: The largest ₹ value the axis needs to cover.
+        axis: Which axis to format, ``"x"`` or ``"y"``.
+    """
+    max_value = max(float(max_value), 1.0)
+    step = _nice_step(max_value / 5)
+    tickvals = [0.0]
+    while tickvals[-1] < max_value:
+        tickvals.append(tickvals[-1] + step)
+    ticktext = [inr_short(v) for v in tickvals]
+    kwargs = dict(tickvals=tickvals, ticktext=ticktext)
+    if axis == "y":
+        fig.update_yaxes(**kwargs)
+    else:
+        fig.update_xaxes(**kwargs)
 
 
 def pretty_category(category: str) -> str:

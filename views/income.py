@@ -8,8 +8,8 @@ import compute
 import storage
 from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
-    accent_primary, accent_secondary, edit_card, inr_short, load_all, page_header,
-    resync, section, style_fig,
+    accent_primary, accent_secondary, edit_card, inr_axis, inr_short, load_all,
+    page_header, resync, section, style_fig,
 )
 
 d = load_all()
@@ -42,7 +42,8 @@ if not visible.empty:
             mode="markers", name="Job change",
             marker=dict(symbol="triangle-down", size=10, color="#64748b", line=dict(width=1, color="white")),
             hovertext="Job change", hoverinfo="text+x"))
-    f.update_layout(xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
+    f.update_layout(xaxis=dict(type="category"))
+    inr_axis(f, totals.max())
     style_fig(f, height=280)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 

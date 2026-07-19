@@ -7,7 +7,7 @@ import streamlit as st
 import compute
 from ui import (
     FS_BODY, FS_HERO, FS_LABEL, ON_TRACK_PCT, SAND, accent_primary, accent_secondary,
-    chart_title, inr_short, load_all, metric_tile, page_header, section, style_fig,
+    chart_title, inr_axis, inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 
 GRAY_LINE = "#9aa0a6"
@@ -64,8 +64,8 @@ else:
               text=[f"{v:.0f}%" for v in rate], textposition="outside",
               textfont=dict(size=11, color=PRIMARY))
     f.update_traces(cliponaxis=False, selector=dict(type="bar"))
-    f.update_layout(barmode="group", xaxis=dict(type="category"),
-                    yaxis=dict(tickprefix="₹", tickformat="~s"))
+    f.update_layout(barmode="group", xaxis=dict(type="category"))
+    inr_axis(f, max(trend["total_income"].max(), trend["investment"].max()))
     style_fig(f, height=360)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
     st.caption("Grey labels: income growth year on year. Coloured labels: % of income invested (the rising slice).")
@@ -117,7 +117,8 @@ else:
     if len(proj) > 1:
         f.add_trace(go.Scatter(x=proj["year"].astype(int).astype(str), y=proj["potential"],
                                name="Projected", mode="lines", line=dict(color=PRIMARY, width=3, dash="dash")))
-    f.update_layout(xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
+    f.update_layout(xaxis=dict(type="category"))
+    inr_axis(f, nw["potential"].max())
     style_fig(f, height=320)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
     st.caption("Solid: contributions compounded at conservative returns. Dashed: if you keep investing the plan. Grey: money put in (no growth).")
@@ -131,6 +132,7 @@ if eval_years:
     f = go.Figure()
     f.add_bar(x=xs, y=planned, name="Planned", marker_color=SECONDARY)
     f.add_bar(x=xs, y=actual, name="Actual", marker_color=PRIMARY)
-    f.update_layout(barmode="group", xaxis=dict(type="category"), yaxis=dict(tickprefix="₹", tickformat="~s"))
+    f.update_layout(barmode="group", xaxis=dict(type="category"))
+    inr_axis(f, max(planned + actual))
     style_fig(f, height=300)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})

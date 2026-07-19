@@ -6,8 +6,8 @@ import compute
 import storage
 from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
-    html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
-    section, style_fig,
+    html_table, inr_axis, inr_short, load_all, metric_tile, page_header,
+    pretty_category, section, style_fig,
 )
 
 d = load_all()
@@ -43,7 +43,8 @@ f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], na
           orientation="h", marker_color=SECONDARY)
 f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name="Actual",
           orientation="h", marker_color=PRIMARY)
-f.update_layout(barmode="group", xaxis=dict(tickprefix="₹", tickformat="~s"))
+f.update_layout(barmode="group")
+inr_axis(f, max(asc["expected"].max(), asc["actual"].max()), axis="x")
 style_fig(f)
 f.update_xaxes(showgrid=True, gridcolor=GRID)
 f.update_yaxes(showgrid=False)
