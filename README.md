@@ -43,9 +43,12 @@ Each page shows **one person at a time** via `?profile=<key>` (`rv` or
 
 **Dashboard** and **Budget** are read-only — they recompute from what you enter
 elsewhere. Dashboard opens with four lifetime tiles, then the year-on-year
-journey (goal vs actual investment, income riding as a line), the net-worth
-projection, cumulative allocation by category, and the catch-up callout last.
-Budget shows how income splits and how the investment slice grows.
+journey (bars: income and the planned goal; line: what you actually
+invested), the net-worth projection, cumulative allocation by category
+(stacked by the year each rupee went in), and the catch-up callout. A quiet
+**Adjustments** expander at the bottom holds one-off audited figures —
+currently just **opening corpus** (see below). Budget shows how income splits
+and how the investment slice grows.
 
 The two write pages:
 
@@ -71,7 +74,12 @@ The two write pages:
 - **Goal** for a year = its investment amount × target %, per category.
 - **Potential net worth** = contributions compounded at conservative
   per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (6 months
-  of needs). A projection, not a valuation.
+  of needs) plus any **opening corpus**. A projection, not a valuation.
+- **Opening corpus** (optional, set in Dashboard → Adjustments) is money
+  invested before tracking began. It's assumed invested at the start of your
+  first tracked year and grown at your allocation-weighted expected return; it
+  counts toward "Invested till date" and net worth, but never touches the
+  budget, goals, catch-up, or plan-vs-actual.
 - **Catch-up** = the lump sum, invested today, that pulls you level with every
   missed year (shortfalls grown at expected returns; the current year counts
   only its elapsed fraction; overshooting is fine).

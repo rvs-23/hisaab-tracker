@@ -38,8 +38,9 @@ bookmarked:
 - `http://localhost:8501/?profile=cheeni`
 
 There is no switch button and no name on the page — you can tell whose page
-you're on by the **accent colours** (rv: platinum grays; cheeni: rose + bronze).
-Once set, the choice sticks as you move between pages.
+you're on by the **accent colours** (rv: platinum grays; cheeni: rose +
+raspberry, a pink family). Once set, the choice sticks as you move between
+pages.
 
 ## Reading the Dashboard
 
@@ -48,17 +49,26 @@ Top to bottom:
 1. **Four lifetime tiles** — earned to date, invested to date, what it could
    be worth today at conservative growth, and how far behind the plan you are
    right now (the current year counts only the fraction of it that's elapsed).
-2. **The journey, year on year** — goal vs actual investment per year, with
-   total income riding along as a line so both trends read at once.
+2. **The journey, year on year** — bars show total income and the planned
+   goal side by side; a line shows what you actually invested, so plan and
+   reality read against each other at once.
 3. **Net worth chart** — an *estimate*: your contributions compounded at
-   conservative expected returns, plus an emergency-fund buffer. Not your real
-   portfolio value.
+   conservative expected returns, plus an emergency-fund buffer (and any
+   opening corpus, see below). Not your real portfolio value.
 4. **Allocation today** — everything you've contributed so far, split across
-   instruments.
+   instruments, stacked by the year each rupee went in (lightest = oldest).
 5. **Catch up** — the closing action item. If past years fell short of the
    plan, this is the lump sum that, invested today, pulls you level. Zero (a
    calm note) means you're on plan. Investing *more* than planned is always
    fine.
+6. **Adjustments** — a small expander at the very bottom for **opening
+   corpus**: money you'd already invested before you started tracking here
+   (say, ₹20L before 2024). Set it once; it's audited like every other save.
+   It's assumed invested at the start of your first tracked year and grown at
+   your own allocation-weighted expected return, and it counts toward
+   "Invested till date" and the net-worth estimate — but it deliberately
+   doesn't touch the budget, the goal, catch-up, or plan-vs-actual, since
+   those are about what you've tracked, not what came before.
 
 Everywhere in the app, the **primary accent means "what actually happened"**
 and the **secondary accent means "what was planned"**.
