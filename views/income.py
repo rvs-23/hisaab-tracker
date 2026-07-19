@@ -8,8 +8,8 @@ import compute
 import storage
 from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
-    accent_primary, accent_secondary, edit_card, inr_axis, inr_short, load_all,
-    page_header, resync, section, style_fig,
+    CHART_TEXT, MARKER, accent_primary, accent_secondary, edit_card, inr_axis,
+    inr_short, load_all, page_header, resync, section, style_fig,
 )
 
 d = load_all()
@@ -31,7 +31,7 @@ if not visible.empty:
     growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in totals.pct_change() * 100]
     f.add_trace(go.Scatter(
         x=yr, y=totals, mode="text", text=growth, textposition="top center",
-        textfont=dict(size=11, color="#6b7280"), showlegend=False, hoverinfo="skip",
+        textfont=dict(size=11, color=CHART_TEXT), showlegend=False, hoverinfo="skip",
         cliponaxis=False))
     # Mark job-change years with a marker above the bar.
     jc = visible.groupby("year")["job_change"].max()
@@ -40,7 +40,7 @@ if not visible.empty:
         f.add_trace(go.Scatter(
             x=[str(y) for y in jc_years], y=[totals[y] for y in jc_years],
             mode="markers", name="Job change",
-            marker=dict(symbol="triangle-down", size=10, color="#64748b", line=dict(width=1, color="white")),
+            marker=dict(symbol="triangle-down", size=10, color=MARKER, line=dict(width=1, color="white")),
             hovertext="Job change", hoverinfo="text+x"))
     f.update_layout(xaxis=dict(type="category"))
     inr_axis(f, totals.max())

@@ -65,8 +65,14 @@ def fresh_data_dir(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("page", PAGES)
-def test_page_renders_without_errors(page, fake_data_dir):
-    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20).run()
+@pytest.mark.parametrize("profile", ["rv", "cheeni"])
+def test_page_renders_without_errors(page, profile, fake_data_dir):
+    """Render every page for BOTH profiles — the default profile is the one
+    without data in this fixture, so rendering only it would skip every chart
+    branch (this blind spot once hid an undefined-name crash)."""
+    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20)
+    at.query_params["profile"] = profile
+    at.run()
     assert not at.exception, at.exception
     assert not at.error, [e.value for e in at.error]
 

@@ -7,12 +7,10 @@ import streamlit as st
 import compute
 import storage
 from ui import (
-    FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary, accent_secondary, chart_title,
-    inr_axis, inr_short, load_all, metric_tile, page_header, pretty_category,
-    section, style_fig, tint,
+    CHART_TEXT, COST_LINE, FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary,
+    accent_secondary, chart_title, inr_axis, inr_short, load_all, metric_tile,
+    page_header, pretty_category, section, style_fig, tint,
 )
-
-GRAY_LINE = "#9aa0a6"
 
 d = load_all()
 profile = page_header("Dashboard", d.profiles)
@@ -92,7 +90,7 @@ else:
     f = go.Figure()
     f.add_bar(
         x=xs, y=income_bars, name="Income", marker_color=SAND,
-        text=growth, textposition="outside", textfont=dict(size=11, color="#6b7280"),
+        text=growth, textposition="outside", textfont=dict(size=11, color=CHART_TEXT),
     )
     f.add_bar(x=xs, y=goal, name="Goal", marker_color=SECONDARY)
     f.add_trace(go.Scatter(
@@ -120,7 +118,7 @@ else:
     proj = nw[nw["year"] >= today_year]
     f = go.Figure()
     f.add_trace(go.Scatter(x=nyr, y=nw["cost_basis"], name="Invested (cost)",
-                           mode="lines", line=dict(color=GRAY_LINE, width=2)))
+                           mode="lines", line=dict(color=COST_LINE, width=2)))
     f.add_trace(go.Scatter(x=past["year"].astype(int).astype(str), y=past["potential"],
                            name="Net worth", mode="lines+markers", line=dict(color=PRIMARY, width=3)))
     if len(proj) > 1:
