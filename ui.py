@@ -125,7 +125,9 @@ def inr_axis(fig, max_value: float, axis: str = "y") -> None:
     while tickvals[-1] < max_value:
         tickvals.append(tickvals[-1] + step)
     ticktext = [inr_short(v) for v in tickvals]
-    kwargs = dict(tickvals=tickvals, ticktext=ticktext)
+    # hoverformat stops Plotly's default SI hover ("2.5M"); full rupees with
+    # separators is the best d3 can do (no lakh grouping in its locale).
+    kwargs = dict(tickvals=tickvals, ticktext=ticktext, hoverformat=",.0f")
     if axis == "y":
         fig.update_yaxes(**kwargs)
     else:

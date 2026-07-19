@@ -157,8 +157,10 @@ if by_category.empty:
     st.caption("Record a contribution on Actuals to see how it's split.")
 else:
     total = by_category.sum()
-    labels = [pretty_category(cat) for cat in by_category.index]
-    share = [f"{100 * v / total:.0f}%" for v in by_category]
+    # The share lives in the category label itself — bar-end text traces kept
+    # colliding with segment edges.
+    labels = [f"{pretty_category(cat)} · {100 * v / total:.0f}%"
+              for cat, v in by_category.items()]
     years = sorted(int(y) for y in contrib["year"].dropna().unique())
     n_years = len(years)
 
@@ -172,10 +174,6 @@ else:
         ]
         f.add_bar(y=labels, x=amounts, orientation="h", name=str(yr),
                   marker_color=tint(PRIMARY, fraction))
-    f.add_trace(go.Scatter(x=by_category.values, y=labels, mode="text", text=share,
-                           textposition="middle right", showlegend=False, hoverinfo="skip",
-                           cliponaxis=False))
-    f.update_traces(cliponaxis=False, selector=dict(type="bar"))  # the outside % label must not clip
     f.update_layout(barmode="stack")
     inr_axis(f, by_category.max(), axis="x")
     style_fig(f, height=max(220, 40 * len(labels)))

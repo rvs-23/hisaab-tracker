@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import compute
+from config import (
+    DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT, PROFILE_BASE_SPLITS,
+    PROFILE_INCREMENT_SPLITS,
+)
 from ui import (
     FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
     html_table, inr_short, load_all, metric_tile, page_header, section, style_fig,
@@ -15,10 +19,19 @@ CURRENT_YEAR = dt.date.today().year
 d = load_all()
 active = page_header("Budget", d.profiles)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
+base_split = PROFILE_BASE_SPLITS.get(active.key, DEFAULT_BASE_SPLIT)
+increment_split = PROFILE_INCREMENT_SPLITS.get(active.key, DEFAULT_INCREMENT_SPLIT)
+
+
+def _split_text(split):
+    """Formats a split dict as needs/wants/investment, e.g. ``50/25/25``."""
+    return f"{split['needs']:.0f}/{split['wants']:.0f}/{split['investment']:.0f}"
+
+
 st.caption(
-    "How income splits, derived from the plan. The anchor year is 50/15/35 "
-    "(needs/wants/investment). After that only each year's raise splits 35/15/50, "
-    "so the investment slice keeps growing."
+    f"How income splits, derived from the plan. Your anchor year is {_split_text(base_split)} "
+    f"(needs/wants/investment). After that only each year's raise splits "
+    f"{_split_text(increment_split)}, so the investment slice keeps growing."
 )
 st.markdown(
     f"<div style='border-left:3px solid {NEEDS};background:var(--strip-bg);border-radius:4px;"
@@ -74,7 +87,23 @@ if not row.empty:
     # secondary (= planned) accent; needs/wants stay neutral.
     metric_tile(cols[0], "Needs", f"{inr_short(r['monthly_needs'])}/mo", f"{pct['needs']:.0f}% of income", big=True)
     metric_tile(cols[1], "Wants", f"{inr_short(r['monthly_wants'])}/mo", f"{pct['wants']:.0f}% of income", big=True)
-    metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", f"{pct['investment']:.0f}% of income", color=SECONDARY, big=True)
+    inv_sub = f"{pct['investment']:.0f}% of income"
+    if year == CURRENT_YEAR:
+        # The adjusted monthly: what to invest per remaining month to clear the
+        # past shortfall AND finish this year's goal by December.
+        year_goal = sum(compute.expected_contributions(active, d.income, d.targets, year).values())
+        invested_ty = float(d.contributions.loc[
+            (d.contributions["profile"] == active.key) & (d.contributions["year"] == year), "amount"
+        ].sum())
+        catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year)
+        months_left = 13 - dt.date.today().month
+        adj_monthly = (catch_up + max(0.0, year_goal - invested_ty)) / months_left
+        inv_sub += f"<br>adjusted: {inr_short(adj_monthly)}/mo to be on track"
+    metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", inv_sub,
+                color=SECONDARY, big=True,
+                help="The plan's monthly investment. 'Adjusted' spreads the past "
+                     "shortfall plus what's left of this year's goal over the months "
+                     "remaining, so following it makes you fully on track by December.")
 
 # Then the slice shifting over the actual years (100% stacked), with the
 # investment segment labelled with both its % and the raw yearly rupees.

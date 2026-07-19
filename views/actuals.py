@@ -4,6 +4,7 @@ import streamlit as st
 
 import compute
 import storage
+from config import EMERGENCY_FUND_MONTHS
 from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
     html_table, inr_axis, inr_short, load_all, metric_tile, page_header,
@@ -55,7 +56,8 @@ st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 # latest earning year.
 bs = compute.budget_series(active, d.income)
 has_budget_row = not bs[(bs["year"] == year) & (~bs["is_projected"])].empty
-ef_sub = f"4 months of {year} needs + wants" if has_budget_row else "4 months of latest year's needs + wants"
+ef_sub = (f"{EMERGENCY_FUND_MONTHS} months of {year} needs + wants" if has_budget_row
+          else f"{EMERGENCY_FUND_MONTHS} months of latest year's needs + wants")
 ef_actual = compute.emergency_fund_actual(d.adjustments, active.key)
 
 goal_pct = compute.pct_goal_achieved(pva)
@@ -210,4 +212,4 @@ with edit_card(f"Record what you actually invested in {year}"):
         except Exception as exc:
             st.error(f"Not saved: {exc}")
 
-st.caption("The emergency-fund goal above is derived from your budget (4 months of needs + wants); what you actually hold is entered in the expander above.")
+st.caption(f"The emergency-fund goal above is derived from your budget ({EMERGENCY_FUND_MONTHS} months of needs + wants); what you actually hold is entered in the expander above.")
