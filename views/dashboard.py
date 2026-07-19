@@ -161,7 +161,8 @@ else:
         f.add_bar(y=labels, x=amounts, orientation="h", name=str(yr),
                   marker_color=tint(PRIMARY, fraction))
     f.add_trace(go.Scatter(x=by_category.values, y=labels, mode="text", text=share,
-                           textposition="middle right", showlegend=False, hoverinfo="skip"))
+                           textposition="middle right", showlegend=False, hoverinfo="skip",
+                           cliponaxis=False))
     f.update_traces(cliponaxis=False, selector=dict(type="bar"))  # the outside % label must not clip
     f.update_layout(barmode="stack")
     inr_axis(f, by_category.max(), axis="x")
