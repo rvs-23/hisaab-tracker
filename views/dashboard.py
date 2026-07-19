@@ -135,6 +135,7 @@ else:
     f = go.Figure()
     f.add_bar(y=labels, x=by_category.values, orientation="h", marker_color=PRIMARY,
               text=share, textposition="outside")
+    f.update_traces(cliponaxis=False)  # the largest bar's % label must not clip at the edge
     f.update_layout(showlegend=False)
     inr_axis(f, by_category.max(), axis="x")
     style_fig(f, height=max(220, 40 * len(labels)))
