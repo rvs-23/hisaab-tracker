@@ -10,8 +10,8 @@ tidy CSVs, keyed by (year, profile) where a year applies:
   adjustments.csv    one-off per-person adjustments, e.g. opening_corpus —
                      money invested before tracking began (optional)
 
-The budget (needs/wants/investment) and the emergency fund (6 months of needs)
-are *derived* from income, not stored. Every save is recorded in the audit log
+The budget (needs/wants/investment) and the emergency-fund target (4 months of
+needs + wants) are *derived* from income, not stored. Every save is recorded in the audit log
 (see audit.py).
 """
 
@@ -38,10 +38,11 @@ CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
 
 # Adjustments are one-off per-person values, not a year-by-year history — a
-# key/value row per (profile, field). The only field so far is opening_corpus:
-# money invested before tracking began (see compute.opening_corpus).
+# key/value row per (profile, field): opening_corpus (money invested before
+# tracking began, see compute.opening_corpus) and emergency_fund (the fund
+# actually held, vs the derived target — see compute.emergency_fund_actual).
 ADJUSTMENTS_COLUMNS = ["profile", "field", "value"]
-ALLOWED_ADJUSTMENTS = {"opening_corpus"}
+ALLOWED_ADJUSTMENTS = {"opening_corpus", "emergency_fund"}
 
 
 def data_dir() -> Path:

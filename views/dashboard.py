@@ -38,9 +38,13 @@ year_range = (
 catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
 earned = float(trend["total_income"].sum())
 opening = compute.opening_corpus(d.adjustments, profile.key)
+# The actual emergency fund (entered on Actuals) beats the derived target in
+# net worth; None falls back to the target until one is recorded.
+ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
 invested = float(contrib["amount"].sum()) + opening
 nw_actual, nw_potential = compute.net_worth_to_date(
-    profile, d.income, d.contributions, d.targets, today_year, opening=opening)
+    profile, d.income, d.contributions, d.targets, today_year, opening=opening,
+    emergency_fund=ef_held)
 
 section("Lifetime")
 c = st.columns(4)
@@ -55,7 +59,7 @@ metric_tile(c[2], "Estimated value today", inr_short(nw_potential), f"as of {tod
             color=PRIMARY, big=True,
             help=f"What your contributions across {year_range} could be worth today, "
                  "compounded at conservative per-category returns, plus your emergency "
-                 "fund (6 months of needs)."
+                 "fund."
                  + (f" Includes {inr_short(opening)} invested before tracking, grown from "
                     "its assumed vintage." if opening > 0 else ""))
 # The plan tile leads with the year's full goal; the catch-up piece and what's
@@ -113,7 +117,7 @@ else:
 
 # Net worth: invested vs projected value.
 nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year,
-                               opening=opening)
+                               opening=opening, emergency_fund=ef_held)
 chart_title("Net worth — invested vs projected value",
             help="An estimate, not your real portfolio value. It compounds what you've "
                  "contributed at conservative per-category expected returns (plus the emergency "

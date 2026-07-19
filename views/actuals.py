@@ -55,17 +55,44 @@ st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 # latest earning year.
 bs = compute.budget_series(active, d.income)
 has_budget_row = not bs[(bs["year"] == year) & (~bs["is_projected"])].empty
-ef_sub = f"6 months of {year} needs" if has_budget_row else "6 months of latest year's needs"
+ef_sub = f"4 months of {year} needs + wants" if has_budget_row else "4 months of latest year's needs + wants"
+ef_actual = compute.emergency_fund_actual(d.adjustments, active.key)
 
 goal_pct = compute.pct_goal_achieved(pva)
 section(f"How {year} is tracking")
-cols = st.columns(3)
+cols = st.columns(4)
 metric_tile(cols[0], "Goal achieved", f"{goal_pct:.0f}%", f"of {year}'s plan",
             color=PRIMARY if goal_pct >= ON_TRACK_PCT else SECONDARY, big=True)
 metric_tile(cols[1], "Invested", inr_short(pva["actual"].sum()),
             f"of {inr_short(pva['expected'].sum())} planned", big=True)
 metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund), ef_sub, big=True,
-            help="Derived, not entered: 6 months of that year's needs bucket (6 × monthly needs).")
+            help="The target, derived from your budget: 4 months of that year's full "
+                 "monthly spending (needs + wants). Enter what you actually hold below.")
+metric_tile(cols[3], "Emergency fund held", inr_short(ef_actual),
+            "not entered yet" if ef_actual == 0 else
+            ("covers the goal" if ef_actual >= emergency_fund else f"{inr_short(emergency_fund - ef_actual)} short"),
+            color=PRIMARY if ef_actual >= emergency_fund and ef_actual > 0 else None, big=True,
+            help="What you actually hold as the emergency buffer (hand-entered, counted "
+                 "in net worth as cash). Update it below when the fund changes.")
+
+with st.expander("Update emergency fund"):
+    st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
+    new_ef = st.number_input("Emergency fund held (₹)", min_value=0, value=int(ef_actual),
+                             step=10000, key=f"ef_{active.key}")
+    if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
+        others = d.adjustments[
+            ~((d.adjustments["profile"] == active.key) & (d.adjustments["field"] == "emergency_fund"))
+        ]
+        rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
+        rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
+        merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
+        try:
+            storage.validate_adjustments(merged, d.profiles)
+            storage.save_adjustments(d.root, merged)
+            st.success("Saved.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Not saved: {exc}")
 st.write("")
 
 ordered = pva.sort_values("expected", ascending=False)
@@ -179,4 +206,4 @@ with edit_card(f"Record what you actually invested in {year}"):
         except Exception as exc:
             st.error(f"Not saved: {exc}")
 
-st.caption("The emergency-fund goal above is derived from your budget (6 months of needs), so there's nothing to enter for it.")
+st.caption("The emergency-fund goal above is derived from your budget (4 months of needs + wants); what you actually hold is entered in the expander above.")

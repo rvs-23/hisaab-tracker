@@ -232,11 +232,28 @@ def test_selectable_years_locked_from_baseline(income, contributions):
     assert yrs == list(range(2022, 2027))  # 2022 floor, 2026 current
 
 
-def test_emergency_fund_is_six_months_of_needs(rv, income):
+def test_emergency_fund_target_is_four_months_of_full_spend(rv, income):
     bs = compute.budget_series(rv, income).set_index("year")
-    assert compute.emergency_fund_target(rv, income, 2024) == pytest.approx(6 * bs.loc[2024, "monthly_needs"])
-    # No income → no budget → no emergency fund.
+    expected = 4 * (bs.loc[2024, "monthly_needs"] + bs.loc[2024, "monthly_wants"])
+    assert compute.emergency_fund_target(rv, income, 2024) == pytest.approx(expected)
+    # No income → no budget → no emergency-fund target.
     assert compute.emergency_fund_target(rv, pd.DataFrame(columns=storage.INCOME_COLUMNS)) == 0.0
+
+
+def test_actual_emergency_fund_overrides_target_in_net_worth(rv, income, targets, contributions):
+    """An entered fund replaces the derived target in both net-worth figures."""
+    with_target = compute.net_worth_to_date(rv, income, contributions, targets, 2025)
+    with_actual = compute.net_worth_to_date(rv, income, contributions, targets, 2025, emergency_fund=100000)
+    ef_target = compute.emergency_fund_target(rv, income, 2025)
+    assert with_actual[0] == with_target[0] - round(ef_target) + 100000
+    assert with_actual[1] == with_target[1] - round(ef_target) + 100000
+
+
+def test_emergency_fund_adjustment_field_accepted(rv):
+    df = pd.DataFrame([{"profile": "rv", "field": "emergency_fund", "value": 500000}])
+    storage.validate_adjustments(df, [rv])
+    assert compute.emergency_fund_actual(df, "rv") == 500000
+    assert compute.emergency_fund_actual(df, "cheeni") == 0.0
 
 
 def test_net_worth_compounds_at_category_return(rv, targets):

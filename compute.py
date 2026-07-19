@@ -246,9 +246,11 @@ def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
 
 
 def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None) -> float:
-    """The emergency-fund buffer: ``EMERGENCY_FUND_MONTHS`` months of the needs
-    bucket (6 × monthly needs). Derived from income like the rest of the budget,
-    never entered. Defaults to the latest non-projected year."""
+    """The emergency-fund *target*: ``EMERGENCY_FUND_MONTHS`` months of the
+    needs + wants buckets (4 months of full monthly spending). Derived from
+    income like the rest of the budget; the *actual* fund held is a hand-entered
+    adjustment (see ``emergency_fund_actual``). Defaults to the latest
+    non-projected year."""
     bs = budget_series(profile, income)
     if bs.empty:
         return 0.0
@@ -258,7 +260,8 @@ def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | No
     row = pool[pool["year"] == year] if year is not None else pool.iloc[[-1]]
     if row.empty:
         row = pool.iloc[[-1]]
-    return float(row.iloc[0]["monthly_needs"]) * EMERGENCY_FUND_MONTHS
+    monthly_spend = float(row.iloc[0]["monthly_needs"]) + float(row.iloc[0]["monthly_wants"])
+    return monthly_spend * EMERGENCY_FUND_MONTHS
 
 
 def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,
@@ -278,14 +281,30 @@ def _corpus_growth_rate(profile: Profile, targets: pd.DataFrame, vintage: int) -
     return sum(pct / 100 * EXPECTED_RETURNS.get(cat, 0) for cat, pct in target.items())
 
 
+def emergency_fund_actual(adjustments: pd.DataFrame, profile_key: str) -> float:
+    """Returns the emergency fund a person actually holds (hand-entered), or
+    ``0.0`` if none is recorded (see ``storage.load_adjustments``)."""
+    if adjustments.empty:
+        return 0.0
+    rows = adjustments[
+        (adjustments["profile"] == profile_key) & (adjustments["field"] == "emergency_fund")
+    ]
+    return float(rows.iloc[0]["value"]) if not rows.empty else 0.0
+
+
 def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
                       targets: pd.DataFrame, today_year: int,
-                      opening: float = 0.0) -> tuple[int, int]:
+                      opening: float = 0.0,
+                      emergency_fund: float | None = None) -> tuple[int, int]:
     """Returns (actual, potential) net worth as of ``today_year``.
 
     ``actual`` is contributions put in (cost basis) plus the emergency fund.
     ``potential`` compounds each contribution at its category's expected return
     and adds the emergency fund. The gap between them is the expected growth.
+
+    ``emergency_fund`` is the fund actually held (hand-entered, no growth);
+    ``None`` falls back to the derived target — the best estimate until the
+    real figure is recorded.
 
     ``opening`` is a person's opening corpus — money invested before tracking
     began (see ``storage.load_adjustments``). It counts at face value in
@@ -301,7 +320,7 @@ def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.
         float(r.amount) * (1 + EXPECTED_RETURNS.get(r.category, 0) / 100) ** max(0, today_year - int(r.year))
         for r in c.itertuples()
     )
-    ef = emergency_fund_target(profile, income, today_year)
+    ef = emergency_fund if emergency_fund is not None else emergency_fund_target(profile, income, today_year)
     vintage = corpus_vintage_year(income, contributions, profile.key)
     corpus_actual = corpus_potential = 0.0
     if opening and vintage is not None and today_year >= vintage:
@@ -362,7 +381,8 @@ def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFram
 def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
                      targets: pd.DataFrame, today_year: int,
                      ahead: int = NETWORTH_PROJECTION_YEARS,
-                     opening: float = 0.0) -> pd.DataFrame:
+                     opening: float = 0.0,
+                     emergency_fund: float | None = None) -> pd.DataFrame:
     """Net worth year by year, actual past plus a projected future.
 
     Past years use actual contributions. Future years assume the plan continues:
@@ -394,7 +414,7 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
         invest_y = cur_invest * (1 + profile.forward_increment_pct / 100) ** i
         streams[today_year + i] = {cat: invest_y * pct / 100 for cat, pct in target.items()}
 
-    ef = emergency_fund_target(profile, income, today_year)
+    ef = emergency_fund if emergency_fund is not None else emergency_fund_target(profile, income, today_year)
     rows = []
     for horizon in range(first, today_year + ahead + 1):
         potential = basis = ef

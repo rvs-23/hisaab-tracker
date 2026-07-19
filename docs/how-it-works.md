@@ -87,8 +87,9 @@ and the **secondary accent means "what was planned"**.
 
 ## Things that surprise people
 
-- **The emergency fund is automatic** — 6 months of your "needs" bucket.
-  There's nowhere to enter it; earn more, and the target grows.
+- **The emergency-fund *target* is automatic** — 4 months of your full monthly
+  spending (needs + wants); earn more and the target grows. What you *actually*
+  hold is entered by hand on the Actuals page and counts in your net worth.
 - **Saving is safe**: every save is checked first (sums, duplicates, negative
   numbers — except income's *other*, which is allowed to go negative) and
   refused with a message if something's off — and every change is also

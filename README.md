@@ -75,8 +75,9 @@ The two write pages:
   to current + 3 at `forward_increment_pct`.
 - **Goal** for a year = its investment amount × target %, per category.
 - **Potential net worth** = contributions compounded at conservative
-  per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (6 months
-  of needs) plus any **opening corpus**. A projection, not a valuation.
+  per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (what you
+  actually hold — or, until entered, the derived target of 4 months of needs +
+  wants) plus any **opening corpus**. A projection, not a valuation.
 - **Opening corpus** (optional, set in Dashboard → Adjustments) is money
   invested before tracking began. It's assumed invested at the start of your
   first tracked year and grown at your allocation-weighted expected return; it
