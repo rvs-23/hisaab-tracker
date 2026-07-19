@@ -3,10 +3,10 @@
 Budget is *derived from income*, not entered. The philosophy (from the source
 workbook) is fixed:
 
-  - In a person's anchor year (their earliest), total income splits 50/30/20
-    across needs / wants / investment.
+  - In a person's anchor year (their first earning year), total income splits
+    50/15/35 across needs / wants / investment.
   - Every year after, last year's rupee amounts carry forward and only the
-    *increment* in income splits 20/30/50 — so more of each raise is invested.
+    *increment* in income splits 35/15/50 — so more of each raise is invested.
 
 Then, for contributions tracking, the goal is that year's investment amount
 split across instruments by the target allocation:
@@ -60,11 +60,11 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     running cumulative invested.
 
     Beyond the entered years, projects forward to current year + 3: income grows
-    by forward_increment_pct and each projected raise splits 20/30/50 like any
+    by forward_increment_pct and each projected raise splits 35/15/50 like any
     other increment. Projected rows carry is_projected=True.
 
     Zero-income years get no budget row: the anchor is the first *earning* year
-    (an all-zero 2022 baseline must not steal the 50/30/20 anchor split from the
+    (an all-zero 2022 baseline must not steal the 50/15/35 anchor split from the
     real first year), and a mid-series zero year is skipped like a missing one.
     A year earning *less* than the last scales the previous buckets down
     proportionally — the split still sums to the new total and never goes

@@ -6,8 +6,8 @@ import streamlit as st
 
 import compute
 from ui import (
-    NEEDS, SAND, accent_primary, accent_secondary, chart_title, html_table,
-    inr_short, load_all, metric_tile, page_header, section, style_fig,
+    FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
+    html_table, inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -16,13 +16,13 @@ d = load_all()
 active = page_header("Budget", d.profiles)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 st.caption(
-    "How income splits, derived from the plan. The anchor year is 50/30/20 "
-    "(needs/wants/investment). After that only each year's raise splits 20/30/50, "
+    "How income splits, derived from the plan. The anchor year is 50/15/35 "
+    "(needs/wants/investment). After that only each year's raise splits 35/15/50, "
     "so the investment slice keeps growing."
 )
 st.markdown(
-    "<div style='border-left:3px solid #b9c0c7;background:#f7f8f9;border-radius:4px;"
-    "padding:.5rem .8rem;color:#555;font-size:.85rem;margin:.2rem 0 .4rem'>"
+    f"<div style='border-left:3px solid {NEEDS};background:var(--strip-bg);border-radius:4px;"
+    f"padding:.5rem .8rem;color:var(--muted);font-size:{FS_BODY};margin:.2rem 0 .4rem'>"
     "Nothing to fill here — these figures are <b>derived</b>. To change them, edit "
     "<b>Income</b>.</div>",
     unsafe_allow_html=True,

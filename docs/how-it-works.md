@@ -19,8 +19,8 @@ Income  →  Budget  →  Allocation  →  Actuals
 - **Income** is the only money fact you enter. Everything else is computed
   from it or compared against it.
 - **Budget** splits that income into needs / wants / investment. Your first
-  earning year splits 50/30/20; after that, only each year's *raise* splits
-  20/30/50 — so as you earn more, a bigger share of income goes to investing.
+  earning year splits 50/15/35; after that, only each year's *raise* splits
+  35/15/50 — so as you earn more, a bigger share of income goes to investing.
   You never type a budget; changing income changes it.
 - **Allocation** is where you say how the investment slice spreads across
   instruments (mutual funds 45%, gold 25%, …). Percentages must sum to 100.

@@ -67,8 +67,8 @@ The two write pages:
 ## The numbers
 
 - **Budget** is derived, never stored: the first earning year splits income
-  **50/30/20** (needs/wants/investment); each later year splits only the
-  **increment 20/30/50**, so raises flow to investing. A zero-income year gets
+  **50/15/35** (needs/wants/investment); each later year splits only the
+  **increment 35/15/50**, so raises flow to investing. A zero-income year gets
   no budget row; an income drop scales the split down proportionally. Projects
   to current + 3 at `forward_increment_pct`.
 - **Goal** for a year = its investment amount × target %, per category.

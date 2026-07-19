@@ -23,6 +23,9 @@ STRIP_BORDER = "#dde2e8"
 STRIP_TEXT = GRAPHITE
 SAND = "#dfe4e8"  # neutral income bar
 NEEDS = "#b9c0c7"  # the "needs" slice of the budget split
+CHART_TEXT = "#6b7280"  # muted grey for in-chart labels (YoY growth etc.)
+COST_LINE = "#9aa0a6"  # the net-worth chart's cost-basis line
+MARKER = "#64748b"  # slate chart markers (job-change triangle)
 FONT = "Inter"
 
 # Per-person accent pair: (primary = actuals/current, secondary = planned/
@@ -37,11 +40,13 @@ PROFILE_ACCENTS = {
 }
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
-# Budget model. The anchor year (a person's first) splits income 50/30/20 across
-# needs/wants/investment; every later year splits only the income *increment*
-# 20/30/50, so raises flow mostly to investing.
-BASE_SPLIT = {"needs": 50, "wants": 30, "investment": 20}
-INCREMENT_SPLIT = {"needs": 20, "wants": 30, "investment": 50}
+# Budget model. The anchor year (a person's first earning year) splits income
+# 50/15/35 across needs/wants/investment; every later year splits only the
+# income *increment* 35/15/50 (needs and investment mirror, wants held), so
+# raises flow mostly to investing. Decided 2026-07: one shared household rule
+# for both profiles, replacing the earlier 50/30/20 + 20/30/50 pair.
+BASE_SPLIT = {"needs": 50, "wants": 15, "investment": 35}
+INCREMENT_SPLIT = {"needs": 35, "wants": 15, "investment": 50}
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 
