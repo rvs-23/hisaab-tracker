@@ -59,21 +59,25 @@ ef_sub = f"4 months of {year} needs + wants" if has_budget_row else "4 months of
 ef_actual = compute.emergency_fund_actual(d.adjustments, active.key)
 
 goal_pct = compute.pct_goal_achieved(pva)
+# One tile, goal-and-held together (same shape as the dashboard's plan tile:
+# headline the target, actuals on the sub-lines).
+ef_status = (
+    "not entered yet" if ef_actual == 0
+    else "covers the goal" if ef_actual >= emergency_fund
+    else f"{inr_short(emergency_fund - ef_actual)} short"
+)
 section(f"How {year} is tracking")
-cols = st.columns(4)
+cols = st.columns(3)
 metric_tile(cols[0], "Goal achieved", f"{goal_pct:.0f}%", f"of {year}'s plan",
             color=PRIMARY if goal_pct >= ON_TRACK_PCT else SECONDARY, big=True)
 metric_tile(cols[1], "Invested", inr_short(pva["actual"].sum()),
             f"of {inr_short(pva['expected'].sum())} planned", big=True)
-metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund), ef_sub, big=True,
-            help="The target, derived from your budget: 4 months of that year's full "
-                 "monthly spending (needs + wants). Enter what you actually hold below.")
-metric_tile(cols[3], "Emergency fund held", inr_short(ef_actual),
-            "not entered yet" if ef_actual == 0 else
-            ("covers the goal" if ef_actual >= emergency_fund else f"{inr_short(emergency_fund - ef_actual)} short"),
-            color=PRIMARY if ef_actual >= emergency_fund and ef_actual > 0 else None, big=True,
-            help="What you actually hold as the emergency buffer (hand-entered, counted "
-                 "in net worth as cash). Update it below when the fund changes.")
+metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund),
+            f"held: {inr_short(ef_actual)}<br>{ef_status}",
+            color=SECONDARY, big=True,
+            help=f"The target ({ef_sub}), derived from your budget. The sub-line is the "
+                 "buffer you actually hold (hand-entered below; counted in net worth as "
+                 "cash).")
 
 with st.expander("Update emergency fund"):
     st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
