@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import compute
+import storage
 from ui import (
     FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary, accent_secondary, chart_title,
     inr_axis, inr_short, load_all, metric_tile, page_header, pretty_category,
@@ -38,20 +39,27 @@ year_range = (
 
 catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
 earned = float(trend["total_income"].sum())
-invested = float(contrib["amount"].sum())
-nw_actual, nw_potential = compute.net_worth_to_date(profile, d.income, d.contributions, today_year)
+opening = compute.opening_corpus(d.adjustments, profile.key)
+invested = float(contrib["amount"].sum()) + opening
+nw_actual, nw_potential = compute.net_worth_to_date(
+    profile, d.income, d.contributions, d.targets, today_year, opening=opening)
 
 section("Lifetime")
 c = st.columns(4)
 metric_tile(c[0], "Earned till date", inr_short(earned), year_range, big=True,
             help=f"Total income across the years you've entered ({year_range}).")
+invested_help = f"Total you've actually put in across {year_range} (cost basis, no growth)."
+if opening > 0:
+    invested_help += f" Includes {inr_short(opening)} invested before tracking."
 metric_tile(c[1], "Invested till date", inr_short(invested), year_range, big=True,
-            help=f"Total you've actually put in across {year_range} (cost basis, no growth).")
+            help=invested_help)
 metric_tile(c[2], "Estimated value today", inr_short(nw_potential), f"as of {today_year}",
             color=PRIMARY, big=True,
             help=f"What your contributions across {year_range} could be worth today, "
                  "compounded at conservative per-category returns, plus your emergency "
-                 "fund (6 months of needs).")
+                 "fund (6 months of needs)."
+                 + (f" Includes {inr_short(opening)} invested before tracking, grown from "
+                    "its assumed vintage." if opening > 0 else ""))
 metric_tile(c[3], "Catch-up from plan", inr_short(catch_up),
             "you're on track" if catch_up == 0 else f"in {today_year}",
             color=SECONDARY if catch_up > 0 else PRIMARY, big=True,
@@ -98,7 +106,8 @@ else:
     st.caption("Bars: income and the planned goal. Line: what you actually invested.")
 
 # Net worth: invested vs projected value.
-nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year)
+nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year,
+                               opening=opening)
 chart_title("Net worth — invested vs projected value",
             help="An estimate, not your real portfolio value. It compounds what you've "
                  "contributed at conservative per-category expected returns (plus the emergency "
@@ -163,3 +172,32 @@ else:
         f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
         unsafe_allow_html=True,
     )
+
+# Adjustments live in a quiet expander at the very bottom — the dashboard stays
+# summary-first, and this is a one-off setting, not something read every visit.
+with st.expander("Adjustments"):
+    st.caption(
+        "One-off figures that don't fit the year-by-year history. Opening corpus is "
+        "money you'd already invested before you started tracking here — it's added "
+        "to your totals and audited like any other save, assumed invested at the "
+        "start of your first tracked year and grown at your allocation-weighted "
+        "expected return."
+    )
+    new_opening = st.number_input(
+        "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,
+        key=f"opening_corpus_{profile.key}",
+    )
+    if st.button("Save", key=f"save_adjustments_{profile.key}", type="primary"):
+        others = d.adjustments[
+            ~((d.adjustments["profile"] == profile.key) & (d.adjustments["field"] == "opening_corpus"))
+        ]
+        rows = pd.DataFrame([{"profile": profile.key, "field": "opening_corpus", "value": new_opening}])
+        rows = rows[rows["value"] > 0]  # a zero corpus is just "nothing recorded"
+        merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
+        try:
+            storage.validate_adjustments(merged, d.profiles)
+            storage.save_adjustments(d.root, merged)
+            st.success("Saved.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Not saved: {exc}")

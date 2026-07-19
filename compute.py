@@ -128,6 +128,17 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     return pd.DataFrame(out)
 
 
+def opening_corpus(adjustments: pd.DataFrame, profile_key: str) -> float:
+    """Returns a person's opening corpus — money invested before tracking
+    began — or ``0.0`` if none is recorded (see ``storage.load_adjustments``)."""
+    if adjustments.empty:
+        return 0.0
+    rows = adjustments[
+        (adjustments["profile"] == profile_key) & (adjustments["field"] == "opening_corpus")
+    ]
+    return float(rows.iloc[0]["value"]) if not rows.empty else 0.0
+
+
 def split_pct(row) -> dict[str, float]:
     """needs/wants/investment as % of total income, for display."""
     total = row["total_income"]
@@ -250,13 +261,39 @@ def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | No
     return float(row.iloc[0]["monthly_needs"]) * EMERGENCY_FUND_MONTHS
 
 
+def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,
+                        profile_key: str) -> int | None:
+    """The assumed vintage of a person's opening corpus (pre-tracking
+    investments): the start of their first tracked year, i.e. the earliest
+    year with any income or contribution rows. ``None`` if they have no data
+    at all to anchor it to."""
+    years = available_years(income, contributions, profile_key)
+    return years[0] if years else None
+
+
+def _corpus_growth_rate(profile: Profile, targets: pd.DataFrame, vintage: int) -> float:
+    """The opening corpus's assumed annual return: the target allocation in
+    force at its vintage year, weighted by each category's expected return."""
+    target = resolve_target(profile, targets, vintage)
+    return sum(pct / 100 * EXPECTED_RETURNS.get(cat, 0) for cat, pct in target.items())
+
+
 def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
-                      today_year: int) -> tuple[int, int]:
+                      targets: pd.DataFrame, today_year: int,
+                      opening: float = 0.0) -> tuple[int, int]:
     """Returns (actual, potential) net worth as of ``today_year``.
 
     ``actual`` is contributions put in (cost basis) plus the emergency fund.
     ``potential`` compounds each contribution at its category's expected return
     and adds the emergency fund. The gap between them is the expected growth.
+
+    ``opening`` is a person's opening corpus — money invested before tracking
+    began (see ``storage.load_adjustments``). It counts at face value in
+    ``actual`` and compounded from its vintage year (their first tracked year,
+    see ``corpus_vintage_year``) to ``today_year`` in ``potential``, at the
+    allocation-weighted expected return in force that year. Contributes
+    nothing to either if ``today_year`` is before the vintage, or if the
+    person has no data to anchor a vintage to.
     """
     c = contributions[contributions["profile"] == profile.key]
     invested = float(c["amount"].sum())
@@ -265,7 +302,13 @@ def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.
         for r in c.itertuples()
     )
     ef = emergency_fund_target(profile, income, today_year)
-    return round(invested + ef), round(grown + ef)
+    vintage = corpus_vintage_year(income, contributions, profile.key)
+    corpus_actual = corpus_potential = 0.0
+    if opening and vintage is not None and today_year >= vintage:
+        rate = _corpus_growth_rate(profile, targets, vintage)
+        corpus_actual = opening
+        corpus_potential = opening * (1 + rate / 100) ** (today_year - vintage)
+    return round(invested + ef + corpus_actual), round(grown + ef + corpus_potential)
 
 
 def elapsed_year_fraction(today: dt.date | None = None) -> float:
@@ -318,17 +361,26 @@ def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFram
 
 def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
                      targets: pd.DataFrame, today_year: int,
-                     ahead: int = NETWORTH_PROJECTION_YEARS) -> pd.DataFrame:
+                     ahead: int = NETWORTH_PROJECTION_YEARS,
+                     opening: float = 0.0) -> pd.DataFrame:
     """Net worth year by year, actual past plus a projected future.
 
     Past years use actual contributions. Future years assume the plan continues:
     this year's investment grown at ``forward_increment_pct``, allocated by the
     current target. Returns a frame with ``year``, ``cost_basis`` (no growth),
     ``potential`` (compounded), and ``is_projected``.
+
+    ``opening`` (see ``net_worth_to_date``) is added flat to ``cost_basis`` and
+    compounded to ``potential`` for every horizon year at or after its vintage
+    (the person's first tracked year); horizon years before that get nothing.
     """
     c = contributions[contributions["profile"] == profile.key]
     years = [int(y) for y in c["year"].unique()]
-    first = min(years) if years else today_year
+    vintage = corpus_vintage_year(income, contributions, profile.key)
+    include_corpus = bool(opening) and vintage is not None
+    candidates = years + ([vintage] if include_corpus else [])
+    first = min(candidates) if candidates else today_year
+    corpus_rate = _corpus_growth_rate(profile, targets, vintage) if include_corpus else 0.0
 
     streams: dict[int, dict[str, float]] = {}
     for y in range(first, today_year + 1):
@@ -350,6 +402,9 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
             for cat, amt in streams.get(y, {}).items():
                 potential += amt * (1 + EXPECTED_RETURNS.get(cat, 0) / 100) ** (horizon - y)
                 basis += amt
+        if include_corpus and horizon >= vintage:
+            basis += opening
+            potential += opening * (1 + corpus_rate / 100) ** (horizon - vintage)
         rows.append({"year": horizon, "cost_basis": round(basis), "potential": round(potential),
                      "is_projected": horizon > today_year})
     return pd.DataFrame(rows)

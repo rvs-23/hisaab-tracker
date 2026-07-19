@@ -2,11 +2,13 @@
 
 The data folder is the database: it lives outside the repo (path in .env) and
 every loader re-reads from disk — no caching anywhere. The numeric history is
-three tidy CSVs, all keyed by (year, profile):
+tidy CSVs, keyed by (year, profile) where a year applies:
 
   income.csv         monthly rows per person — salary + bonus + other
   contributions.csv  what was actually invested, per person/year/category
   targets.csv        per-year target-allocation overrides (optional)
+  adjustments.csv    one-off per-person adjustments, e.g. opening_corpus —
+                     money invested before tracking began (optional)
 
 The budget (needs/wants/investment) and the emergency fund (6 months of needs)
 are *derived* from income, not stored. Every save is recorded in the audit log
@@ -32,6 +34,12 @@ REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
 CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
 TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
+
+# Adjustments are one-off per-person values, not a year-by-year history — a
+# key/value row per (profile, field). The only field so far is opening_corpus:
+# money invested before tracking began (see compute.opening_corpus).
+ADJUSTMENTS_COLUMNS = ["profile", "field", "value"]
+ALLOWED_ADJUSTMENTS = {"opening_corpus"}
 
 
 def data_dir() -> Path:
@@ -97,6 +105,25 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
         total = g["pct"].sum()
         if abs(total - 100) > 0.01:
             raise ValueError(f"targets.csv {profile} {int(year)}: pct must sum to 100, got {total}")
+
+
+def load_adjustments(root: Path, profiles: list[Profile]) -> pd.DataFrame:
+    df = _read_optional(root / "adjustments.csv", ADJUSTMENTS_COLUMNS)
+    validate_adjustments(df, profiles)
+    return df
+
+
+def validate_adjustments(df: pd.DataFrame, profiles: list[Profile]) -> None:
+    _check_columns(df, ADJUSTMENTS_COLUMNS, "adjustments.csv")
+    if df.empty:
+        return
+    _check_profiles(df, profiles, "adjustments.csv")
+    bad_field = set(df["field"].dropna()) - ALLOWED_ADJUSTMENTS
+    if bad_field:
+        raise ValueError(f"adjustments.csv has unknown fields: {sorted(bad_field)}")
+    _check_numeric(df, ["value"], "adjustments.csv")
+    _check_non_negative(df, ["value"], "adjustments.csv")
+    _check_no_duplicates(df, ["profile", "field"], "adjustments.csv")
 
 
 def load_income(root: Path, profiles: list[Profile]) -> pd.DataFrame:
@@ -173,6 +200,10 @@ def save_contributions(root: Path, df: pd.DataFrame) -> None:
 
 def save_targets(root: Path, df: pd.DataFrame) -> None:
     _save(root, "targets.csv", df, ["profile", "year", "category"], TARGETS_COLUMNS)
+
+
+def save_adjustments(root: Path, df: pd.DataFrame) -> None:
+    _save(root, "adjustments.csv", df, ["profile", "field"], ADJUSTMENTS_COLUMNS)
 
 
 def _read_optional(path: Path, columns: list[str]) -> pd.DataFrame:
