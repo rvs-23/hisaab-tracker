@@ -62,20 +62,22 @@ metric_tile(c[2], "Estimated value today", inr_short(nw_potential), f"as of {tod
                  "fund."
                  + (f" Includes {inr_short(opening)} invested before tracking, grown from "
                     "its assumed vintage." if opening > 0 else ""))
-# The plan tile leads with the year's full goal; the catch-up piece and what's
-# already gone in ride the sub-line (the callout at the bottom expands on it).
+# The plan tile headlines the TOTAL to invest to be fully on track: this
+# year's goal plus the catch-up from past years. The sub-lines split it.
 year_goal = sum(compute.expected_contributions(profile, d.income, d.targets, today_year).values())
 invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
-plan_sub = f"invested so far: {inr_short(invested_ty)}<br>" + (
-    "no catch-up needed" if catch_up == 0 else f"catch-up to get level: {inr_short(catch_up)}"
+to_go = max(0.0, year_goal - invested_ty)
+plan_sub = (
+    ("no past shortfall" if catch_up == 0 else f"past shortfall: {inr_short(catch_up)}")
+    + "<br>"
+    + (f"{today_year} left: {inr_short(to_go)}" if to_go > 0 else f"{today_year} goal met")
 )
-metric_tile(c[3], f"{today_year} investment goal", inr_short(year_goal), plan_sub,
+metric_tile(c[3], f"{today_year} total goal", inr_short(year_goal + catch_up), plan_sub,
             color=SECONDARY, big=True,
-            help=f"{today_year}'s full investment goal. The sub-line shows what you've "
-                 f"already put in this year, and the catch-up: the lump sum, invested "
-                 f"today, to be level with the plan across {year_range} (shortfalls "
-                 f"grown at expected returns; {today_year} counts only its elapsed "
-                 "share). Overshooting is fine.")
+            help=f"{today_year}'s goal ({inr_short(year_goal)}) plus the shortfall from "
+                 f"past years grown at expected returns ({inr_short(catch_up)}). "
+                 f"'{today_year} left' is the year's goal minus the {inr_short(invested_ty)} "
+                 "you've already put in. Overshooting is fine.")
 
 # The journey: income and the goal as bars, actual investment riding along as
 # a line, all on one shared rupee axis (one axis only — dual axes hinder
@@ -189,7 +191,7 @@ if catch_up > 0:
         f"Catch up in {today_year}</span>"
         f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
         f"<span style='font-size:{FS_BODY};color:var(--muted)'>invest this much extra today and you're level with "
-        f"every year you fell short (grown at expected returns). Overshooting is fine.</span></div>",
+        f"every past year you fell short (grown at expected returns). This year's own goal is on top of it.</span></div>",
         unsafe_allow_html=True,
     )
 else:
