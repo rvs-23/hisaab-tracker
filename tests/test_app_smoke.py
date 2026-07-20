@@ -90,14 +90,15 @@ def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
 # rv has income in fake_data_dir, cheeni doesn't, so one profile exercises the
 # projection and the other exercises its "not enough data yet" fallback.
 
-def test_rent_vs_buy_verdict_names_the_cheaper_side(fake_data_dir):
+def test_rent_vs_buy_verdict_names_the_leaner_side(fake_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     assert not at.exception, at.exception
     captions = " ".join(c.value for c in at.caption)
-    assert "costs" in captions and "less" in captions
-    assert "Not investing the difference costs the renter a further" in captions
+    assert "wastes" in captions and "less" in captions
+    assert "idle cash" in captions
+    assert "Interest is front-loaded" in captions  # the amortization table's caption
     assert "against the" in captions  # the income projection line
 
 

@@ -1,18 +1,20 @@
 """Rent vs buy: a stateless calculator, not a save.
 
-Frames the decision as **net cost** — money that left your hands minus the
-asset you ended up holding — computed the same way on both sides:
+Frames the decision as **money wasted** — cash that buys nothing lasting:
 
-    buying  = registration + loan interest + maintenance − property appreciation
-    renting = rent paid − growth on the money buying would have consumed
+    buying  = registration + loan interest + maintenance
+    renting = rent paid (plus forgone growth, if the difference sits idle)
 
-Principal repaid is never a cost (it becomes equity), and a renter's own
-savings are never a cost (they stay theirs). Nothing here reads or writes the
-data CSVs; it's pure what-if, anchored to the active person's real numbers.
+Loan principal is never waste (it becomes equity) and neither are a renter's
+own savings (they stay theirs), so both are excluded. Interest comes from a
+real monthly amortization schedule, which is why it dominates the early years.
+Nothing here reads or writes the data CSVs; it's pure what-if, anchored to the
+active person's real numbers.
 """
 
 import datetime as dt
 
+import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
@@ -31,8 +33,8 @@ k = profile.key  # per-person widget key suffix, so switching profile keeps inpu
 
 st.caption(
     "A calculator, not a save — nothing here is written to your data. Both sides are "
-    "measured the same way: **what you paid out, minus what you ended up owning**. "
-    "Every number below is overridable."
+    "measured the same way: **money wasted**, meaning cash that buys you nothing lasting. "
+    "Equity and savings are yours, so they never count as waste. Every number is overridable."
 )
 
 target = compute.resolve_target(profile, d.targets, today_year)
@@ -94,53 +96,85 @@ df = compute.rent_vs_buy(
 )
 yr = (today_year - 1 + df["year"]).astype(str)  # calendar years from the locked start
 
-# The one chart: three cumulative net-cost lines. Buying nets off the property's
-# appreciation; the renter who invests nets off their portfolio's growth; the
-# renter who doesn't invest eats the rent whole (the point of the third line).
+# The one chart: cumulative money wasted — cash that bought nothing lasting.
+# Everything here stays positive and rising, so "lower line wastes less" reads
+# straight off the page. Assets (equity, appreciation, a portfolio) are not
+# waste and are deliberately absent; the table below shows where the money went.
 chart_title(
-    "Net cost, cumulative",
-    help="Paid out minus what you own at the end. Buying: registration + loan interest "
-         "(bank amortization, so interest is front-loaded) + maintenance, less the "
-         "property's appreciation. Renting: the rent, less the growth on the money "
-         "buying would have tied up. Loan principal and a renter's own savings are "
-         "never costs — they stay yours either way. Lower line wins.",
+    "Money wasted, cumulative",
+    help="Waste = money you never get back. Buying wastes registration + loan interest "
+         "+ maintenance — never the principal, which becomes your equity. Renting wastes "
+         "the rent. A renter who leaves the difference in idle cash also wastes the growth "
+         "they gave up, so that line sits higher. Lower = less wasted.",
 )
+# Only the Buying line carries value labels — three sets of numbers collided
+# into noise. The rest read off the grid, the hover, or the table below.
 lines = [
-    ("Buying", df["buy_wasted_net"], PRIMARY, "solid", 3),
-    ("Renting + investing the difference", df["rent_wasted_net"], SECONDARY, "solid", 3),
-    ("Renting, not investing", df["rent_wasted_cum"], COST_LINE, "dash", 2),
+    ("Buying", df["buy_wasted_cum"], PRIMARY, "solid", 3, True),
+    ("Renting + investing the difference", df["rent_wasted_cum"], SECONDARY, "solid", 3, False),
+    ("Renting, cash left idle", df["rent_wasted_no_invest_cum"], COST_LINE, "dash", 2, False),
 ]
 f = go.Figure()
-for name, series, color, dash, width in lines:
+for name, series, color, dash, width, show_values in lines:
     f.add_trace(go.Scatter(
-        x=yr, y=series, name=name, mode="lines",
-        line=dict(color=color, width=width, dash=dash),
-        hovertemplate="%{x}: %{y:,.0f}<extra>" + name + "</extra>",
+        x=yr, y=series, name=name, mode="lines+markers+text" if show_values else "lines+markers",
+        line=dict(color=color, width=width, dash=dash), marker=dict(size=5),
+        text=[inr_short(v) for v in series] if show_values else None,
+        textposition="top center", textfont=dict(color=color, size=11),
+        cliponaxis=False,
+        hovertemplate="%{x}: ₹%{y:,.0f}<extra>" + name + "</extra>",
     ))
-    # End-of-line value label, so the chart reads without the legend or a hover.
-    # Anchored in paper x (not data x): on a category axis Plotly reads an
-    # annotation's x as a category *index*, so "2040" would stretch the axis to
-    # 2040 slots and squash the real years into a sliver.
-    f.add_annotation(xref="paper", x=1.0, y=float(series.iloc[-1]), text=inr_short(series.iloc[-1]),
-                     showarrow=False, xanchor="left", xshift=8, font=dict(color=color, size=12))
-f.update_layout(xaxis=dict(type="category"), legend=dict(orientation="h", y=1.12, x=0),
-                margin=dict(r=90))
-all_values = [v for _, s, *_ in lines for v in (s.max(), s.min())]
-inr_axis(f, max(max(all_values), 0), min_value=min(min(all_values), 0))
-style_fig(f, height=380)
+# Legend below the plot: above it, it crowded the section title and pushed the
+# first year's label off the grid.
+f.update_layout(xaxis=dict(type="category"),
+                legend=dict(orientation="h", yanchor="top", y=-0.18, x=0),
+                margin=dict(t=20, b=70))
+# Auto step (≈5 round gridlines); a fixed 10L grid gives 16 lines at these
+# magnitudes. The 5% headroom keeps the top value label on the canvas.
+inr_axis(f, max(s.max() for _, s, *_ in lines) * 1.05)
+style_fig(f, height=440)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-buy_end = float(df.iloc[-1]["buy_wasted_net"])
-rent_end = float(df.iloc[-1]["rent_wasted_net"])
-rent_plain_end = float(df.iloc[-1]["rent_wasted_cum"])
+buy_end = float(df.iloc[-1]["buy_wasted_cum"])
+rent_end = float(df.iloc[-1]["rent_wasted_cum"])
+idle_end = float(df.iloc[-1]["rent_wasted_no_invest_cum"])
 horizon_year = today_year + horizon_years - 1
-cheaper, gap = ("Buying", rent_end - buy_end) if buy_end <= rent_end else ("Renting", buy_end - rent_end)
+leaner, gap = ("Buying", rent_end - buy_end) if buy_end <= rent_end else ("Renting", buy_end - rent_end)
 st.caption(
-    f"By {horizon_year}, **{cheaper.lower()} costs {inr_short(abs(gap))} less**. "
-    f"Not investing the difference costs the renter a further "
-    f"{inr_short(rent_plain_end - rent_end)} — that gap is what the discipline is worth. "
-    "A line below zero means the asset grew more than the money spent on it."
+    f"By {horizon_year}, **{leaner.lower()} wastes {inr_short(abs(gap))} less**: buying burns "
+    f"{inr_short(buy_end)} (registration + interest + maintenance) against {inr_short(rent_end)} "
+    f"of rent. Leaving the difference in idle cash pushes renting's waste to "
+    f"{inr_short(idle_end)} — the {inr_short(idle_end - rent_end)} gap is what investing it is worth."
 )
+
+# Year by year, in rupees — the chart's numbers as a table, and the only place
+# the EMI split is visible. Early years are almost all interest (pure waste);
+# principal overtakes it only well into the tenure.
+with st.expander("Year by year — where each rupee goes"):
+    table = pd.DataFrame({
+        "Year": yr.values,
+        "Interest": df["interest_paid"],
+        "Principal": df["principal_paid"],
+        "Maintenance": df["maintenance_paid"],
+        "Loan left": df["loan_balance"],
+        "Wasted buying": df["buy_wasted_cum"],
+        "Rent": df["rent_paid"],
+        "Wasted renting": df["rent_wasted_cum"],
+    })
+    st.dataframe(
+        table.style.format({c: "₹{:,.0f}" for c in table.columns if c != "Year"}),
+        width="stretch", hide_index=True,
+    )
+    first, last = df.iloc[0], df.iloc[-1]
+    if first["interest_paid"] > 0:
+        st.caption(
+            f"Interest is front-loaded because the bank charges it on the outstanding "
+            f"balance each month: in {yr.iloc[0]} you pay {inr_short(first['interest_paid'])} "
+            f"interest against only {inr_short(first['principal_paid'])} principal "
+            f"({100 * first['interest_paid'] / (first['interest_paid'] + first['principal_paid']):.0f}% "
+            f"of the EMI is waste); by {yr.iloc[-1]} that flips to "
+            f"{inr_short(last['interest_paid'])} interest vs {inr_short(last['principal_paid'])} principal."
+        )
 
 # Headline tiles: the three cash facts of buying, plus the verdict.
 total_interest = monthly_emi * tenure_years * 12 - loan_principal
@@ -148,10 +182,10 @@ cols = st.columns(4)
 metric_tile(cols[0], "EMI / month", inr_short(monthly_emi), f"{tenure_years}-year loan", big=True)
 metric_tile(cols[1], "Total interest", inr_short(total_interest), "over the full tenure", big=True)
 metric_tile(cols[2], "Registration cost", inr_short(registration_cost), f"{registration_pct:.1f}% of price", big=True)
-metric_tile(cols[3], f"Cheaper by {horizon_year}", cheaper, f"by {inr_short(abs(gap))}",
+metric_tile(cols[3], f"Wastes less by {horizon_year}", leaner, f"by {inr_short(abs(gap))}",
             color=PRIMARY, big=True,
-            help="The lower net-cost line at the horizon, against a renter who invests "
-                 "the difference.")
+            help="The lower waste line at the horizon, against a renter who invests the "
+                 "difference. Says nothing about which side ends up with more assets.")
 
 # What would it take? One goal, saving from zero: the SIP for the down payment,
 # the EMI on the balance, and the salary that keeps that EMI under the cap.
@@ -195,10 +229,10 @@ else:
     st.caption("Add income to see this against your own numbers.")
 
 st.markdown(
-    f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats: the assumptions "
-    "— appreciation, investment return, rent inflation — dominate the verdict; treat it as "
-    "illustrative. Interest follows a real monthly amortization; everything else compounds "
-    "yearly. No tax breaks modelled (Section 24/80C, HRA), and no selling or brokerage "
-    "costs.</div>",
+    f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats: this compares "
+    "waste, not wealth — the buyer also ends up owning a house, which this chart "
+    "deliberately ignores. Interest follows a real monthly amortization; maintenance, "
+    "rent and returns compound yearly. No tax breaks modelled (Section 24/80C, HRA), and "
+    "no selling or brokerage costs.</div>",
     unsafe_allow_html=True,
 )

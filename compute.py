@@ -623,6 +623,14 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         buy_wasted_cum: registration + cumulative interest paid + cumulative
             maintenance, to date.
         rent_wasted_cum: cumulative rent paid, to date.
+        rent_wasted_no_invest_cum: cumulative rent plus the investment growth
+            a renter forgoes by leaving the difference as idle cash — the
+            opportunity cost is real waste, so it belongs on the same axis.
+        interest_paid / principal_paid: that single year's EMI split, from the
+            monthly amortization schedule (interest is heaviest in year 1 and
+            falls as the balance amortizes; principal mirrors it).
+        maintenance_paid / rent_paid: that single year's maintenance and rent.
+        loan_balance: principal still outstanding at the end of the year.
         appreciation_gain: house value so far minus the price paid.
         renter_contributed: what the renter has put aside to date (down
             payment + registration never spent, plus the yearly differences)
@@ -704,6 +712,12 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
             "year": year,
             "buy_wasted_cum": buy_wasted_cum,
             "rent_wasted_cum": rent_wasted_cum,
+            "rent_wasted_no_invest_cum": rent_wasted_cum + renter_gain,
+            "interest_paid": interest_this_year,
+            "principal_paid": principal_this_year,
+            "maintenance_paid": maintenance_annual,
+            "rent_paid": rent_this_year,
+            "loan_balance": max(0.0, loan_principal - cum_principal),
             "buy_equity": buy_equity,
             "renter_portfolio": renter_portfolio,
             "appreciation_gain": appreciation_gain,
