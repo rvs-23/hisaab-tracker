@@ -74,11 +74,11 @@ EXPECTED_RETURNS = {
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 AFFORD_EMI_CAP_PCT = 50  # "affordable" = EMI at or under this share of monthly income
 
-# An EMI is really funded out of the needs + wants buckets (a home replaces
-# rent, and squeezes discretionary spend), never out of the investment slice.
-# This is the share of needs + wants a home loan may consume — the default the
-# rent-vs-buy affordability slider opens at.
-EMI_SHARE_OF_NEEDS_WANTS_PCT = 70
+# An EMI is really funded out of wants + investment: needs are committed
+# spending (an EMI can't come out of groceries), so a house is paid for by
+# giving up discretionary spend and investing less. This is the share of that
+# envelope a home loan may claim — the default the affordability slider opens at.
+EMI_SHARE_OF_WANTS_INVESTMENT_PCT = 70
 
 # Emergency-fund *target* = this many months of the needs bucket (essential
 # spending only; wants pause in an emergency). The target is derived; the

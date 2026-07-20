@@ -13,14 +13,13 @@ active person's real numbers.
 """
 
 import datetime as dt
-import math
 
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 import compute
-from config import EMI_SHARE_OF_NEEDS_WANTS_PCT
+from config import EMI_SHARE_OF_WANTS_INVESTMENT_PCT
 from ui import (
     COST_LINE, FS_BODY, MARKER, accent_primary, accent_secondary, chart_title,
     inr_axis, inr_short, load_all, metric_tile, page_header, style_fig,
@@ -151,13 +150,12 @@ f.add_trace(go.Scatter(
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
 f.update_layout(xaxis=dict(type="category"))
-# Gridlines in whole 25L multiples: 25L itself where the values are small (per
-# year), rounding up to 50L/1Cr as they grow, so the cumulative axis doesn't end
-# up with twenty lines.
+# Fixed gridline steps, one per view: the cumulative totals run to crores, the
+# per-year amounts to tens of lakhs. Both get a taller canvas so the extra
+# lines have room to breathe.
 top = max(s.max() for s in series.values()) * 1.08
-step = max(25_00_000, math.ceil(top / 6.5 / 25_00_000) * 25_00_000)
-inr_axis(f, top, step=step)
-style_fig(f, height=440)
+inr_axis(f, top, step=25_00_000 if per_year else 1_00_00_000)
+style_fig(f, height=560)
 # After style_fig — it sets both legend and margin, so anything set before it is
 # silently overwritten. Legend sits above the plot, left-aligned (the names are
 # too long to hang off the right edge); l/r margins stay 8 so the plot spans the
@@ -219,15 +217,16 @@ metric_tile(cols[3], f"Wastes less by {horizon_year}", leaner, f"by {inr_short(a
             help="The lower waste line at the horizon, against a renter who invests the "
                  "difference. Says nothing about which side ends up with more assets.")
 
-# Affordability, from the budget rather than gross income: an EMI is funded out
-# of needs + wants (a home replaces rent and squeezes discretionary spend), and
-# should never eat the investment slice. The share is yours to set.
+# Affordability, from the budget rather than gross income. The envelope is
+# wants + investment: needs are already committed (an EMI can't come out of
+# groceries), so what a house can actually claim is discretionary spending plus
+# the money that would otherwise be invested. The share is yours to set.
 chart_title(
     "What you can afford",
-    help="Your budget's needs + wants for the current year, not gross income — the "
-         "investment slice stays untouched. The share below is how much of that "
-         "envelope a home loan may consume; the rest keeps paying for everything "
-         "else you need and want.",
+    help="Your budget's wants + investment for the current year, not gross income. "
+         "Needs are committed spending and stay out of it; a house is funded by "
+         "giving up discretionary spend and investing less. The share below is how "
+         "much of that envelope a home loan may claim.",
 )
 bs = compute.budget_series(profile, d.income)
 entered = bs[~bs["is_projected"]]
@@ -239,11 +238,11 @@ if not cur_row.empty and monthly_income > 0:
     monthly_needs = float(row["monthly_needs"])
     monthly_wants = float(row["monthly_wants"])
     monthly_investment = float(row["monthly_investment"])
-    envelope = monthly_needs + monthly_wants
+    envelope = monthly_wants + monthly_investment
 
     share_pct = st.slider(
-        "Share of needs + wants an EMI may take (%)", 10, 100,
-        EMI_SHARE_OF_NEEDS_WANTS_PCT, step=5, key=f"rvb_emishare_{k}",
+        "Share of wants + investment an EMI may take (%)", 10, 100,
+        EMI_SHARE_OF_WANTS_INVESTMENT_PCT, step=5, key=f"rvb_emishare_{k}",
     )
     emi_budget = envelope * share_pct / 100
     max_loan = compute.max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
@@ -252,8 +251,8 @@ if not cur_row.empty and monthly_income > 0:
     max_price = max_loan / (1 - down_pct / 100) if down_pct < 100 else 0.0
 
     acols = st.columns(4)
-    metric_tile(acols[0], "Needs + wants / month", inr_short(envelope),
-                f"{inr_short(monthly_needs)} needs + {inr_short(monthly_wants)} wants", big=True)
+    metric_tile(acols[0], "Wants + investment / month", inr_short(envelope),
+                f"{inr_short(monthly_wants)} wants + {inr_short(monthly_investment)} invested", big=True)
     metric_tile(acols[1], "EMI you can carry", inr_short(emi_budget),
                 f"{share_pct}% of that envelope", color=SECONDARY, big=True)
     metric_tile(acols[2], "Loan it supports", inr_short(max_loan),
@@ -265,18 +264,18 @@ if not cur_row.empty and monthly_income > 0:
     share_of_envelope = 100 * monthly_emi / envelope if envelope else 0.0
     afford_caption = (
         f"This {inr_short(price)} house needs a {inr_short(monthly_emi)} EMI — "
-        f"{share_of_envelope:.0f}% of your needs + wants, so it's **{verdict}**. "
+        f"{share_of_envelope:.0f}% of your wants + investment, so it's **{verdict}**. "
     )
     if monthly_emi > emi_budget:
         afford_caption += (
             f"Closing the gap means {inr_short(monthly_emi - emi_budget)} a month more, "
-            f"which comes out of the {inr_short(monthly_investment)} you currently invest "
-            "unless income grows first."
+            f"out of the {inr_short(monthly_needs)} needs bucket — cutting committed "
+            "spending — unless income grows first."
         )
     else:
         afford_caption += (
             f"That leaves {inr_short(emi_budget - monthly_emi)} a month of the envelope "
-            f"spare, with the {inr_short(monthly_investment)} investment slice untouched."
+            f"spare, and the {inr_short(monthly_needs)} needs bucket untouched."
         )
     st.caption(afford_caption)
 else:

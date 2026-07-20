@@ -99,7 +99,7 @@ def test_rent_vs_buy_verdict_names_the_leaner_side(fake_data_dir):
     assert "wastes" in captions and "less" in captions
     assert "sit idle" in captions
     assert "Interest is front-loaded" in captions  # the amortization table's caption
-    assert "of your needs + wants" in captions  # the affordability verdict
+    assert "of your wants + investment" in captions  # the affordability verdict
 
 
 def test_rent_vs_buy_affordability_silent_without_data(fake_data_dir):
