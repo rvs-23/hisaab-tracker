@@ -11,7 +11,7 @@ tidy CSVs, keyed by (year, profile) where a year applies:
                      money invested before tracking began (optional)
 
 The budget (needs/wants/investment) and the emergency-fund target (4 months of
-needs + wants) are *derived* from income, not stored. Every save is recorded in the audit log
+needs) are *derived* from income, not stored. Every save is recorded in the audit log
 (see audit.py).
 """
 
@@ -171,6 +171,7 @@ def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Prof
     if bad:
         raise ValueError(f"contributions.csv uses categories not in config.yaml: {sorted(bad)}")
     _check_non_negative(df, ["amount"], "contributions.csv")
+    _check_no_duplicates(df, ["profile", "year", "category"], "contributions.csv")
 
 
 def _save(root: Path, filename: str, df: pd.DataFrame, sort_cols: list[str],

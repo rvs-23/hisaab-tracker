@@ -95,11 +95,14 @@ def test_very_low_rent_makes_renting_waste_less_within_horizon():
     assert last["rent_wasted_cum"] < last["buy_wasted_cum"]
 
 
-def test_net_columns_are_asset_minus_waste():
+def test_net_columns_are_the_assets_directly():
+    """Both sides spend the same housing budget, so assets compare directly —
+    subtracting waste again would double-count (the renter's portfolio already
+    paid the rent out of that budget; Codex review 2026-07-20)."""
     df = compute.rent_vs_buy(**DEFAULTS)
     row = df.iloc[5]
-    assert row["buy_net"] == pytest.approx(row["buy_equity"] - row["buy_wasted_cum"])
-    assert row["rent_net"] == pytest.approx(row["renter_portfolio"] - row["rent_wasted_cum"])
+    assert row["buy_net"] == pytest.approx(row["buy_equity"])
+    assert row["rent_net"] == pytest.approx(row["renter_portfolio"])
 
 
 def test_crossover_year_found_when_rent_eventually_costlier():

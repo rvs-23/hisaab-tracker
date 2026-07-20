@@ -663,3 +663,12 @@ def test_affordability_crosses_when_income_outpaces_house():
     behind = df.iloc[0]["affordable_price"] < df.iloc[0]["house_price"]
     ahead_later = (df["affordable_price"] >= df["house_price"]).any()
     assert behind and ahead_later
+
+
+def test_corpus_growth_honours_flat_return(rv):
+    """Regression (Codex 2026-07-20): _corpus_growth_rate dropped flat_return,
+    so a configured single rate silently used per-category rates for the corpus."""
+    targets = pd.DataFrame(columns=storage.TARGETS_COLUMNS)
+    weighted = compute._corpus_growth_rate(rv, targets, 2024)
+    assert weighted != 10.0  # rv's weighted rate isn't coincidentally 10
+    assert compute._corpus_growth_rate(rv, targets, 2024, flat_return=10.0) == 10.0

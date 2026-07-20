@@ -310,7 +310,7 @@ def _corpus_growth_rate(profile: Profile, targets: pd.DataFrame, vintage: int,
                         flat_return: float | None = None) -> float:
     """The opening corpus's assumed annual return: the target allocation in
     force at its vintage year, weighted by each category's expected return."""
-    return expected_return_for_target(resolve_target(profile, targets, vintage))
+    return expected_return_for_target(resolve_target(profile, targets, vintage), flat_return)
 
 
 def emergency_fund_actual(adjustments: pd.DataFrame, profile_key: str) -> float:
@@ -481,9 +481,11 @@ def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
          too early in January isn't "behind" yet.
       3. No emergency fund has ever been recorded (``emergency_fund_actual``
          is 0).
-      4. Cumulative actual allocation (all years, all categories) drifts 15
-         percentage points or more from the current target, for any one
-         category — one message per drifting category.
+      4. The current year's contribution mix drifts 15 percentage points or
+         more from the current year's target, for any one category — one
+         message per drifting category. (Deliberately not cumulative: targets
+         are flow targets, and old years judged against a newer target would
+         flag intentional target changes as drift.)
 
     Args:
         fmt: Formats a rupee amount for check #2's message; defaults to a
@@ -518,17 +520,22 @@ def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
     if emergency_fund_actual(adjustments, profile.key) == 0:
         findings.append("Emergency fund not recorded yet — enter it on Actuals to track your buffer.")
 
-    mine_contrib = contributions[contributions["profile"] == profile.key]
-    total_actual = float(mine_contrib["amount"].sum())
+    # Drift compares THIS year's flow against THIS year's target — targets are
+    # contribution-flow targets, and judging old years against a newer target
+    # would flag intentional target changes as drift.
+    year_contrib = contributions[
+        (contributions["profile"] == profile.key) & (contributions["year"] == year)
+    ]
+    total_actual = float(year_contrib["amount"].sum())
     if total_actual > 0:
-        actual_pct = 100 * mine_contrib.groupby("category")["amount"].sum() / total_actual
+        actual_pct = 100 * year_contrib.groupby("category")["amount"].sum() / total_actual
         target = resolve_target(profile, targets, year)
         for cat in sorted(set(actual_pct.index) | set(target.keys())):
             drift = actual_pct.get(cat, 0.0) - target.get(cat, 0.0)
             if abs(drift) >= 15:
                 label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").capitalize())
                 findings.append(
-                    f"Your actual mix drifts from target: {label} is "
+                    f"{year}'s mix drifts from its target: {label} is "
                     f"{actual_pct.get(cat, 0.0):.0f}% vs target {target.get(cat, 0.0):.0f}%."
                 )
 
@@ -629,10 +636,11 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         renter_portfolio: down payment + registration money never spent,
             invested from year 0, plus every year's (EMI + maintenance −
             rent) difference invested from the year it occurs.
-        buy_net: buy_equity − buy_wasted_cum — what buying built minus what
-            it threw away.
-        rent_net: renter_portfolio − rent_wasted_cum — what renting's
-            invested savings built minus what renting threw away on rent.
+        buy_net / rent_net: each side's ASSETS — buy_equity and
+            renter_portfolio verbatim. Both sides spend the same housing
+            budget by construction, so assets compare directly; subtracting
+            waste again would double-count (the renter's portfolio already
+            paid the rent out of that budget).
 
     Args:
         price: Property price.
@@ -699,8 +707,8 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
             "renter_gain": renter_gain,
             "buy_wasted_net": buy_wasted_cum - appreciation_gain,
             "rent_wasted_net": rent_wasted_cum - renter_gain,
-            "buy_net": buy_equity - buy_wasted_cum,
-            "rent_net": renter_portfolio - rent_wasted_cum,
+            "buy_net": buy_equity,
+            "rent_net": renter_portfolio,
         })
     return pd.DataFrame(rows)
 

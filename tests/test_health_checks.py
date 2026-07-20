@@ -115,14 +115,25 @@ def test_emergency_fund_recorded_does_not_fire(rv, no_income, no_contrib, no_tar
 # 4. Cumulative actual mix drifts ≥15pp from target.
 
 def test_mix_drift_fires(rv, no_income, no_targets, no_adjustments):
-    """All contributions in mfs vs a 60/40 target — both categories drift 40pp."""
+    """This year all-mfs vs a 60/40 target — both categories drift 40pp.
+    Drift is judged on the CURRENT year's flow vs the current year's target
+    (cumulative-vs-newer-target flagged intentional target changes)."""
     contrib = pd.DataFrame([
-        {"year": 2024, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None},
+        {"year": TODAY.year, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None},
     ])
     findings = compute.health_checks(rv, no_income, no_targets, contrib, no_adjustments, today=TODAY)
-    drift = [f for f in findings if "drifts from target" in f]
+    drift = [f for f in findings if "drifts from its target" in f]
     assert any("Mutual funds" in f for f in drift)
     assert any("Gold" in f for f in drift)
+
+
+def test_mix_drift_ignores_past_years(rv, no_income, no_targets, no_adjustments):
+    """A past year's mix can't fire drift — targets are flow targets."""
+    contrib = pd.DataFrame([
+        {"year": TODAY.year - 2, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None},
+    ])
+    findings = compute.health_checks(rv, no_income, no_targets, contrib, no_adjustments, today=TODAY)
+    assert not [f for f in findings if "drifts" in f]
 
 
 def test_mix_close_to_target_does_not_fire(rv, no_income, no_targets, no_adjustments):
