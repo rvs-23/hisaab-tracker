@@ -313,23 +313,36 @@ buy_years = (today_year + timing["wait_years"]).astype(str)
 
 f2 = go.Figure()
 f2.add_trace(go.Bar(
-    x=buy_years, y=timing["total_wasted"],
+    x=buy_years, y=timing["total_wasted"], showlegend=False,
     marker_color=[PRIMARY if row.feasible else COST_LINE for row in timing.itertuples()],
     hovertemplate="Buy in %{x}: ₹%{y:,.0f} wasted<extra></extra>",
 ))
+# The colour carries the affordability split, so it needs a key on the chart —
+# empty traces exist only to put those two swatches in the legend.
+for name, colour, shown in [("You can afford this year", PRIMARY, True),
+                            ("Corpus can't fund it yet", COST_LINE,
+                             not bool(timing["feasible"].all()))]:
+    if shown:
+        f2.add_trace(go.Bar(x=[None], y=[None], name=name, marker_color=colour))
 if not feasible.empty:
     best = timing.loc[feasible["total_wasted"].idxmin()]
     # "Cheapest" alone misleads when the early bars are unaffordable: the pick is
     # only the best of the years you can actually transact in.
     pick = "cheapest you can afford" if not timing["feasible"].all() else "cheapest"
+    # Point the label inward when the winner sits near the right edge, or the
+    # text runs off the canvas.
+    late = int(best["wait_years"]) > len(timing) * 0.6
     f2.add_annotation(x=str(today_year + int(best["wait_years"])), y=float(best["total_wasted"]),
                       text=f"{pick}: {inr_short(best['total_wasted'])} wasted",
-                      showarrow=True, arrowhead=0, ay=-32, font=dict(color=PRIMARY, size=12))
+                      showarrow=True, arrowhead=0, ay=-34, ax=-60 if late else 0,
+                      xanchor="right" if late else "center",
+                      font=dict(color=PRIMARY, size=12))
 inr_axis(f2, timing["total_wasted"].max() * 1.15, min_step=1_00_00_000)
 style_fig(f2, height=380)
 # Both axes carry a title here: bare rupee bars over bare years don't say what
 # is being measured, and "lower is better" is the opposite of the usual reading.
-f2.update_layout(margin=dict(l=8, r=8, t=34, b=8))
+f2.update_layout(margin=dict(l=8, r=8, t=34, b=8), barmode="overlay",
+                 legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0))
 f2.update_yaxes(title_text="Total wasted over the whole loan — lower is better",
                 title_font=dict(size=12, color=CHART_TEXT))
 f2.update_xaxes(title_text="Year you buy", title_font=dict(size=12, color=CHART_TEXT))
