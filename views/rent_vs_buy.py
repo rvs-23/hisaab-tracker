@@ -1,10 +1,11 @@
 """Rent vs buy: a stateless calculator, not a save.
 
 Frames the decision the way the household actually thinks about it — money
-*wasted*, not net worth — made apples-to-apples by netting each side's waste
-against the asset that side ends up holding (the buyer's appreciation, the
-renter's investment growth). Nothing on this page reads or writes the data
-CSVs; it's pure what-if, anchored to the active person's real numbers.
+*wasted*, not net worth — then gives the apples-to-apples verdict as one
+line: buyer's assets minus renter's assets (both sides spend the same
+housing budget, so the asset gap is the whole answer). Nothing on this page
+reads or writes the data CSVs; it's pure what-if, anchored to the active
+person's real numbers.
 """
 
 import datetime as dt
@@ -27,8 +28,8 @@ k = profile.key  # per-person widget key suffix, so switching profile keeps inpu
 
 st.caption(
     "A calculator, not a save — nothing here is written to your data. It frames both "
-    "choices as **money wasted**, netted against the asset each side ends up holding. "
-    "Defaults and context come from your own data; every number is overridable."
+    "choices as **money wasted**, then gives the verdict in one line: whose assets end "
+    "up ahead. Defaults and context come from your own data; every number is overridable."
 )
 
 target = compute.resolve_target(profile, d.targets, today_year)
@@ -97,46 +98,61 @@ df = compute.rent_vs_buy(
 )
 yr = (today_year - 1 + df["year"]).astype(str)  # calendar years from the locked start
 
-# 1. Money wasted, apples to apples: each side's waste minus the asset gain
-# that side holds (buyer: house appreciation; renter: investment growth).
+# 1. Money wasted — the raw philosophy: cash that bought nothing lasting.
 chart_title(
-    "Money wasted, net of what you own",
-    help="Waste minus the asset gain each side ends up holding. Buying: registration + "
-         "interest + maintenance, minus the house's appreciation. Renting: the rent, minus "
-         "growth on the savings a renter invests. Below zero = the asset gained more than "
-         "the waste.",
+    "Money wasted, cumulative",
+    help="Waste = money that buys you nothing lasting. Buying wastes registration + loan "
+         "interest + maintenance; renting wastes the rent itself. Assets and their growth "
+         "are the next chart's job.",
 )
 f = go.Figure()
-f.add_trace(go.Scatter(x=yr, y=df["buy_wasted_net"], name="Buying", mode="lines+markers",
+f.add_trace(go.Scatter(x=yr, y=df["buy_wasted_cum"], name="Buying", mode="lines+markers",
                        line=dict(color=PRIMARY, width=3)))
-f.add_trace(go.Scatter(x=yr, y=df["rent_wasted_net"], name="Renting", mode="lines+markers",
+f.add_trace(go.Scatter(x=yr, y=df["rent_wasted_cum"], name="Renting", mode="lines+markers",
                        line=dict(color=MARKER, width=3)))
 f.update_layout(xaxis=dict(type="category"))
-inr_axis(f, max(abs(df["buy_wasted_net"]).max(), abs(df["rent_wasted_net"]).max()))
-style_fig(f, height=340)
+inr_axis(f, max(df["buy_wasted_cum"].max(), df["rent_wasted_cum"].max()))
+style_fig(f, height=320)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+st.caption("Principal repaid and a renter's invested savings are never counted as waste.")
 
-net_cross = None
-worse = df["buy_wasted_net"] > df["rent_wasted_net"]
-if worse.iloc[0] and (~worse).any():
-    net_cross = int(yr.iloc[(~worse).idxmax()])
-adj_caption = ("Lower line = less money truly lost. Principal repaid and a renter's invested "
-               "savings were never waste; here the buyer also gets credit for appreciation and "
-               "the renter for investment growth.")
-if net_cross:
-    adj_caption += f" Buying becomes the less wasteful choice from {net_cross}."
-st.caption(adj_caption)
+# 1b. The apples-to-apples verdict as ONE line: buying's assets minus
+# renting's assets (both sides spend the same housing budget, so the asset
+# difference IS the net advantage). Above zero = buying ahead.
+chart_title(
+    "Who ends up ahead — buying minus renting",
+    help="One line: the buyer's assets (equity + appreciation) minus the renter's "
+         "(invested savings + growth), year by year. Both sides spend the same housing "
+         "budget, so this difference is the whole verdict. Above zero: buying is ahead.",
+)
+advantage = df["buy_net"] - df["rent_net"]
+f_adv = go.Figure()
+f_adv.add_trace(go.Scatter(x=yr, y=advantage, name="Buying advantage", mode="lines+markers",
+                           line=dict(color=PRIMARY, width=3), fill="tozeroy"))
+f_adv.update_layout(xaxis=dict(type="category"), showlegend=False)
+inr_axis(f_adv, max(advantage.max(), 0), min_value=min(advantage.min(), 0))
+style_fig(f_adv, height=300)
+st.plotly_chart(f_adv, width="stretch", config={"displayModeBar": False})
+
+adv_caption = "Above the zero line, buying has you ahead; below it, renting-and-investing does."
+ahead = advantage >= 0
+if not ahead.iloc[0] and ahead.any():
+    adv_caption += f" Buying pulls ahead from {int(yr.iloc[ahead.idxmax()])}."
+elif ahead.iloc[0] and not ahead.all():
+    adv_caption += f" Renting pulls ahead from {int(yr.iloc[(~ahead).idxmax()])}."
+st.caption(adv_caption)
 
 # 2. Headline tiles.
 total_interest = monthly_emi * tenure_years * 12 - loan_principal
-net_buy, net_rent = df.iloc[-1]["buy_wasted_net"], df.iloc[-1]["rent_wasted_net"]
+adv_end = advantage.iloc[-1]
 cols = st.columns(4)
 metric_tile(cols[0], "EMI / month", inr_short(monthly_emi), f"{tenure_years}-year loan", big=True)
 metric_tile(cols[1], "Total interest", inr_short(total_interest), "over the full tenure", big=True)
 metric_tile(cols[2], "Registration cost", inr_short(registration_cost), f"{registration_pct:.1f}% of price", big=True)
-metric_tile(cols[3], "Net waste in horizon", f"Buy {inr_short(net_buy)}",
-            f"Rent {inr_short(net_rent)}", color=PRIMARY, big=True,
-            help="Each side's waste minus its asset gain, at the horizon — the chart's last points.")
+metric_tile(cols[3], "Ahead at horizon", "Buying" if adv_end >= 0 else "Renting",
+            f"by {inr_short(abs(adv_end))}", color=PRIMARY, big=True,
+            help="The verdict line's last point: whose assets are larger at the horizon, "
+                 "and by how much.")
 
 # 3. When can you afford it? Income grows at the same rate the house
 # appreciates (the user's stated assumption), EMI capped per config.
@@ -191,28 +207,11 @@ if monthly_income > 0:
 else:
     st.caption("Add income to see the bottom line against your own numbers.")
 
-with st.expander("Net position — the fuller picture"):
-    chart_title("Net position: buy vs rent",
-                help="buy_net = equity built minus everything wasted; rent_net = the "
-                     "renter's invested savings minus everything wasted on rent.")
-    f3 = go.Figure()
-    f3.add_trace(go.Scatter(x=yr, y=df["buy_net"], name="Buying (net)", mode="lines+markers",
-                            line=dict(color=PRIMARY, width=3)))
-    f3.add_trace(go.Scatter(x=yr, y=df["rent_net"], name="Renting (net)", mode="lines+markers",
-                            line=dict(color=MARKER, width=3)))
-    f3.update_layout(xaxis=dict(type="category"))
-    inr_axis(f3, max(df["buy_net"].abs().max(), df["rent_net"].abs().max()))
-    style_fig(f3, height=300)
-    st.plotly_chart(f3, width="stretch", config={"displayModeBar": False})
-    st.markdown(
-        f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveat: the "
-        "assumptions — appreciation, invest return, rent inflation — dominate this answer. "
-        "Treat it as illustrative, not predictive.</div>",
-        unsafe_allow_html=True,
-    )
-
-st.caption(
-    "Approximations: yearly compounding, not monthly. No tax breaks modelled (Section "
-    "24/80C, HRA). No selling or transaction costs. The affordable price assumes the "
-    "down payment is available."
+st.markdown(
+    f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats: the verdict "
+    "line's assumptions — appreciation, investment return, rent inflation — dominate it; "
+    "treat it as illustrative. Yearly compounding, not monthly. No tax breaks modelled "
+    "(Section 24/80C, HRA). No selling or transaction costs. The affordable price assumes "
+    "the down payment is available.</div>",
+    unsafe_allow_html=True,
 )
