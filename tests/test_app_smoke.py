@@ -123,5 +123,5 @@ def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     at.button(key="inc_rv_2023_save").click().run()   # writes all 12 months
     at.button(key="inc_rv_2023_save").click().run()   # nothing changed now
     assert not at.exception, at.exception
-    assert "No changes to save" in " ".join(m.value for m in at.info)
+    assert "No changes to save" in " ".join(m.value for m in at.warning)
     assert "Saved" not in " ".join(s.value for s in at.success)

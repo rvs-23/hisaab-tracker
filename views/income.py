@@ -128,6 +128,21 @@ with edit_card(f"Enter {year}"):
     prev_total = annual(year - 1)
     delta = f"{100 * (total - prev_total) / prev_total:+.0f}% vs {year - 1}" if prev_total else "first year"
 
+    # Does the grid (only its *committed* cells) differ from what's on disk? This
+    # is the honest signal: if you typed a value but the cell hasn't committed
+    # yet, it isn't here, and this reads "in sync" — telling you the edit hasn't
+    # registered before you hit Save.
+    preview = edited[COMPONENTS].assign(month=range(1, 13), job_change=int(job_change))
+    pending = rows_sig(preview) != rows_sig(disk_rows(year))
+    if pending:
+        st.markdown(f"<div style='color:{PRIMARY};font-weight:600;font-size:.82rem'>"
+                    "● Unsaved changes — press Enter to commit the cell, then Save.</div>",
+                    unsafe_allow_html=True)
+    else:
+        st.markdown("<div style='color:var(--muted);font-size:.82rem'>"
+                    "✓ In sync with saved data — nothing to save.</div>",
+                    unsafe_allow_html=True)
+
     b2, b3 = st.columns([1, 3])
     if b2.button("Save", key=f"{base}_save", type="primary"):
         current = rows_sig(disk_rows(year))
@@ -146,8 +161,10 @@ with edit_card(f"Enter {year}"):
         elif rows_sig(new) == current:
             # Nothing to write. Most often the last-typed cell never committed:
             # Streamlit's editor only captures a cell once it loses focus.
-            st.info("No changes to save — if you just typed in a cell, click another cell "
-                    "or press Enter to commit it, then Save.")
+            st.toast("Nothing saved — your last edit hasn't committed.", icon="⚠️")
+            st.warning("**No changes to save.** If you just typed a value, press **Enter** "
+                       "(or click another cell) to commit it — the number turns from an "
+                       "editing box into plain text — then Save. Nothing was written.")
         else:
             others = d.income[~((d.income["profile"] == active.key) & (d.income["year"] == year))]
             merged = pd.concat([others, new], ignore_index=True)
