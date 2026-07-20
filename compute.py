@@ -624,8 +624,11 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
             maintenance, to date.
         rent_wasted_cum: cumulative rent paid, to date.
         appreciation_gain: house value so far minus the price paid.
+        renter_contributed: what the renter has put aside to date (down
+            payment + registration never spent, plus the yearly differences)
+            at face value — a renter who never invests holds exactly this.
         renter_gain: growth on the renter's invested savings (portfolio minus
-            what was put in).
+            renter_contributed).
         buy_wasted_net / rent_wasted_net: the apples-to-apples pair — each
             side's waste minus the asset gain that side ends up holding
             (the buyer's appreciation; the renter's investment growth). Can go
@@ -704,6 +707,7 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
             "buy_equity": buy_equity,
             "renter_portfolio": renter_portfolio,
             "appreciation_gain": appreciation_gain,
+            "renter_contributed": renter_contributed,
             "renter_gain": renter_gain,
             "buy_wasted_net": buy_wasted_cum - appreciation_gain,
             "rent_wasted_net": rent_wasted_cum - renter_gain,

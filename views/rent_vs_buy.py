@@ -39,9 +39,14 @@ return_source = ("the household expected_return_pct in config.yaml"
                  else "your target allocation's weighted expected return")
 
 section("Your numbers")
-house_col, loan_col, rent_col = st.columns(3)
+sc1, sc2, _ = st.columns([1, 1, 2])
+sc1.number_input("Start year (locked)", value=today_year, disabled=True, key=f"rvb_start_{k}",
+                 help="Scenarios start from the current year; the charts read in calendar years.")
+horizon_years = int(sc2.number_input("Horizon (years)", min_value=1, value=15, step=1, key=f"rvb_horizon_{k}"))
 
-with house_col:
+house_col, loan_col, renting_col, invest_col = st.columns(4)
+
+with house_col, st.container(border=True):
     st.markdown("**The house**")
     price = st.number_input("Property price (₹)", min_value=0, value=15_000_000, step=100_000, key=f"rvb_price_{k}")
     st.caption(f"= {inr_short(price)}")
@@ -49,27 +54,28 @@ with house_col:
     maintenance_pct = st.number_input("Maintenance (% of price / yr)", min_value=0.0, value=0.5, step=0.1, key=f"rvb_maint_{k}")
     appreciation_pct = st.number_input("Appreciation (% p.a.)", min_value=0.0, value=5.0, step=0.5, key=f"rvb_appr_{k}")
 
-with loan_col:
+with loan_col, st.container(border=True):
     st.markdown("**The loan**")
     down_pct = st.slider("Down payment (%)", 0, 100, 20, key=f"rvb_down_{k}")
     st.caption(f"= {inr_short(price * down_pct / 100)}")
     loan_rate_pct = st.number_input("Loan rate (% p.a.)", min_value=0.0, value=8.5, step=0.1, key=f"rvb_rate_{k}")
     tenure_years = int(st.number_input("Tenure (years)", min_value=1, value=20, step=1, key=f"rvb_tenure_{k}"))
-    st.number_input("Start year (locked)", value=today_year, disabled=True, key=f"rvb_start_{k}",
-                    help="Scenarios start from the current year; the charts read in calendar years.")
 
-with rent_col:
-    st.markdown("**Renting & investing**")
+with renting_col, st.container(border=True):
+    st.markdown("**Renting**")
     rent_monthly = st.number_input("Starting rent (₹ / month)", min_value=0, value=40_000, step=1_000, key=f"rvb_rent_{k}")
     st.caption(f"= {inr_short(rent_monthly)}/mo")
     rent_inflation_pct = st.number_input("Rent inflation (% p.a.)", min_value=0.0, value=5.0, step=0.5, key=f"rvb_rentinfl_{k}")
+
+with invest_col, st.container(border=True):
+    st.markdown("**Investing**")
+    st.caption("What a renter does with the money buying would have consumed.")
     invest_return_pct = st.number_input(
         "Investment return (% p.a.)", min_value=0.0, value=default_return, step=0.1,
         key=f"rvb_return_{k}",
         help=f"Defaults to {return_source} ({default_return:.1f}%) — the same number "
              "behind the dashboard's Est. value today. Edit to model something else.",
     )
-    horizon_years = int(st.number_input("Horizon (years)", min_value=1, value=15, step=1, key=f"rvb_horizon_{k}"))
 
 # Derived once, up front — the summary, tiles, and charts all reuse the same
 # numbers as the model (no separate recompute path).
@@ -126,20 +132,28 @@ chart_title(
          "budget, so this difference is the whole verdict. Above zero: buying is ahead.",
 )
 advantage = df["buy_net"] - df["rent_net"]
+advantage_no_invest = df["buy_net"] - df["renter_contributed"]
+invest_worth = float(df.iloc[-1]["renter_gain"])
 f_adv = go.Figure()
-f_adv.add_trace(go.Scatter(x=yr, y=advantage, name="Buying advantage", mode="lines+markers",
+f_adv.add_trace(go.Scatter(x=yr, y=advantage, name="vs renter who invests", mode="lines+markers",
                            line=dict(color=PRIMARY, width=3), fill="tozeroy"))
-f_adv.update_layout(xaxis=dict(type="category"), showlegend=False)
-inr_axis(f_adv, max(advantage.max(), 0), min_value=min(advantage.min(), 0))
+f_adv.add_trace(go.Scatter(x=yr, y=advantage_no_invest, name="vs renter who doesn't",
+                           mode="lines", line=dict(color=MARKER, width=2, dash="dash")))
+f_adv.update_layout(xaxis=dict(type="category"), showlegend=True)
+inr_axis(f_adv, max(advantage.max(), advantage_no_invest.max(), 0),
+         min_value=min(advantage.min(), advantage_no_invest.min(), 0))
 style_fig(f_adv, height=300)
 st.plotly_chart(f_adv, width="stretch", config={"displayModeBar": False})
 
-adv_caption = "Above the zero line, buying has you ahead; below it, renting-and-investing does."
+adv_caption = ("Above the zero line, buying has you ahead. The dashed line is the verdict "
+               "against a renter who leaves the difference as cash — the gap between the "
+               f"two lines is what investing the difference is worth: {inr_short(invest_worth)} "
+               "by the horizon.")
 ahead = advantage >= 0
 if not ahead.iloc[0] and ahead.any():
-    adv_caption += f" Buying pulls ahead from {int(yr.iloc[ahead.idxmax()])}."
+    adv_caption += f" Buying pulls ahead of the investing renter from {int(yr.iloc[ahead.idxmax()])}."
 elif ahead.iloc[0] and not ahead.all():
-    adv_caption += f" Renting pulls ahead from {int(yr.iloc[(~ahead).idxmax()])}."
+    adv_caption += f" The investing renter pulls ahead from {int(yr.iloc[(~ahead).idxmax()])}."
 st.caption(adv_caption)
 
 # 2. Headline tiles.

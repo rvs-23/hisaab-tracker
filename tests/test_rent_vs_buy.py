@@ -129,3 +129,10 @@ def test_expected_return_for_target_weights_by_pct():
     target = {"mfs": 50, "gold_metals": 50}
     rate = compute.expected_return_for_target(target)
     assert rate == pytest.approx(0.5 * compute.EXPECTED_RETURNS["mfs"] + 0.5 * compute.EXPECTED_RETURNS["gold_metals"])
+
+
+def test_renter_contributed_is_portfolio_minus_gain():
+    """The non-investing renter's cash pile: portfolio = contributed + gain."""
+    df = compute.rent_vs_buy(**DEFAULTS)
+    row = df.iloc[5]
+    assert row["renter_portfolio"] == pytest.approx(row["renter_contributed"] + row["renter_gain"])
