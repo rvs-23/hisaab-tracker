@@ -107,31 +107,39 @@ chart_title(
          "the rent. A renter who leaves the difference in idle cash also wastes the growth "
          "they gave up, so that line sits higher. Lower = less wasted.",
 )
-# Only the Buying line carries value labels — three sets of numbers collided
-# into noise. The rest read off the grid, the hover, or the table below.
-lines = [
-    ("Buying", df["buy_wasted_cum"], PRIMARY, "solid", 3, True),
-    ("Renting + investing the difference", df["rent_wasted_cum"], SECONDARY, "solid", 3, False),
-    ("Renting, cash left idle", df["rent_wasted_no_invest_cum"], COST_LINE, "dash", 2, False),
-]
+# Mixed encoding: the two real alternatives are bars (side by side, easy to
+# compare height at any year), and the idle-cash case rides above them as a
+# dashed reference line — it's an order of magnitude larger, so as a bar it
+# would flatten the pair you're actually choosing between. Only the Buying bars
+# carry value labels; three sets of numbers collided into noise.
+series = {
+    "buy": df["buy_wasted_cum"],
+    "rent": df["rent_wasted_cum"],
+    "idle": df["rent_wasted_no_invest_cum"],
+}
 f = go.Figure()
-for name, series, color, dash, width, show_values in lines:
-    f.add_trace(go.Scatter(
-        x=yr, y=series, name=name, mode="lines+markers+text" if show_values else "lines+markers",
-        line=dict(color=color, width=width, dash=dash), marker=dict(size=5),
-        text=[inr_short(v) for v in series] if show_values else None,
-        textposition="top center", textfont=dict(color=color, size=11),
-        cliponaxis=False,
-        hovertemplate="%{x}: ₹%{y:,.0f}<extra>" + name + "</extra>",
-    ))
-# Legend below the plot: above it, it crowded the section title and pushed the
-# first year's label off the grid.
-f.update_layout(xaxis=dict(type="category"),
+f.add_trace(go.Bar(
+    x=yr, y=series["buy"], name="Buying", marker_color=PRIMARY,
+    text=[inr_short(v) for v in series["buy"]], textposition="outside",
+    textangle=-90, textfont=dict(size=10), cliponaxis=False,
+    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>",
+))
+f.add_trace(go.Bar(
+    x=yr, y=series["rent"], name="Renting + investing the difference",
+    marker_color=SECONDARY,
+    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting</extra>",
+))
+f.add_trace(go.Scatter(
+    x=yr, y=series["idle"], name="Renting, cash left idle", mode="lines",
+    line=dict(color=COST_LINE, width=2, dash="dash"),
+    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Cash left idle</extra>",
+))
+# Legend below the plot: above it, it crowded the section title.
+f.update_layout(barmode="group", bargap=0.28, bargroupgap=0.06,
+                xaxis=dict(type="category"),
                 legend=dict(orientation="h", yanchor="top", y=-0.18, x=0),
                 margin=dict(t=20, b=70))
-# Auto step (≈5 round gridlines); a fixed 10L grid gives 16 lines at these
-# magnitudes. The 5% headroom keeps the top value label on the canvas.
-inr_axis(f, max(s.max() for _, s, *_ in lines) * 1.05)
+inr_axis(f, max(s.max() for s in series.values()) * 1.05, step=50_00_000)
 style_fig(f, height=440)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
