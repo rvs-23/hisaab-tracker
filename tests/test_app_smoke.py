@@ -97,7 +97,7 @@ def test_rent_vs_buy_verdict_names_the_leaner_side(fake_data_dir):
     assert not at.exception, at.exception
     captions = " ".join(c.value for c in at.caption)
     assert "wastes" in captions and "less" in captions
-    assert "idle cash" in captions
+    assert "sit idle" in captions
     assert "Interest is front-loaded" in captions  # the amortization table's caption
     assert "against the" in captions  # the income projection line
 

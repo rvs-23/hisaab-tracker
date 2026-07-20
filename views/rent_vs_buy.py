@@ -135,12 +135,12 @@ f.add_trace(go.Scatter(
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>",
 ))
 f.add_trace(go.Scatter(
-    x=yr, y=series["rent"], name="Renting", mode="lines+markers",
+    x=yr, y=series["rent"], name="Renting + investing the rest", mode="lines+markers",
     line=dict(color=SECONDARY, width=3), marker=dict(size=5),
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference invested</extra>",
 ))
 f.add_trace(go.Scatter(
-    x=yr, y=series["idle"], name="Renting, idle cash", mode="lines",
+    x=yr, y=series["idle"], name="Renting, rest sits idle", mode="lines",
     line=dict(color=COST_LINE, width=2, dash="dash"),
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
@@ -151,11 +151,11 @@ inr_axis(f, max(s.max() for s in series.values()) * 1.08,
          step=None if per_year else 50_00_000)
 style_fig(f, height=440)
 # After style_fig — it sets both legend and margin, so anything set before it is
-# silently overwritten. Legend rides top-right on the title's line: short labels
-# fit, it costs no vertical space, and the plot keeps the full width (l/r 8).
-f.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.0,
-                            xanchor="right", x=1),
-                margin=dict(l=8, r=8, t=34, b=8))
+# silently overwritten. Legend sits above the plot, left-aligned (the names are
+# too long to hang off the right edge); l/r margins stay 8 so the plot spans the
+# full width.
+f.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
+                margin=dict(l=8, r=8, t=44, b=8))
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 buy_end = float(df.iloc[-1]["buy_wasted_cum"])
@@ -166,8 +166,8 @@ leaner, gap = ("Buying", rent_end - buy_end) if buy_end <= rent_end else ("Renti
 st.caption(
     f"By {horizon_year}, **{leaner.lower()} wastes {inr_short(abs(gap))} less**: buying burns "
     f"{inr_short(buy_end)} (registration + interest + maintenance) against {inr_short(rent_end)} "
-    f"of rent. Leaving the difference in idle cash pushes renting's waste to "
-    f"{inr_short(idle_end)} — the {inr_short(idle_end - rent_end)} gap is what investing it is worth."
+    f"of rent. Letting the rest sit idle instead of investing it pushes renting's waste to "
+    f"{inr_short(idle_end)} — the {inr_short(idle_end - rent_end)} gap is what the investing is worth."
 )
 
 # Year by year, in rupees — the chart's numbers as a table, and the only place
