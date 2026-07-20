@@ -8,7 +8,7 @@ from config import EMERGENCY_FUND_MONTHS
 from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
     html_table, inr_axis, inr_short, load_all, metric_tile, page_header,
-    pretty_category, resync, section, style_fig,
+    pretty_category, section, style_fig,
 )
 
 d = load_all()
@@ -56,8 +56,8 @@ st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 # latest earning year.
 bs = compute.budget_series(active, d.income)
 has_budget_row = not bs[(bs["year"] == year) & (~bs["is_projected"])].empty
-ef_sub = (f"{EMERGENCY_FUND_MONTHS} months of {year} needs + wants" if has_budget_row
-          else f"{EMERGENCY_FUND_MONTHS} months of latest year's needs + wants")
+ef_sub = (f"{EMERGENCY_FUND_MONTHS} months of {year} needs" if has_budget_row
+          else f"{EMERGENCY_FUND_MONTHS} months of latest year's needs")
 ef_actual = compute.emergency_fund_actual(d.adjustments, active.key)
 
 goal_pct = compute.pct_goal_achieved(pva)
@@ -85,6 +85,7 @@ with st.expander("Update emergency fund"):
     st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
     new_ef = st.number_input("Emergency fund held (₹)", min_value=0, value=int(ef_actual),
                              step=10000, key=f"ef_{active.key}")
+    st.caption(f"= {inr_short(new_ef)}")
     if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
         others = d.adjustments[
             ~((d.adjustments["profile"] == active.key) & (d.adjustments["field"] == "emergency_fund"))
@@ -108,75 +109,6 @@ html_table(
     formats={"category": pretty_category, "expected": inr_short, "actual": inr_short, "shortfall": inr_short},
 )
 
-# Target allocation: the active mix read-only up front, the editor tucked into
-# an expander so filling in actuals stays this page's main job.
-budget_row = bs[bs["year"] == year]
-investment = float(budget_row.iloc[0]["investment"]) if not budget_row.empty else 0.0
-target = compute.resolve_target(active, d.targets, year)
-
-section("Target allocation")
-active_mix = pd.DataFrame({"category": list(target.keys()), "pct": list(target.values())})
-active_mix = active_mix.sort_values("pct", ascending=False)
-active_mix["per_year"] = active_mix["pct"] / 100 * investment
-active_mix["per_month"] = active_mix["per_year"] / 12
-html_table(
-    active_mix,
-    {"category": "Instrument", "pct": "Target %", "per_year": "₹ / year", "per_month": "₹ / month"},
-    formats={"category": pretty_category, "pct": lambda v: f"{v:.0f}%",
-             "per_year": inr_short, "per_month": inr_short},
-)
-
-with st.expander("Edit allocation"):
-    st.caption("Set the % per instrument (must sum to 100). The ₹/year and ₹/month follow from that year's investment.")
-
-    def derive_alloc(df):  # recompute the ₹ columns from the % column
-        out = df.copy()
-        out["per_year"] = out["pct"] / 100 * investment
-        out["per_month"] = out["per_year"] / 12
-        return out
-
-    abase = f"alloc_{active.key}_{year}"
-    agkey, avkey = f"{abase}__grid", f"{abase}__ver"
-    if agkey not in st.session_state:
-        g = pd.DataFrame({"category": d.config.categories})
-        g["label"] = g["category"].map(pretty_category)
-        g["pct"] = [target.get(c, 0.0) for c in d.config.categories]
-        st.session_state[agkey] = derive_alloc(g[["label", "pct"]].assign(per_year=0.0, per_month=0.0))
-        st.session_state[avkey] = 0
-
-    alloc_edited = st.data_editor(
-        st.session_state[agkey], hide_index=True, width="stretch",
-        key=f"{abase}__{st.session_state[avkey]}",
-        column_config={
-            "label": st.column_config.TextColumn("Instrument", disabled=True),
-            "pct": st.column_config.NumberColumn("Target %", min_value=0, max_value=100, required=True),
-            "per_year": st.column_config.NumberColumn("₹ / year", disabled=True, format="%.0f"),
-            "per_month": st.column_config.NumberColumn("₹ / month", disabled=True, format="%.0f"),
-        },
-    )
-    resync(agkey, avkey, derive_alloc(alloc_edited), ["per_year", "per_month"])
-    total_pct = alloc_edited["pct"].sum()
-    ok = abs(total_pct - 100) < 0.01
-    msg = f"Total <b>{total_pct:.0f}%</b>" + ("  ·  ready to save" if ok else "  ·  must sum to 100")
-    st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
-                unsafe_allow_html=True)
-
-    if st.button(f"Save {year}", key=f"save_alloc_{active.key}_{year}",
-                 type="primary", disabled=not ok):
-        rows = pd.DataFrame({"profile": active.key, "year": year,
-                             "category": d.config.categories, "pct": alloc_edited["pct"].values})
-        rows = rows[rows["pct"] > 0]
-        others = d.targets[~((d.targets["profile"] == active.key) & (d.targets["year"] == year))]
-        merged = pd.concat([others, rows], ignore_index=True)
-        try:
-            storage.validate_targets(merged, d.config, d.profiles)
-            storage.save_targets(d.root, merged)
-            del st.session_state[agkey]
-            st.success("Saved.")
-            st.rerun()
-        except Exception as exc:
-            st.error(f"Not saved: {exc}")
-    st.caption("A saved year carries forward until you set a newer one.")
 
 section("Fill in")
 
@@ -193,7 +125,7 @@ with edit_card(f"Record what you actually invested in {year}"):
         key=f"contrib_{active.key}_{year}",
         column_config={
             "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
-            "amount": st.column_config.NumberColumn("Amount (₹)", required=True),
+            "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
             "notes": "Notes",
         },
     )
@@ -212,4 +144,4 @@ with edit_card(f"Record what you actually invested in {year}"):
         except Exception as exc:
             st.error(f"Not saved: {exc}")
 
-st.caption(f"The emergency-fund goal above is derived from your budget ({EMERGENCY_FUND_MONTHS} months of needs + wants); what you actually hold is entered in the expander above.")
+st.caption(f"The emergency-fund goal above is derived from your budget ({EMERGENCY_FUND_MONTHS} months of the needs bucket); what you actually hold is entered in the expander above.")

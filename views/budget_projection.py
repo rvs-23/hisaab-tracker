@@ -5,13 +5,15 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import compute
+import storage
 from config import (
     DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT, PROFILE_BASE_SPLITS,
     PROFILE_INCREMENT_SPLITS,
 )
 from ui import (
     FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
-    html_table, inr_short, load_all, metric_tile, page_header, section, style_fig,
+    html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
+    resync, section, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -36,8 +38,8 @@ st.caption(
 st.markdown(
     f"<div style='border-left:3px solid {NEEDS};background:var(--strip-bg);border-radius:4px;"
     f"padding:.5rem .8rem;color:var(--muted);font-size:{FS_BODY};margin:.2rem 0 .4rem'>"
-    "Nothing to fill here — these figures are <b>derived</b>. To change them, edit "
-    "<b>Income</b>.</div>",
+    "These figures are <b>derived</b> — to change them, edit <b>Income</b>. The one "
+    "thing to set here is your <b>target allocation</b> below.</div>",
     unsafe_allow_html=True,
 )
 
@@ -104,6 +106,77 @@ if not row.empty:
                 help="The plan's monthly investment. 'Adjusted' spreads the past "
                      "shortfall plus what's left of this year's goal over the months "
                      "remaining, so following it makes you fully on track by December.")
+
+# Target allocation lives here (moved from Actuals, 2026-07-20): right under
+# the monthly split, so how each monthly goal is consumed per instrument reads
+# top-down. The active mix is read-only; the editor sits in the expander.
+budget_row = bs[bs["year"] == year]
+investment = float(budget_row.iloc[0]["investment"]) if not budget_row.empty else 0.0
+target = compute.resolve_target(active, d.targets, year)
+
+section(f"Target allocation · how the monthly goal is consumed")
+active_mix = pd.DataFrame({"category": list(target.keys()), "pct": list(target.values())})
+active_mix = active_mix.sort_values("pct", ascending=False)
+active_mix["per_year"] = active_mix["pct"] / 100 * investment
+active_mix["per_month"] = active_mix["per_year"] / 12
+html_table(
+    active_mix,
+    {"category": "Instrument", "pct": "Target %", "per_month": "₹ / month", "per_year": "₹ / year"},
+    formats={"category": pretty_category, "pct": lambda v: f"{v:.0f}%",
+             "per_year": inr_short, "per_month": inr_short},
+)
+
+with st.expander("Edit allocation"):
+    st.caption("Set the % per instrument (must sum to 100). The ₹/year and ₹/month follow from that year's investment.")
+
+    def derive_alloc(df):  # recompute the ₹ columns from the % column
+        out = df.copy()
+        out["per_year"] = out["pct"] / 100 * investment
+        out["per_month"] = out["per_year"] / 12
+        return out
+
+    abase = f"alloc_{active.key}_{year}"
+    agkey, avkey = f"{abase}__grid", f"{abase}__ver"
+    if agkey not in st.session_state:
+        g = pd.DataFrame({"category": d.config.categories})
+        g["label"] = g["category"].map(pretty_category)
+        g["pct"] = [target.get(c, 0.0) for c in d.config.categories]
+        st.session_state[agkey] = derive_alloc(g[["label", "pct"]].assign(per_year=0.0, per_month=0.0))
+        st.session_state[avkey] = 0
+
+    alloc_edited = st.data_editor(
+        st.session_state[agkey], hide_index=True, width="stretch",
+        key=f"{abase}__{st.session_state[avkey]}",
+        column_config={
+            "label": st.column_config.TextColumn("Instrument", disabled=True),
+            "pct": st.column_config.NumberColumn("Target %", min_value=0, max_value=100, required=True),
+            "per_year": st.column_config.NumberColumn("₹ / year", disabled=True, format="localized"),
+            "per_month": st.column_config.NumberColumn("₹ / month", disabled=True, format="localized"),
+        },
+    )
+    resync(agkey, avkey, derive_alloc(alloc_edited), ["per_year", "per_month"])
+    total_pct = alloc_edited["pct"].sum()
+    ok = abs(total_pct - 100) < 0.01
+    msg = f"Total <b>{total_pct:.0f}%</b>" + ("  ·  ready to save" if ok else "  ·  must sum to 100")
+    st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
+                unsafe_allow_html=True)
+
+    if st.button(f"Save {year}", key=f"save_alloc_{active.key}_{year}",
+                 type="primary", disabled=not ok):
+        rows = pd.DataFrame({"profile": active.key, "year": year,
+                             "category": d.config.categories, "pct": alloc_edited["pct"].values})
+        rows = rows[rows["pct"] > 0]
+        others = d.targets[~((d.targets["profile"] == active.key) & (d.targets["year"] == year))]
+        merged = pd.concat([others, rows], ignore_index=True)
+        try:
+            storage.validate_targets(merged, d.config, d.profiles)
+            storage.save_targets(d.root, merged)
+            del st.session_state[agkey]
+            st.success("Saved.")
+            st.rerun()
+        except Exception as exc:
+            st.error(f"Not saved: {exc}")
+    st.caption("A saved year carries forward until you set a newer one.")
 
 # Then the slice shifting over the actual years (100% stacked), with the
 # investment segment labelled with both its % and the raw yearly rupees.
