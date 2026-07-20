@@ -81,17 +81,31 @@ and the **secondary accent means "what was planned"**.
 
 A calculator on its own page — nothing you enter here is saved. Inputs sit
 in four groups: the house, the loan, renting (just its cost), and investing
-(what a renter does with the money buying would have consumed). The first
-chart is **money wasted** — registration, loan *interest* (never principal)
-and maintenance for buying, the rent itself for renting. The second is the
-verdict in one line: the buyer's assets minus the renter's, year by year —
-above zero, buying has you ahead; a dashed twin shows the same verdict
-against a renter who leaves the difference as cash, and the gap between the
-two lines is what investing the difference is worth. An affordability chart
-shows when this house's price crosses what your income can carry (EMI capped
-at half your monthly income), and "The bottom line" says it plainly against
-your own numbers. The investment-return input defaults to the same single
-expected return the dashboard uses.
+(what a renter does with the money buying would have consumed), plus a
+horizon and an inflation rate.
+
+**Money wasted** is the first chart: registration, loan *interest* (never
+principal) and maintenance for buying; the rent itself for renting; and a
+dashed third line for a renter who leaves the spare money idle and gives up
+the growth — the gap between those two is what the investing is worth. Switch
+between the running total and each year on its own; year 1 towers because it
+carries registration and the heaviest interest. The table below it shows how
+each EMI splits between interest and principal, year by year.
+
+**What you can afford** sizes the EMI from your budget's *wants + investment*
+— needs are committed spending, so a house is paid for by giving up
+discretionary spend and investing less. It's deliberately conservative: your
+rent sits inside needs, so buying frees up money this doesn't credit you with.
+
+**When to buy** prices every year in the horizon the same way — rent until you
+buy, then registration, every rupee of the loan's interest, and maintenance
+for the whole tenure, all discounted to today's money. Waiting costs rent and
+a pricier house but grows your corpus into a bigger down payment and a smaller
+loan, so the cheapest year is usually neither the first nor the last. Bars are
+greyed unless *both* tests pass: enough cash for registration and the down
+payment, and an EMI your budget can service.
+
+None of it counts what you end up owning — it compares waste, not wealth.
 
 ## What to do, and when
 

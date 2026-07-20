@@ -2,8 +2,10 @@
 
 A local Streamlit app for two people that replaces a finance-tracking Excel.
 It answers one question — *did we invest what the plan said this year?* — so it
-tracks **contributions vs goal**, never net worth. Income drives a derived
-budget, a target allocation, and a planned-vs-actual comparison.
+tracks **contributions vs goal**. Income drives a derived budget, a target
+allocation, and a planned-vs-actual comparison. Balances are never entered;
+where a portfolio value appears it is *estimated* from those contributions and
+the expected returns, and labelled as such.
 
 New here? **[docs/how-it-works.md](docs/how-it-works.md)** is the 5-minute,
 no-jargon guide.
@@ -36,7 +38,8 @@ row, riding the same validation and audit log as every other save.
 
 Every save **validates first** (numeric, non-negative — except income's
 *other*, which may be negative — known categories/profiles, no duplicates, %s
-sum to 100) and refuses bad input with a message. Every accepted save appends
+sum to 100) and refuses bad input with a message. CSVs are replaced atomically (temp file + `os.replace`), so an
+interrupted write can't leave a half-written file. Every accepted save appends
 one JSON line to **`changes.jsonl`** — an append-only audit log of exactly
 which rows were added and removed.
 
@@ -73,13 +76,26 @@ The two write pages:
 
 **Rent vs buy** is a calculator, not a save — stateless, nothing written to
 disk. Inputs sit in four bordered groups (the house / the loan / renting /
-investing) under a locked start-year. It shows **money wasted** (registration
-+ loan interest + maintenance vs the rent itself), then the verdict as one
-line — buyer's assets minus renter's assets, with a dashed twin against a
-renter who never invests the difference — plus an affordability chart (EMI
-capped at `AFFORD_EMI_CAP_PCT` of income) and a plain-sentence bottom line
-against your own income and net worth. The invest-return input defaults to
-the household expected return.
+investing) under a locked start-year, a horizon, and an inflation rate. Three
+sections follow:
+
+- **Money wasted** — cash that buys nothing lasting: registration + loan
+  interest + maintenance for buying, the rent itself for renting, and a third
+  line for a renter who leaves the difference idle and forfeits the growth.
+  Principal and a renter's own savings are never waste. Cumulative or per-year,
+  with a year-by-year table showing the EMI's interest/principal split.
+- **What you can afford** — the EMI sized from your budget's *wants +
+  investment* (needs are committed spending), at a configurable share
+  (`EMI_SHARE_OF_WANTS_INVESTMENT_PCT`, default 70%), back-solved to a loan and
+  a house price capped by whichever binds: that EMI or your cash.
+- **When to buy** — every year in the horizon priced end to end (rent while
+  waiting, then registration, the loan's *full* interest, and maintenance for
+  the tenure), discounted to today's rupees. A year counts as affordable only
+  if the cash covers registration + the down payment *and* the EMI fits the
+  budget. The starting corpus defaults to your estimated portfolio less the
+  emergency fund, and can be overridden or excluded.
+
+The invest-return input defaults to the household expected return.
 
 ## The numbers
 
