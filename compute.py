@@ -734,34 +734,57 @@ def max_loan_for_emi(monthly_emi_budget: float, annual_rate_pct: float,
 
 
 def affordability_series(monthly_income: float, income_growth_pct: float, price: float,
-                         appreciation_pct: float, down_pct: float, loan_rate_pct: float,
-                         tenure_years: int, horizon_years: int,
-                         emi_cap_pct: float) -> pd.DataFrame:
-    """When does this house become affordable — and what house is, each year?
+                         appreciation_pct: float, down_pct: float, registration_pct: float,
+                         loan_rate_pct: float, tenure_years: int, horizon_years: int,
+                         emi_cap_pct: float, starting_corpus: float = 0.0,
+                         monthly_investment: float = 0.0,
+                         invest_return_pct: float = 0.0) -> pd.DataFrame:
+    """When does this house become affordable — and what constraint is binding?
 
-    "Affordable" means the EMI stays at or under ``emi_cap_pct`` of that
-    year's monthly income. Income grows at ``income_growth_pct``; the house
-    appreciates at ``appreciation_pct``. The affordable price assumes the
-    down payment itself is available (it only inverts the EMI constraint).
-    Note the built-in honesty: if income and the house grow at the same rate,
-    the two curves stay parallel forever — affordability then never changes.
+    Two ceilings, each year — the true affordable price is the lower of them:
+
+      - **Income-limited**: the priciest house whose EMI stays at or under
+        ``emi_cap_pct`` of that year's monthly income (income grows at
+        ``income_growth_pct``), grossed up by the financed share.
+      - **Cash-limited**: the priciest house whose down payment + registration
+        your investable corpus can cover. The corpus starts at
+        ``starting_corpus``, grows at ``invest_return_pct``, and takes a yearly
+        ``monthly_investment`` top-up (itself growing with income).
+
+    The binding constraint typically flips: early on you're cash-constrained
+    (can't save the down payment fast enough); once the corpus outgrows the
+    down-payment need, income becomes the ceiling. With ``starting_corpus`` and
+    ``monthly_investment`` both zero the cash line is zero and income never
+    binds — pass the person's real numbers for a meaningful answer.
 
     Returns:
         One row per year offset 0..horizon: ``year_offset``, ``house_price``
-        (this house, appreciated), ``affordable_price`` (the priciest house
-        the EMI cap allows that year).
+        (this house, appreciated), ``income_limited_price``,
+        ``cash_limited_price``, ``affordable_price`` (the min of the two), and
+        ``binding`` ("cash" or "income").
     """
+    financed_share = 1 - down_pct / 100
+    upfront_share = (down_pct + registration_pct) / 100  # down + stamp duty, from corpus
+    corpus = starting_corpus
+    annual_topup = monthly_investment * 12
     rows = []
     for t in range(0, horizon_years + 1):
+        if t > 0:
+            corpus = corpus * (1 + invest_return_pct / 100) + annual_topup
+            annual_topup *= (1 + income_growth_pct / 100)  # the SIP grows with income
         income_t = monthly_income * (1 + income_growth_pct / 100) ** t
         emi_budget = income_t * emi_cap_pct / 100
         loan = max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
-        financed_share = 1 - down_pct / 100
-        affordable = loan / financed_share if financed_share > 0 else float("inf")
+        income_price = loan / financed_share if financed_share > 0 else float("inf")
+        cash_price = corpus / upfront_share if upfront_share > 0 else float("inf")
+        affordable = min(income_price, cash_price)
         rows.append({
             "year_offset": t,
             "house_price": price * (1 + appreciation_pct / 100) ** t,
+            "income_limited_price": income_price,
+            "cash_limited_price": cash_price,
             "affordable_price": affordable,
+            "binding": "cash" if cash_price < income_price else "income",
         })
     return pd.DataFrame(rows)
 

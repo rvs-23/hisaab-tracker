@@ -16,8 +16,8 @@ import streamlit as st
 import compute
 from config import AFFORD_EMI_CAP_PCT
 from ui import (
-    FS_BODY, MARKER, accent_primary, accent_secondary, chart_title, inr_axis,
-    inr_short, load_all, metric_tile, page_header, section, style_fig,
+    COST_LINE, FS_BODY, MARKER, accent_primary, accent_secondary, chart_title,
+    inr_axis, inr_short, load_all, metric_tile, page_header, section, style_fig,
 )
 
 d = load_all()
@@ -168,19 +168,28 @@ metric_tile(cols[3], "Ahead at horizon", "Buying" if adv_end >= 0 else "Renting"
             help="The verdict line's last point: whose assets are larger at the horizon, "
                  "and by how much.")
 
-# 3. When can you afford it? Income grows at the same rate the house
-# appreciates (the user's stated assumption), EMI capped per config.
+# 3. When can you afford it? The affordable price is min(cash, income): early
+# you're cash-limited (can't fund the down payment), later income-limited (EMI
+# capped). Corpus = investable net worth (excl. emergency fund) growing at the
+# invest-return, topped up monthly; income grows at the appreciation rate.
 chart_title(
-    f"When can you afford it? (EMI ≤ {AFFORD_EMI_CAP_PCT}% of income)",
-    help=f"The affordable price is the priciest house whose EMI stays at or under "
-         f"{AFFORD_EMI_CAP_PCT}% of that year's monthly income, with income growing at the "
-         "same rate as the house appreciates.",
+    "When can you afford it?",
+    help=f"Two ceilings, whichever is lower: how much house your corpus can put "
+         f"down (down payment + registration), and how much your income can "
+         f"service (EMI ≤ {AFFORD_EMI_CAP_PCT}% of monthly income). Corpus is your "
+         "investable net worth growing at the investment return, topped up by "
+         "your monthly investment; income grows at the appreciation rate.",
 )
+cur_row = bs[bs["year"] == today_year]
+monthly_investment = float(cur_row.iloc[0]["monthly_investment"]) if not cur_row.empty else 0.0
+investable = max(0.0, nw_potential - (ef_held or 0.0))  # emergency fund stays reserved
 if monthly_income > 0:
     aff = compute.affordability_series(
         monthly_income=monthly_income, income_growth_pct=appreciation_pct, price=price,
-        appreciation_pct=appreciation_pct, down_pct=down_pct, loan_rate_pct=loan_rate_pct,
-        tenure_years=tenure_years, horizon_years=horizon_years, emi_cap_pct=AFFORD_EMI_CAP_PCT,
+        appreciation_pct=appreciation_pct, down_pct=down_pct, registration_pct=registration_pct,
+        loan_rate_pct=loan_rate_pct, tenure_years=tenure_years, horizon_years=horizon_years,
+        emi_cap_pct=AFFORD_EMI_CAP_PCT, starting_corpus=investable,
+        monthly_investment=monthly_investment, invest_return_pct=invest_return_pct,
     )
     ax = (today_year + aff["year_offset"]).astype(str)
     f2 = go.Figure()
@@ -188,20 +197,32 @@ if monthly_income > 0:
                             line=dict(color=SECONDARY, width=3)))
     f2.add_trace(go.Scatter(x=ax, y=aff["affordable_price"], name="You can afford", mode="lines+markers",
                             line=dict(color=PRIMARY, width=3)))
+    f2.add_trace(go.Scatter(x=ax, y=aff["cash_limited_price"], name="Cash ceiling (down payment)",
+                            mode="lines", line=dict(color=COST_LINE, width=1.5, dash="dot")))
+    f2.add_trace(go.Scatter(x=ax, y=aff["income_limited_price"], name="Income ceiling (EMI)",
+                            mode="lines", line=dict(color=MARKER, width=1.5, dash="dash")))
     f2.update_layout(xaxis=dict(type="category"))
     inr_axis(f2, max(aff["house_price"].max(), aff["affordable_price"].max()))
-    style_fig(f2, height=320)
+    style_fig(f2, height=340)
     st.plotly_chart(f2, width="stretch", config={"displayModeBar": False})
-    affordable_now = aff.iloc[0]["affordable_price"] >= aff.iloc[0]["house_price"]
+
     crossing = aff[aff["affordable_price"] >= aff["house_price"]]
-    if affordable_now:
-        afford_caption = f"Affordable today: your EMI cap already covers this house."
+    if aff.iloc[0]["affordable_price"] >= aff.iloc[0]["house_price"]:
+        afford_caption = "Affordable today — both ceilings clear this house."
     elif not crossing.empty:
         afford_caption = f"You cross into affordability in {today_year + int(crossing.iloc[0]['year_offset'])}."
     else:
-        afford_caption = ("Never crosses in this horizon — with income growing at the same rate the house "
-                          "appreciates, the gap stays constant; affordability only improves if raises outpace the property market.")
-    st.caption(afford_caption + f" Today you can afford about {inr_short(aff.iloc[0]['affordable_price'])}.")
+        afford_caption = ("Never crosses in this horizon — income growing at the appreciation rate "
+                          "keeps the gap open; only raises that outpace the property market close it.")
+    # Name the binding constraint today and the year it flips (cash → income).
+    binding_now = aff.iloc[0]["binding"]
+    flip = aff[aff["binding"] != binding_now]
+    afford_caption += (f" Right now you're **{binding_now}-limited** "
+                       f"({'saving the down payment' if binding_now == 'cash' else 'servicing the EMI'} is the bottleneck)")
+    if not flip.empty:
+        afford_caption += f", flipping to {flip.iloc[0]['binding']}-limited in {today_year + int(flip.iloc[0]['year_offset'])}"
+    afford_caption += f". Today you can afford about {inr_short(aff.iloc[0]['affordable_price'])}."
+    st.caption(afford_caption)
 else:
     st.caption("Add income to see affordability.")
 

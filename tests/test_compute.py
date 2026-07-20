@@ -647,22 +647,50 @@ def test_adjusted_waste_columns_are_identities():
     assert (df["renter_gain"] >= 0).all()  # positive-return growth never negative here
 
 
-def test_affordability_parallel_when_growth_matches_appreciation():
-    """Same growth rate on both sides → the affordability ratio never moves."""
+def test_income_limited_parallel_when_growth_matches_appreciation():
+    """The income ceiling scales with income; when income and the house grow at
+    the same rate their ratio never moves (independent of the corpus)."""
     df = compute.affordability_series(monthly_income=200000, income_growth_pct=5, price=15_000_000,
-                                      appreciation_pct=5, down_pct=20, loan_rate_pct=8.5,
-                                      tenure_years=20, horizon_years=10, emi_cap_pct=50)
-    ratio = df["affordable_price"] / df["house_price"]
+                                      appreciation_pct=5, down_pct=20, registration_pct=7,
+                                      loan_rate_pct=8.5, tenure_years=20, horizon_years=10,
+                                      emi_cap_pct=50, starting_corpus=10_00_00_000)
+    ratio = df["income_limited_price"] / df["house_price"]
     assert ratio.std() == pytest.approx(0, abs=1e-9)
 
 
 def test_affordability_crosses_when_income_outpaces_house():
+    """With a huge corpus, income binds; income outpacing the house closes the gap."""
     df = compute.affordability_series(monthly_income=150000, income_growth_pct=10, price=20_000_000,
-                                      appreciation_pct=3, down_pct=20, loan_rate_pct=8.5,
-                                      tenure_years=20, horizon_years=25, emi_cap_pct=50)
+                                      appreciation_pct=3, down_pct=20, registration_pct=7,
+                                      loan_rate_pct=8.5, tenure_years=20, horizon_years=25,
+                                      emi_cap_pct=50, starting_corpus=10_00_00_000)
     behind = df.iloc[0]["affordable_price"] < df.iloc[0]["house_price"]
     ahead_later = (df["affordable_price"] >= df["house_price"]).any()
     assert behind and ahead_later
+
+
+def test_binding_constraint_flips_cash_to_income():
+    """A modest corpus that compounds fast: cash-constrained early (can't fund
+    the down payment), income-constrained once the corpus outgrows it."""
+    df = compute.affordability_series(monthly_income=500000, income_growth_pct=6, price=15_000_000,
+                                      appreciation_pct=6, down_pct=50, registration_pct=7,
+                                      loan_rate_pct=8.5, tenure_years=20, horizon_years=15,
+                                      emi_cap_pct=50, starting_corpus=500000,
+                                      monthly_investment=200000, invest_return_pct=14)
+    assert df.iloc[0]["binding"] == "cash"
+    assert df.iloc[-1]["binding"] == "income"
+    # affordable is always the smaller of the two ceilings
+    assert (df["affordable_price"] == df[["income_limited_price", "cash_limited_price"]].min(axis=1)).all()
+
+
+def test_affordability_zero_corpus_is_cash_locked():
+    """No corpus and no top-up → cash ceiling is zero, so nothing is affordable."""
+    df = compute.affordability_series(monthly_income=300000, income_growth_pct=5, price=10_000_000,
+                                      appreciation_pct=5, down_pct=20, registration_pct=7,
+                                      loan_rate_pct=8.5, tenure_years=20, horizon_years=10,
+                                      emi_cap_pct=50)
+    assert (df["affordable_price"] == 0).all()
+    assert (df["binding"] == "cash").all()
 
 
 def test_corpus_growth_honours_flat_return(rv):
