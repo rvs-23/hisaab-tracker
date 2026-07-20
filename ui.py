@@ -213,8 +213,17 @@ def inject_theme() -> None:
         f".ht th:first-child,.ht td:first-child{{text-align:left}}"
         f".ht tr.cur td{{background:var(--strip-bg);font-weight:600}}"
         f".ht tr.proj td{{color:var(--muted);font-style:italic}}"
-        # slimmer sidebar
-        f"section[data-testid='stSidebar']{{width:212px!important;min-width:212px!important}}"
+        # metric tiles: one shared class so a row of tiles reads as one clean
+        # header — uniform min-height regardless of how many sub-lines each has
+        f".tile{{border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;"
+        f"background:var(--card-bg);height:100%;min-height:8.6rem;display:flex;flex-direction:column}}"
+        f".tile .lbl{{font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;"
+        f"letter-spacing:.05em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}"
+        f".tile .val{{font-weight:700;margin-top:3px;line-height:1.1}}"
+        f".tile .sub{{font-size:{FS_CAPTION};color:var(--muted);margin-top:3px}}"
+        # slimmer sidebar — only while expanded, so collapsing actually
+        # returns the width to the main area
+        f"section[data-testid='stSidebar'][aria-expanded='true']{{width:212px!important;min-width:212px!important}}"
         # bigger brand: st.logo caps the height; let it grow (stacked logo fits the slim rail)
         f"[data-testid='stLogo'],[data-testid='stSidebarLogo']{{height:3rem!important;width:auto!important}}"
         f"</style>",
@@ -239,11 +248,10 @@ def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = 
     size = FS_HERO if big else FS_VALUE
     info = info_icon(help) if help else ""
     col.markdown(
-        f"<div style='border:1px solid var(--card-border);border-radius:12px;padding:14px 16px;"
-        f"background:var(--card-bg);height:100%'>"
-        f"<div style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>{label}{info}</div>"
-        f"<div style='font-size:{size};font-weight:700;color:{color or 'var(--text)'};margin-top:3px;line-height:1.1'>{value}</div>"
-        f"<div style='font-size:{FS_CAPTION};color:var(--muted);margin-top:3px'>{sub}</div></div>",
+        f"<div class='tile'>"
+        f"<div class='lbl'>{label}{info}</div>"
+        f"<div class='val' style='font-size:{size};color:{color or 'var(--text)'}'>{value}</div>"
+        f"<div class='sub'>{sub}</div></div>",
         unsafe_allow_html=True,
     )
 

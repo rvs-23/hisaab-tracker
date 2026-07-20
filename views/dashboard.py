@@ -55,7 +55,7 @@ if opening > 0:
     invested_help += f" Includes {inr_short(opening)} invested before tracking."
 metric_tile(c[1], "Invested till date", inr_short(invested), year_range, big=True,
             help=invested_help)
-metric_tile(c[2], "Estimated value today", inr_short(nw_potential), f"as of {today_year}",
+metric_tile(c[2], "Est. value today", inr_short(nw_potential), f"as of {today_year}",
             color=PRIMARY, big=True,
             help=f"What your contributions across {year_range} could be worth today, "
                  "compounded at conservative per-category returns, plus your emergency "
