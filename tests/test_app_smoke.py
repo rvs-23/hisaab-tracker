@@ -124,3 +124,19 @@ def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     assert not at.exception, at.exception
     assert "No changes to save" in " ".join(m.value for m in at.warning)
     assert "Saved" not in " ".join(s.value for s in at.success)
+
+
+def test_rent_vs_buy_timing_compares_against_an_affordable_year(fake_data_dir):
+    """When the corpus can't fund a purchase today, the verdict must say so
+    rather than claim a later year is 'cheaper than buying today' — that
+    comparison is against something the person cannot do (and read as a
+    negative saving)."""
+    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
+    at.query_params["profile"] = "rv"
+    at.run()
+    assert not at.exception, at.exception
+    captions = " ".join(c.value for c in at.caption)
+    assert "You can't buy this house yet" in captions
+    # The baseline it compares against must be a year the corpus can fund —
+    # never "buying today" when today is out of reach.
+    assert "buying today" not in captions

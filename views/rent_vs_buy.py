@@ -319,8 +319,11 @@ f2.add_trace(go.Bar(
 ))
 if not feasible.empty:
     best = timing.loc[feasible["total_wasted"].idxmin()]
+    # "Cheapest" alone misleads when the early bars are unaffordable: the pick is
+    # only the best of the years you can actually transact in.
+    pick = "cheapest you can afford" if not timing["feasible"].all() else "cheapest"
     f2.add_annotation(x=str(today_year + int(best["wait_years"])), y=float(best["total_wasted"]),
-                      text=f"cheapest: {inr_short(best['total_wasted'])} wasted",
+                      text=f"{pick}: {inr_short(best['total_wasted'])} wasted",
                       showarrow=True, arrowhead=0, ay=-32, font=dict(color=PRIMARY, size=12))
 inr_axis(f2, timing["total_wasted"].max() * 1.15, min_step=1_00_00_000)
 style_fig(f2, height=380)
@@ -340,37 +343,63 @@ if feasible.empty:
 elif investable <= 0:
     st.caption("Record your savings on Actuals to price the waiting years against your own corpus.")
 else:
+    # Compare like with like: the baseline is the earliest year you could
+    # actually buy, not year 0. When the corpus can't fund today's purchase,
+    # "cheaper than buying today" is a comparison against something you can't do.
+    baseline = timing[timing["feasible"]].iloc[0]
+    baseline_year = today_year + int(baseline["wait_years"])
     best_year = today_year + int(best["wait_years"])
-    now_row = timing.iloc[0]
-    saving = float(now_row["total_wasted"] - best["total_wasted"])
-    if int(best["wait_years"]) == 0:
+    gap = float(baseline["total_wasted"] - best["total_wasted"])
+
+    if not bool(timing.iloc[0]["feasible"]):
         st.caption(
-            f"**Buy now.** Every year of waiting costs more in rent and appreciation "
-            f"than your corpus gains — by {today_year + 1} the same house is "
-            f"{inr_short(timing.iloc[1]['price_then'])} and total waste rises "
-            f"{inr_short(float(timing.iloc[1]['total_wasted'] - now_row['total_wasted']))}."
+            f"**You can't buy this house yet** — {inr_short(investable)} invested doesn't "
+            f"cover {inr_short(registration_cost)} registration plus the "
+            f"{inr_short(down_payment)} minimum down payment. {baseline_year} is the first "
+            f"year your corpus gets there."
+        )
+
+    if best_year == baseline_year:
+        st.caption(
+            f"**Buy as soon as you can — {best_year}.** Every year you wait after that "
+            f"adds more in rent and appreciation than your corpus gains: waiting one "
+            f"more year wastes {inr_short(float(timing.iloc[int(best['wait_years']) + 1]['total_wasted'] - best['total_wasted']))} extra."
+            if int(best["wait_years"]) + 1 < len(timing) else
+            f"**Buy as soon as you can — {best_year}.**"
         )
     else:
+        loan_verb = "falls to" if best["loan"] < baseline["loan"] else "rises to"
         st.caption(
-            f"**{best_year} is the cheapest year to buy** — {inr_short(best['total_wasted'])} "
-            f"wasted against {inr_short(now_row['total_wasted'])} buying today, a "
-            f"{inr_short(saving)} difference. By then the house is "
-            f"{inr_short(best['price_then'])} and your corpus {inr_short(best['corpus'])}, "
-            f"so the loan drops to {inr_short(best['loan'])} "
-            f"(from {inr_short(now_row['loan'])} today) — less interest is what pays for "
-            f"the {inr_short(best['rent_paid'])} of rent along the way."
+            f"**{best_year} wastes the least — {inr_short(best['total_wasted'])}**, "
+            f"{inr_short(gap)} less than buying in {baseline_year} "
+            f"({inr_short(baseline['total_wasted'])}). By {best_year} the house costs "
+            f"{inr_short(best['price_then'])} and your corpus is {inr_short(best['corpus'])}, "
+            f"so the loan {loan_verb} {inr_short(best['loan'])} — the interest saved is what "
+            f"pays for the {inr_short(best['rent_paid'])} of rent in the meantime."
         )
-    if not timing["feasible"].all():
-        first = int(timing["feasible"].idxmax())
-        st.caption(f"Greyed years are out of reach — the corpus first covers registration "
-                   f"plus the minimum down payment in {today_year + first}.")
+    st.caption(
+        "Each bar is one decision priced end to end: rent until you buy, then "
+        "registration, every rupee of the loan's interest, and maintenance for the "
+        "whole tenure. Greyed bars are years your corpus can't fund."
+        if not timing["feasible"].all() else
+        "Each bar is one decision priced end to end: rent until you buy, then "
+        "registration, every rupee of the loan's interest, and maintenance for the "
+        "whole tenure."
+    )
 
 st.markdown(
-    f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats: this compares "
-    "waste, not wealth — the buyer also ends up owning a house, which this chart "
-    "deliberately ignores. Assumes a ready-to-move-in property: rent stops the day you "
-    "buy, with no construction gap or pre-EMI. Interest follows a real monthly "
-    "amortization; maintenance, rent and returns compound yearly. No tax breaks modelled "
-    "(Section 24/80C, HRA), and no selling or brokerage costs.</div>",
+    f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats. "
+    "<b>Waste, not wealth</b> — the buyer ends up owning a house and the renter a "
+    "portfolio; neither asset is counted here, so a low bar is not the same as being "
+    "better off. <b>When to buy assumes the whole corpus goes into the house</b> "
+    "(everything except your emergency fund), which minimises interest but leaves you "
+    "illiquid — in practice you'd keep some back, which pushes the cheapest year later. "
+    "<b>Affordability is deliberately conservative</b>: rent lives in your needs bucket, "
+    "so buying frees up money the envelope doesn't credit you with. "
+    "<b>Ready-to-move-in</b> — rent stops the day you buy, no construction gap or "
+    "pre-EMI. Interest follows a real monthly amortization; maintenance, rent and "
+    "returns compound yearly. No tax breaks modelled (Section 24/80C, HRA), no selling "
+    "or brokerage costs, and the verdict is only as good as the appreciation and return "
+    "you assume.</div>",
     unsafe_allow_html=True,
 )
