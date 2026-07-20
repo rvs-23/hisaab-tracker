@@ -28,7 +28,11 @@ committed), re-read from disk on every refresh. The minimum is `config.yaml`
 (`categories`) plus one `profiles/<key>.yaml` per person (`name, birth_year,
 forward_increment_pct, default_target`; the filename stem is the profile key);
 the history CSVs appear as you save. Scaffold a fresh folder with
-`uv run python scripts/init_data_dir.py <path>`.
+`uv run python scripts/init_data_dir.py <path>`. Zerodha users can skip
+re-typing equity/MF contributions by hand with
+`uv run python scripts/import_tradebook.py <tradebook.csv> --profile <key> --year <year>`
+— it collapses a year's tradebook into one net (buys − sells) contribution
+row, riding the same validation and audit log as every other save.
 
 Every save **validates first** (numeric, non-negative — except income's
 *other*, which may be negative — known categories/profiles, no duplicates, %s
@@ -66,6 +70,13 @@ The two write pages:
   ₹/month live) sits in an expander. A saved year carries forward until
   replaced. Saves never touch other people, other years, or the other file.
 
+**Rent vs buy** is a calculator, not a save — stateless, nothing written to
+disk. It frames the decision as **money wasted** (registration + loan
+interest + maintenance for buying, the rent itself for renting) rather than
+net worth, defaults its invest-return input to your own allocation-weighted
+expected return, and closes with an honest "assumptions dominate this"
+caveat on the fuller net-position view.
+
 ## The numbers
 
 - **Budget** is derived, never stored: the first earning year splits income
@@ -87,13 +98,18 @@ The two write pages:
 - **Catch-up** = the lump sum, invested today, that erases every *past* year's
   shortfall (grown at expected returns; the current year's gap is "left to go",
   not catch-up; overshooting is fine).
+- **Health nudges** on the Dashboard quietly flag things worth a look — no
+  current-year income entered, investing badly behind pace, an unrecorded
+  emergency fund, or an actual mix that's drifted from target — and say
+  nothing at all when everything's healthy.
 
 ## Layout
 
 Flat: `app.py` (entry) · `config.py` (palette + model constants) · `models.py`
 (pydantic YAML schemas) · `storage.py` (CSV/YAML I/O + validation) · `audit.py`
 (save log) · `compute.py` (pure financial model) · `ui.py` (Streamlit helpers)
-· `views/` (the four pages) · `tests/` (golden + headless render tests).
+· `views/` (the five pages) · `scripts/` (data-dir scaffold + the Zerodha
+tradebook importer) · `tests/` (golden + headless render tests).
 
 ## Non-goals
 

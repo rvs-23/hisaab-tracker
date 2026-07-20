@@ -63,7 +63,11 @@ Top to bottom:
    plan, this is the lump sum that, invested today, pulls you level. Zero (a
    calm note) means you're on plan. Investing *more* than planned is always
    fine.
-6. **Adjustments** — a small expander at the very bottom for **opening
+6. **Health** — quiet, muted-caption nudges that only appear when something
+   needs attention: no income entered yet this year, investing badly behind
+   pace, an emergency fund you've never recorded, or an actual mix that's
+   drifted from target. Nothing shows at all once everything's healthy.
+7. **Adjustments** — a small expander at the very bottom for **opening
    corpus**: money you'd already invested before you started tracking here
    (say, ₹20L before 2024). Set it once; it's audited like every other save.
    It's assumed invested at the start of your first tracked year and grown at
@@ -74,6 +78,18 @@ Top to bottom:
 
 Everywhere in the app, the **primary accent means "what actually happened"**
 and the **secondary accent means "what was planned"**.
+
+## Rent vs buy
+
+A calculator on its own page — nothing you enter here is saved. It frames
+the decision the same way as everywhere else in the app: what's *wasted*,
+not what you're worth. Buying wastes registration/stamp duty (once), loan
+**interest** (never the principal — that's equity), and maintenance; renting
+wastes the rent itself, inflating every year. The chart leads with that
+cumulative waste, buying vs renting; a "Net position" expander below gives
+the fuller picture (equity/portfolio built minus waste) with an honest note
+that the assumptions — appreciation, investment return, rent inflation —
+drive that number far more than the waste comparison above.
 
 ## What to do, and when
 
@@ -86,6 +102,9 @@ and the **secondary accent means "what was planned"**.
 - **Once a year:** check the target allocation on **Actuals** still reflects
   where you want money to go; glance at **Budget** (nothing to fill — it's
   derived).
+- **Zerodha for equities/MFs?** `scripts/import_tradebook.py` turns a year's
+  tradebook export into one net contribution row instead of typing it in by
+  hand — see the README for the command.
 
 ## Things that surprise people
 
