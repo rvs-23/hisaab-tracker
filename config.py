@@ -12,8 +12,8 @@ from here rather than hard-coding values.
 INK = "#2b2b2b"
 GRAPHITE = "#334155"  # rv primary — dark gunmetal (the "platinum" scheme)
 STEEL = "#64748B"  # rv secondary — lighter steel, so planned recedes
-ROSE = "#DB2777"  # cheeni primary
-RASPBERRY = "#9D174D"  # cheeni secondary — deep raspberry, same pink family
+ORCHID = "#C026D3"  # cheeni primary — vivid orchid (toward the requested #FA9EFF, AA-readable)
+MAGENTA = "#86198F"  # cheeni secondary — deep magenta, same orchid family
 MUTED = "#697077"  # ≈5:1 on white — the old #7c828c failed WCAG AA at small sizes
 CARD_BG = "#ffffff"
 CARD_BORDER = "#e7eaee"
@@ -33,10 +33,10 @@ FONT = "Inter"
 # both light and dark backgrounds *and* to pass WCAG AA (≥4.5:1) as small text
 # on white; the shared grays stay the neutral base.
 #   rv     → platinum monochrome (graphite + steel)
-#   cheeni → pink family (rose + raspberry)
+#   cheeni → orchid family (orchid + deep magenta)
 PROFILE_ACCENTS = {
     "rv": (GRAPHITE, STEEL),
-    "cheeni": (ROSE, RASPBERRY),
+    "cheeni": (ORCHID, MAGENTA),
 }
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 

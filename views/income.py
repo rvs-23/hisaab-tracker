@@ -67,6 +67,21 @@ def saved_job_change(yr):
     return bool(rows["job_change"].max()) if not rows.empty else False
 
 
+def disk_rows(yr):
+    return d.income[(d.income["profile"] == active.key) & (d.income["year"] == yr)]
+
+
+def rows_sig(rows):
+    """An order-independent fingerprint of a year's income rows, for detecting
+    whether the on-disk data changed (or whether a save would be a no-op)."""
+    cols = ["month", *COMPONENTS, "job_change"]
+    if rows.empty:
+        return ()
+    return tuple(sorted(
+        tuple(int(round(float(v))) for v in r) for r in rows[cols].to_numpy()
+    ))
+
+
 def fresh_grid(yr):
     grid = pd.DataFrame({"Month": MONTHS})
     for component in COMPONENTS:
@@ -86,10 +101,11 @@ def fresh_grid(yr):
 
 with edit_card(f"Enter {year}"):
     base = f"inc_{active.key}_{year}"
-    gkey, vkey = f"{base}_grid", f"{base}_ver"
+    gkey, vkey, skey = f"{base}_grid", f"{base}_ver", f"{base}_seed"
     if gkey not in ss:
         ss[gkey] = fresh_grid(year)
         ss[vkey] = 0
+        ss[skey] = rows_sig(disk_rows(year))  # what disk held when this grid opened
 
     edited = st.data_editor(
         ss[gkey], num_rows="fixed", hide_index=True, width="stretch",
@@ -114,20 +130,36 @@ with edit_card(f"Enter {year}"):
 
     b2, b3 = st.columns([1, 3])
     if b2.button("Save", key=f"{base}_save", type="primary"):
+        current = rows_sig(disk_rows(year))
         new = edited[COMPONENTS].copy()
         new["profile"], new["year"], new["month"] = active.key, year, range(1, 13)
         new["job_change"] = int(job_change)
         new = new[storage.INCOME_COLUMNS]
-        others = d.income[~((d.income["profile"] == active.key) & (d.income["year"] == year))]
-        merged = pd.concat([others, new], ignore_index=True)
-        try:
-            storage.validate_income(merged, d.profiles)
-            storage.save_income(d.root, merged)
-            del ss[gkey]
-            st.success("Saved.")
+        if ss.get(skey) is not None and ss[skey] != current:
+            # Disk moved under this grid (another tab, or an import) — reload
+            # rather than overwrite the newer data with our stale grid.
+            st.warning(f"{year}'s income changed on disk since you opened this. Reloaded — "
+                       "re-enter your change so nothing is overwritten.")
+            ss.pop(gkey, None)
+            ss.pop(skey, None)
             st.rerun()
-        except Exception as exc:
-            st.error(f"Not saved: {exc}")
+        elif rows_sig(new) == current:
+            # Nothing to write. Most often the last-typed cell never committed:
+            # Streamlit's editor only captures a cell once it loses focus.
+            st.info("No changes to save — if you just typed in a cell, click another cell "
+                    "or press Enter to commit it, then Save.")
+        else:
+            others = d.income[~((d.income["profile"] == active.key) & (d.income["year"] == year))]
+            merged = pd.concat([others, new], ignore_index=True)
+            try:
+                storage.validate_income(merged, d.profiles)
+                storage.save_income(d.root, merged)
+                ss.pop(gkey, None)
+                ss.pop(skey, None)
+                st.success(f"Saved — {inr_short(total)} across {filled} month{'s' if filled != 1 else ''} of {year}.")
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Not saved: {exc}")
     b3.markdown(
         f"<div style='padding-top:.4rem;color:var(--muted)'>{filled} of 12 months entered &nbsp;·&nbsp; "
         f"<b style='color:var(--text)'>{inr_short(total)}</b> for {year} ({delta})</div>",

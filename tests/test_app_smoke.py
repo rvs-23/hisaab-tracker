@@ -111,3 +111,17 @@ def test_bottom_line_silent_without_data(fake_data_dir):
     assert "If you buy today" not in body
     captions = " ".join(c.value for c in at.caption)
     assert "Add income to see the bottom line" in captions
+
+def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
+    """Saving without a real change must say so, not flash a misleading 'Saved.'
+    — this is the cell-didn't-commit symptom that looked like a lost edit. The
+    first save fills the 12 months; a second, unchanged save is the no-op."""
+    at = AppTest.from_file(str(REPO_ROOT / "views/income.py"), default_timeout=20)
+    at.query_params["profile"] = "rv"
+    at.run()
+    at.selectbox[0].set_value(2023).run()  # rv 2023 has one seeded month
+    at.button(key="inc_rv_2023_save").click().run()   # writes all 12 months
+    at.button(key="inc_rv_2023_save").click().run()   # nothing changed now
+    assert not at.exception, at.exception
+    assert "No changes to save" in " ".join(m.value for m in at.info)
+    assert "Saved" not in " ".join(s.value for s in at.success)
