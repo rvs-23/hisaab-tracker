@@ -86,31 +86,28 @@ def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
     assert not at.error, [e.value for e in at.error]
 
 
-# Rent vs buy's "For you" context strip: reads the person's own data (income,
-# contributions, adjustments) to evaluate the calculator's current inputs —
-# rv has data in fake_data_dir, cheeni doesn't, so one profile exercises the
-# strip and the other exercises its "not enough data yet" silence.
+# Rent vs buy's "What would it take?" caption reads the person's own data —
+# rv has income in fake_data_dir, cheeni doesn't, so one profile exercises the
+# projection and the other exercises its "not enough data yet" fallback.
 
-def test_bottom_line_shows_when_data_present(fake_data_dir):
+def test_rent_vs_buy_verdict_names_the_cheaper_side(fake_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     assert not at.exception, at.exception
-    body = " ".join(m.value for m in at.markdown)
-    assert "of your monthly take-home" in body
-    assert "If you buy today" in body
-    assert "If you continue renting" in body
+    captions = " ".join(c.value for c in at.caption)
+    assert "costs" in captions and "less" in captions
+    assert "Not investing the difference costs the renter a further" in captions
+    assert "against the" in captions  # the income projection line
 
 
-def test_bottom_line_silent_without_data(fake_data_dir):
+def test_rent_vs_buy_income_line_silent_without_data(fake_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
     at.query_params["profile"] = "cheeni"  # no income in this fixture
     at.run()
     assert not at.exception, at.exception
-    body = " ".join(m.value for m in at.markdown)
-    assert "If you buy today" not in body
     captions = " ".join(c.value for c in at.caption)
-    assert "Add income to see the bottom line" in captions
+    assert "Add income to see this against your own numbers" in captions
 
 def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     """Saving without a real change must say so, not flash a misleading 'Saved.'
