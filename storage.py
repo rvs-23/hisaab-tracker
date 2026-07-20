@@ -17,12 +17,22 @@ needs) are *derived* from income, not stored. Every save is recorded in the audi
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
 from audit import log_change
+
+
+class AuditLogError(RuntimeError):
+    """The CSV was written but its audit record could not be appended.
+
+    Raised after a successful save so callers can tell the user the change is
+    on disk yet unaudited, rather than the audit failure passing unnoticed.
+    """
+
 from config import INCOME_COMPONENTS
 from models import Config, Profile
 
@@ -182,6 +192,11 @@ def _save(root: Path, filename: str, df: pd.DataFrame, sort_cols: list[str],
     comparison is between two CSV-normalised frames (no spurious int-vs-float
     diffs).
 
+    The CSV is replaced atomically. If the audit record can't be appended the
+    data is already safely saved, so this raises ``AuditLogError`` *after* the
+    write — callers surface it as "saved, but not audited" rather than losing
+    the change.
+
     Args:
         root: Data folder to write into.
         filename: Target CSV name.
@@ -191,9 +206,19 @@ def _save(root: Path, filename: str, df: pd.DataFrame, sort_cols: list[str],
     """
     path = root / filename
     before = _read_optional(path, columns)
-    df.sort_values(sort_cols).to_csv(path, index=False)
+    # Write to a sibling temp file and swap it in: os.replace is atomic on the
+    # same filesystem, so an interrupted write can never leave a half-written
+    # CSV where the real data used to be.
+    tmp = path.with_name(f".{filename}.tmp")
+    try:
+        df.sort_values(sort_cols).to_csv(tmp, index=False)
+        os.replace(tmp, path)
+    finally:
+        tmp.unlink(missing_ok=True)
     after = _read_optional(path, columns)
-    log_change(root, filename, before, after, columns)
+    failure = log_change(root, filename, before, after, columns)
+    if failure:
+        raise AuditLogError(failure)
 
 
 def save_income(root: Path, df: pd.DataFrame) -> None:

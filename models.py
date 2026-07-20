@@ -29,10 +29,23 @@ class Profile(BaseModel):
     default_target: dict[str, float]
 
     @model_validator(mode="after")
-    def _target_sums_to_100(self) -> "Profile":
+    def _target_is_a_valid_allocation(self) -> "Profile":
+        """An allocation must sum to 100 *and* hold no negative weight.
+
+        Summing to 100 alone lets a typo through — -20% here and 120% there
+        balances arithmetically but is not an allocation anyone can hold, and
+        it would quietly skew every expected-return calculation.
+        """
+        if not self.default_target:
+            raise ValueError("default_target must list at least one category")
+        negative = sorted(c for c, pct in self.default_target.items() if pct < 0)
+        if negative:
+            raise ValueError(f"default_target has negative weights: {', '.join(negative)}")
         total = sum(self.default_target.values())
         if abs(total - 100) > 0.01:
             raise ValueError(f"default_target must sum to 100, got {total}")
+        if self.birth_year < 1900 or self.birth_year > 2100:
+            raise ValueError(f"birth_year looks wrong: {self.birth_year}")
         return self
 
 
@@ -49,3 +62,16 @@ class Config(BaseModel):
 
     categories: list[str]
     expected_return_pct: float | None = None
+
+    @model_validator(mode="after")
+    def _sane_household_settings(self) -> "Config":
+        """Guards the two ways this file can silently break the whole model."""
+        if not self.categories:
+            raise ValueError("categories must not be empty")
+        duplicates = sorted({c for c in self.categories if self.categories.count(c) > 1})
+        if duplicates:
+            raise ValueError(f"categories has duplicates: {', '.join(duplicates)}")
+        rate = self.expected_return_pct
+        if rate is not None and not 0 <= rate <= 30:
+            raise ValueError(f"expected_return_pct must be 0-30, got {rate}")
+        return self

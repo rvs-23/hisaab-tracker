@@ -38,15 +38,18 @@ def _row_multiset(df: pd.DataFrame, columns: list[str]) -> Counter:
 
 
 def log_change(root: Path, filename: str, before: pd.DataFrame, after: pd.DataFrame,
-               columns: list[str]) -> None:
+               columns: list[str]) -> str | None:
     """Appends one JSON line describing what a save changed.
 
     The record carries ``ts``, ``file``, the ``[profile, year]`` pairs touched,
     ``rows_after`` (the file's row count after the write, a quick integrity
     check), and the exact rows ``added``/``removed`` (full rows up to 100 per
-    side, else the count). A save that changed nothing logs nothing, and any
-    failure here is swallowed: a successful write must never be blocked or
-    corrupted by its own audit trail.
+    side, else the count). A save that changed nothing logs nothing.
+
+    A failure here never blocks or corrupts the write that already succeeded,
+    but it is not silent either: the reason is returned so the caller can tell
+    the user their change went through *unaudited*. Losing the audit trail
+    without noticing is the failure mode this guards against.
 
     Args:
         root: Data folder that holds the log.
@@ -54,13 +57,17 @@ def log_change(root: Path, filename: str, before: pd.DataFrame, after: pd.DataFr
         before: Frame read from disk before the write (CSV-normalised).
         after: Frame read back after the write (CSV-normalised).
         columns: Canonical column order for the row comparison.
+
+    Returns:
+        ``None`` when the record was written (or there was nothing to record),
+        else a short description of why the audit write failed.
     """
     try:
         bc, ac = _row_multiset(before, columns), _row_multiset(after, columns)
         added = [dict(zip(columns, r)) for r in (ac - bc).elements()]
         removed = [dict(zip(columns, r)) for r in (bc - ac).elements()]
         if not added and not removed:
-            return
+            return None
         touched = sorted(
             {(d.get("profile"), int(d["year"])) for d in (added + removed) if d.get("year") is not None},
             key=lambda t: (str(t[0]), t[1]),
@@ -75,5 +82,6 @@ def log_change(root: Path, filename: str, before: pd.DataFrame, after: pd.DataFr
         }
         with open(root / CHANGES_LOG, "a") as f:
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except Exception:
-        pass
+        return None
+    except Exception as exc:  # noqa: BLE001 - the write already succeeded
+        return f"{type(exc).__name__}: {exc}"
