@@ -112,17 +112,7 @@ with edit_card(f"Enter {year}"):
     prev_total = annual(year - 1)
     delta = f"{100 * (total - prev_total) / prev_total:+.0f}% vs {year - 1}" if prev_total else "first year"
 
-    b1, b2, b3 = st.columns([1, 1, 2])
-    # Tertiary: a convenience, not a peer of Save — only one primary action here.
-    if b1.button("Copy January down", key=f"{base}_cpy", type="tertiary",
-                 help="Fill every month with January's values."):
-        jan = edited.iloc[0]
-        g = edited.copy()
-        for c in COMPONENTS:
-            g[c] = jan[c]
-        ss[gkey] = g.assign(Total=g[COMPONENTS].sum(axis=1))
-        ss[vkey] += 1
-        st.rerun()
+    b2, b3 = st.columns([1, 3])
     if b2.button("Save", key=f"{base}_save", type="primary"):
         new = edited[COMPONENTS].copy()
         new["profile"], new["year"], new["month"] = active.key, year, range(1, 13)
