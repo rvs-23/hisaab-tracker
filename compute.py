@@ -280,11 +280,21 @@ def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,
     return years[0] if years else None
 
 
+def expected_return_for_target(target: dict[str, float]) -> float:
+    """The allocation-weighted expected annual return for a target mix (%).
+
+    E.g. 45% mfs @ 11.5% + 25% gold @ 7.5% + ... Used for the opening
+    corpus's assumed growth (``_corpus_growth_rate``) and exposed publicly so
+    other callers (e.g. the rent-vs-buy calculator's default invest return)
+    can reuse the same weighting instead of hard-coding a number.
+    """
+    return sum(pct / 100 * EXPECTED_RETURNS.get(cat, 0) for cat, pct in target.items())
+
+
 def _corpus_growth_rate(profile: Profile, targets: pd.DataFrame, vintage: int) -> float:
     """The opening corpus's assumed annual return: the target allocation in
     force at its vintage year, weighted by each category's expected return."""
-    target = resolve_target(profile, targets, vintage)
-    return sum(pct / 100 * EXPECTED_RETURNS.get(cat, 0) for cat, pct in target.items())
+    return expected_return_for_target(resolve_target(profile, targets, vintage))
 
 
 def emergency_fund_actual(adjustments: pd.DataFrame, profile_key: str) -> float:
@@ -504,3 +514,167 @@ def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
                 )
 
     return findings
+
+
+# Rent-vs-buy: money wasted, not net worth. The core philosophy — buying
+# wastes registration/stamp duty (one-time), loan INTEREST (never principal,
+# which is equity), and maintenance/property tax; renting wastes the rent
+# itself, inflating every year. A renter's invested savings are not waste.
+
+def emi(principal: float, annual_rate_pct: float, tenure_years: int) -> float:
+    """The standard equated-monthly-instalment formula.
+
+    Args:
+        principal: Loan amount.
+        annual_rate_pct: Annual interest rate, in percent (e.g. ``8.5``).
+        tenure_years: Loan tenure in years.
+
+    Returns:
+        The constant monthly instalment. At 0% interest the standard formula
+        divides by zero, so that case is simply ``principal / months``.
+    """
+    months = tenure_years * 12
+    if months <= 0:
+        return 0.0
+    if annual_rate_pct == 0:
+        return principal / months
+    r = annual_rate_pct / 1200
+    factor = (1 + r) ** months
+    return principal * r * factor / (factor - 1)
+
+
+def _amortization_by_year(principal: float, annual_rate_pct: float, tenure_years: int,
+                          monthly_emi: float) -> tuple[list[float], list[float]]:
+    """Splits a loan's EMIs into interest and principal, summed per year.
+
+    A month-by-month schedule (the only way to split interest from
+    principal correctly) collapsed to one interest total and one principal
+    total per year of the tenure — indices ``0..tenure_years-1``.
+    """
+    r = annual_rate_pct / 1200
+    balance = principal
+    interest_by_year: list[float] = []
+    principal_by_year: list[float] = []
+    interest_acc = principal_acc = 0.0
+    for m in range(1, tenure_years * 12 + 1):
+        interest_payment = balance * r
+        principal_payment = min(monthly_emi - interest_payment, balance)
+        balance = max(0.0, balance - principal_payment)
+        interest_acc += interest_payment
+        principal_acc += principal_payment
+        if m % 12 == 0:
+            interest_by_year.append(interest_acc)
+            principal_by_year.append(principal_acc)
+            interest_acc = principal_acc = 0.0
+    return interest_by_year, principal_by_year
+
+
+def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_years: int,
+               registration_pct: float, maintenance_pct: float, appreciation_pct: float,
+               rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
+               horizon_years: int) -> pd.DataFrame:
+    """Year-by-year money-wasted comparison between buying and renting.
+
+    One row per year 1..``horizon_years``. Buying wastes registration/stamp
+    duty (once), loan interest (never principal — that's equity), and
+    maintenance/property tax (``maintenance_pct`` of ``price``, flat every
+    year — an approximation, since a real property-tax bill usually tracks
+    assessed value). Renting wastes the rent itself, inflating at
+    ``rent_inflation_pct`` every year.
+
+    The renter is assumed to have the same monthly housing budget a buyer
+    would (EMI + maintenance): whatever of that budget isn't spent on rent —
+    plus the down payment and registration money never spent at all — is
+    invested at ``invest_return_pct``. Once the rent (inflating) overtakes
+    EMI + maintenance (fixed once the loan is repaid, since maintenance
+    persists), that monthly "difference" goes negative and draws down what
+    would otherwise be invested, per the same logic. Monthly amounts are
+    aggregated to one lump per year and compounded yearly (an approximation:
+    real contributions land monthly, so this slightly understates each
+    year's compounding versus true monthly compounding).
+
+    Columns:
+        buy_wasted_cum: registration + cumulative interest paid + cumulative
+            maintenance, to date.
+        rent_wasted_cum: cumulative rent paid, to date.
+        buy_equity: down payment + principal repaid so far + property
+            appreciation on the full price (interest/maintenance/registration
+            build no equity, so they're excluded here).
+        renter_portfolio: down payment + registration money never spent,
+            invested from year 0, plus every year's (EMI + maintenance −
+            rent) difference invested from the year it occurs.
+        buy_net: buy_equity − buy_wasted_cum — what buying built minus what
+            it threw away.
+        rent_net: renter_portfolio − rent_wasted_cum — what renting's
+            invested savings built minus what renting threw away on rent.
+
+    Args:
+        price: Property price.
+        down_pct: Down payment as % of price; the rest is financed.
+        loan_rate_pct: Annual home-loan interest rate, in percent.
+        tenure_years: Loan tenure in years.
+        registration_pct: One-time registration + stamp duty, as % of price.
+        maintenance_pct: Annual maintenance/property tax, as % of price.
+        appreciation_pct: Assumed annual property appreciation, in percent.
+        rent_monthly: Starting monthly rent.
+        rent_inflation_pct: Annual rent inflation, in percent.
+        invest_return_pct: Annual return assumed on money the renter invests.
+        horizon_years: How many years to project.
+
+    Returns:
+        A DataFrame with one row per year, columns as above.
+    """
+    down_payment = price * down_pct / 100
+    loan_principal = price - down_payment
+    registration_cost = price * registration_pct / 100
+    monthly_emi = emi(loan_principal, loan_rate_pct, tenure_years)
+    interest_by_year, principal_by_year = _amortization_by_year(
+        loan_principal, loan_rate_pct, tenure_years, monthly_emi
+    )
+    maintenance_annual = price * maintenance_pct / 100
+    non_invested_base = down_payment + registration_cost
+
+    rows = []
+    cum_interest = cum_principal = cum_maintenance = cum_rent = 0.0
+    yearly_diff: dict[int, float] = {}  # year -> that year's (EMI+maint-rent) lump
+
+    for year in range(1, horizon_years + 1):
+        idx = year - 1
+        interest_this_year = interest_by_year[idx] if idx < len(interest_by_year) else 0.0
+        principal_this_year = principal_by_year[idx] if idx < len(principal_by_year) else 0.0
+        cum_interest += interest_this_year
+        cum_principal += principal_this_year
+        cum_maintenance += maintenance_annual
+
+        rent_this_year = rent_monthly * (1 + rent_inflation_pct / 100) ** (year - 1) * 12
+        cum_rent += rent_this_year
+        emi_this_year = monthly_emi * 12 if year <= tenure_years else 0.0
+        yearly_diff[year] = (emi_this_year + maintenance_annual) - rent_this_year
+
+        buy_wasted_cum = registration_cost + cum_interest + cum_maintenance
+        rent_wasted_cum = cum_rent
+        appreciation_gain = price * (1 + appreciation_pct / 100) ** year - price
+        buy_equity = down_payment + cum_principal + appreciation_gain
+
+        renter_portfolio = non_invested_base * (1 + invest_return_pct / 100) ** year
+        for k, diff in yearly_diff.items():
+            renter_portfolio += diff * (1 + invest_return_pct / 100) ** (year - k)
+
+        rows.append({
+            "year": year,
+            "buy_wasted_cum": buy_wasted_cum,
+            "rent_wasted_cum": rent_wasted_cum,
+            "buy_equity": buy_equity,
+            "renter_portfolio": renter_portfolio,
+            "buy_net": buy_equity - buy_wasted_cum,
+            "rent_net": renter_portfolio - rent_wasted_cum,
+        })
+    return pd.DataFrame(rows)
+
+
+def rent_vs_buy_crossover_year(df: pd.DataFrame) -> int | None:
+    """The first year where buying's cumulative waste drops to or below
+    renting's — the point buying becomes the less wasteful choice — or
+    ``None`` if that never happens within the projected horizon."""
+    crossed = df[df["buy_wasted_cum"] <= df["rent_wasted_cum"]]
+    return int(crossed.iloc[0]["year"]) if not crossed.empty else None
