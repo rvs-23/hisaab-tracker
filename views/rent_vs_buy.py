@@ -300,12 +300,32 @@ _, nw_potential = compute.net_worth_to_date(
 )
 investable = max(0.0, nw_potential - (ef_held or 0.0))  # the emergency fund stays reserved
 
+# Starting corpus: defaults to the dashboard's estimated value less the
+# emergency fund, but it's an estimate built on assumed returns — so it can be
+# overridden, or excluded entirely to see the timing on new savings alone.
+cc1, cc2, _ = st.columns([1, 1, 2])
+use_corpus = cc1.checkbox(
+    "Use my current savings", value=True, key=f"rvb_usecorpus_{k}",
+    help="On: start from what you've already invested. Off: start from zero and "
+         "let only your monthly investing build the down payment.",
+)
+corpus_input = cc2.number_input(
+    "Starting corpus (₹)", min_value=0, value=int(round(investable)), step=100_000,
+    disabled=not use_corpus, key=f"rvb_corpus_{k}",
+    help="Defaults to your estimated portfolio value today minus the emergency "
+         "fund — the same figure the dashboard shows. Override it for a what-if.",
+)
+starting_corpus = float(corpus_input) if use_corpus else 0.0
+cc2.caption(f"= {inr_short(starting_corpus)}")
+if use_corpus and abs(corpus_input - investable) > 1:
+    cc1.caption(f"Your data says {inr_short(investable)}.")
+
 timing = compute.best_buy_year(
     price=price, down_pct=down_pct, loan_rate_pct=loan_rate_pct, tenure_years=tenure_years,
     registration_pct=registration_pct, maintenance_pct=maintenance_pct,
     appreciation_pct=appreciation_pct, rent_monthly=rent_monthly,
     rent_inflation_pct=rent_inflation_pct, invest_return_pct=invest_return_pct,
-    horizon_years=horizon_years, starting_corpus=investable,
+    horizon_years=horizon_years, starting_corpus=starting_corpus,
     monthly_saving=monthly_investment,
 )
 feasible = timing[timing["feasible"]]
@@ -353,8 +373,8 @@ if feasible.empty:
         "Your corpus can't cover registration plus the minimum down payment in any "
         "year of this horizon — stretch the horizon, or lower the price."
     )
-elif investable <= 0:
-    st.caption("Record your savings on Actuals to price the waiting years against your own corpus.")
+elif starting_corpus <= 0 and monthly_investment <= 0:
+    st.caption("Record your savings on Actuals, or set a starting corpus above, to price the waiting years.")
 else:
     # Compare like with like: the baseline is the earliest year you could
     # actually buy, not year 0. When the corpus can't fund today's purchase,
@@ -366,7 +386,7 @@ else:
 
     if not bool(timing.iloc[0]["feasible"]):
         st.caption(
-            f"**You can't buy this house yet** — {inr_short(investable)} invested doesn't "
+            f"**You can't buy this house yet** — {inr_short(starting_corpus)} invested doesn't "
             f"cover {inr_short(registration_cost)} registration plus the "
             f"{inr_short(down_payment)} minimum down payment. {baseline_year} is the first "
             f"year your corpus gets there."

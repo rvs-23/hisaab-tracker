@@ -140,3 +140,17 @@ def test_rent_vs_buy_timing_compares_against_an_affordable_year(fake_data_dir):
     # The baseline it compares against must be a year the corpus can fund —
     # never "buying today" when today is out of reach.
     assert "buying today" not in captions
+
+
+def test_rent_vs_buy_starting_corpus_can_be_excluded(fake_data_dir):
+    """Unchecking 'use my current savings' must actually zero the corpus the
+    timing model starts from, not just grey the input out."""
+    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
+    at.query_params["profile"] = "rv"
+    at.run()
+    before = " ".join(c.value for c in at.caption)
+    at.checkbox(key="rvb_usecorpus_rv").uncheck().run()
+    assert not at.exception, at.exception
+    after = " ".join(c.value for c in at.caption)
+    assert "= ₹0" in after
+    assert before != after
