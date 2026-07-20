@@ -226,6 +226,40 @@ if monthly_income > 0:
 else:
     st.caption("Add income to see affordability.")
 
+# 3b. What would it take? Isolate this one goal (Rv via Sonnet): the monthly
+# SIP to save the down payment by the horizon, the EMI on the balance, and the
+# salary that keeps that EMI under the cap.
+buy_year = today_year + horizon_years
+chart_title(
+    "What would it take?",
+    help="Isolated to this one goal, saving from zero: the monthly SIP to reach the "
+         "down payment + registration by the horizon (house price grown at the "
+         "appreciation rate), the EMI on the loan, and the salary that keeps the EMI "
+         f"under {AFFORD_EMI_CAP_PCT}% of income. Ignores your existing corpus and other goals.",
+)
+future_price = price * (1 + appreciation_pct / 100) ** horizon_years
+upfront_target = future_price * (down_pct + registration_pct) / 100
+sip = compute.sip_for_target(upfront_target, invest_return_pct, horizon_years)
+loan_then = future_price * (1 - down_pct / 100)
+emi_then = compute.emi(loan_then, loan_rate_pct, tenure_years)
+salary_needed = emi_then / (AFFORD_EMI_CAP_PCT / 100) if AFFORD_EMI_CAP_PCT else 0.0
+wcols = st.columns(3)
+metric_tile(wcols[0], "Save / month", inr_short(sip),
+            f"to reach {inr_short(upfront_target)} by {buy_year}", color=SECONDARY, big=True)
+metric_tile(wcols[1], "EMI after", inr_short(emi_then),
+            f"on a {inr_short(loan_then)} loan", big=True)
+metric_tile(wcols[2], f"Salary needed, {buy_year}", inr_short(salary_needed),
+            f"so EMI ≤ {AFFORD_EMI_CAP_PCT}% of it", color=PRIMARY, big=True)
+if monthly_income > 0:
+    proj_income = monthly_income * (1 + appreciation_pct / 100) ** horizon_years
+    invest_bit = (f"You invest about {inr_short(monthly_investment)}/mo now vs the "
+                  f"{inr_short(sip)} this needs. " if monthly_investment > 0 else "")
+    st.caption(
+        invest_bit
+        + f"Your income would be roughly {inr_short(proj_income)}/mo by {buy_year} "
+        f"(growing at the appreciation rate) against the {inr_short(salary_needed)} needed."
+    )
+
 # 4. The bottom line, in plain sentences against the person's own numbers.
 section("The bottom line")
 if monthly_income > 0:

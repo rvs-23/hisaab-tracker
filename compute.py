@@ -733,6 +733,25 @@ def max_loan_for_emi(monthly_emi_budget: float, annual_rate_pct: float,
     return monthly_emi_budget * ((1 + r) ** months - 1) / (r * (1 + r) ** months)
 
 
+def sip_for_target(target_amount: float, annual_return_pct: float, years: float) -> float:
+    """The monthly SIP that grows to ``target_amount`` in ``years``.
+
+    End-of-month contributions compounded monthly — the inverse of the standard
+    SIP future-value ``FV = P·((1+r)ⁿ−1)/r``. Handles a 0% return (straight
+    division). Use it for "how much a month to reach the down payment by then".
+
+    Args:
+        target_amount: The corpus to reach.
+        annual_return_pct: Assumed annual return, in percent.
+        years: Years to save.
+    """
+    n = max(1, round(years * 12))
+    r = annual_return_pct / 100 / 12
+    if r == 0:
+        return target_amount / n
+    return target_amount * r / ((1 + r) ** n - 1)
+
+
 def affordability_series(monthly_income: float, income_growth_pct: float, price: float,
                          appreciation_pct: float, down_pct: float, registration_pct: float,
                          loan_rate_pct: float, tenure_years: int, horizon_years: int,

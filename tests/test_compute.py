@@ -700,3 +700,16 @@ def test_corpus_growth_honours_flat_return(rv):
     weighted = compute._corpus_growth_rate(rv, targets, 2024)
     assert weighted != 10.0  # rv's weighted rate isn't coincidentally 10
     assert compute._corpus_growth_rate(rv, targets, 2024, flat_return=10.0) == 10.0
+
+
+def test_sip_for_target_round_trips_future_value():
+    """The SIP grown by the standard FV formula returns the target."""
+    sip = compute.sip_for_target(75_000_000, 14, 10)  # 7.5Cr in 10y @14%
+    assert sip == pytest.approx(289_668, rel=0.001)   # ~₹2.90L, matches the hand calc
+    r, n = 14 / 1200, 120
+    fv = sip * ((1 + r) ** n - 1) / r
+    assert fv == pytest.approx(75_000_000, rel=1e-9)
+
+
+def test_sip_for_target_zero_return():
+    assert compute.sip_for_target(1_200_000, 0, 10) == pytest.approx(1_200_000 / 120)
