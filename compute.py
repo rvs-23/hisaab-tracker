@@ -20,11 +20,12 @@ split across instruments by the target allocation:
 from __future__ import annotations
 
 import datetime as dt
+from typing import Callable
 
 import pandas as pd
 
 from config import (
-    BASELINE_YEAR, DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT,
+    BASELINE_YEAR, CATEGORY_LABELS, DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT,
     EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
     NETWORTH_PROJECTION_YEARS, PROFILE_BASE_SPLITS, PROFILE_INCREMENT_SPLITS,
     PROJECTION_YEARS_AHEAD,
@@ -426,3 +427,80 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
         rows.append({"year": horizon, "cost_basis": round(basis), "potential": round(potential),
                      "is_projected": horizon > today_year})
     return pd.DataFrame(rows)
+
+
+def _default_fmt(value: float) -> str:
+    """A plain ₹ formatter with thousands grouping, for callers that don't
+    pass their own (see ``health_checks``)."""
+    return f"₹{value:,.0f}"
+
+
+def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
+                  contributions: pd.DataFrame, adjustments: pd.DataFrame,
+                  today: dt.date | None = None,
+                  fmt: Callable[[float], str] | None = None) -> list[str]:
+    """Plain-language data-health nudges for one person; empty when healthy.
+
+    Pure and side-effect free — a view renders whatever comes back (or
+    nothing, when the list is empty). Four checks, run independently (any
+    number may fire at once):
+
+      1. The current year has no income rows at all.
+      2. The current year's investing is badly behind pace: what's gone in
+         so far is under half of the elapsed-year share of the goal, and the
+         year is at least 3 months in (``elapsed_year_fraction`` ≥ 0.25) —
+         too early in January isn't "behind" yet.
+      3. No emergency fund has ever been recorded (``emergency_fund_actual``
+         is 0).
+      4. Cumulative actual allocation (all years, all categories) drifts 15
+         percentage points or more from the current target, for any one
+         category — one message per drifting category.
+
+    Args:
+        fmt: Formats a rupee amount for check #2's message; defaults to a
+            plain ``₹12,345`` grouping. Pass ``ui.inr_short`` from a view for
+            the app's compact ₹ style — formatting is a UI concern, this stays
+            pure.
+
+    Returns:
+        Plain-language findings, or ``[]`` when nothing needs attention.
+    """
+    fmt = fmt or _default_fmt
+    today = today or dt.date.today()
+    year = today.year
+    findings: list[str] = []
+
+    mine_income = income[income["profile"] == profile.key]
+    if mine_income[mine_income["year"] == year].empty:
+        findings.append(f"No {year} income entered yet.")
+
+    year_goal = sum(expected_contributions(profile, income, targets, year).values())
+    if year_goal > 0 and elapsed_year_fraction(today) >= 0.25:
+        invested_so_far = float(contributions.loc[
+            (contributions["profile"] == profile.key) & (contributions["year"] == year), "amount"
+        ].sum())
+        expected_by_now = year_goal * elapsed_year_fraction(today)
+        if invested_so_far < 0.5 * expected_by_now:
+            findings.append(
+                f"{year} investing is behind: {fmt(invested_so_far)} in vs "
+                f"{fmt(expected_by_now)} expected by now."
+            )
+
+    if emergency_fund_actual(adjustments, profile.key) == 0:
+        findings.append("Emergency fund not recorded yet — enter it on Actuals to track your buffer.")
+
+    mine_contrib = contributions[contributions["profile"] == profile.key]
+    total_actual = float(mine_contrib["amount"].sum())
+    if total_actual > 0:
+        actual_pct = 100 * mine_contrib.groupby("category")["amount"].sum() / total_actual
+        target = resolve_target(profile, targets, year)
+        for cat in sorted(set(actual_pct.index) | set(target.keys())):
+            drift = actual_pct.get(cat, 0.0) - target.get(cat, 0.0)
+            if abs(drift) >= 15:
+                label = CATEGORY_LABELS.get(cat, cat.replace("_", " ").capitalize())
+                findings.append(
+                    f"Your actual mix drifts from target: {label} is "
+                    f"{actual_pct.get(cat, 0.0):.0f}% vs target {target.get(cat, 0.0):.0f}%."
+                )
+
+    return findings

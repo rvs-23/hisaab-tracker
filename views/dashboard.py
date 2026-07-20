@@ -200,6 +200,15 @@ else:
         unsafe_allow_html=True,
     )
 
+# Health nudges: quiet, plain-language findings — nothing renders when healthy.
+findings = compute.health_checks(
+    profile, d.income, d.targets, d.contributions, d.adjustments, fmt=inr_short
+)
+if findings:
+    section("Health")
+    for finding in findings:
+        st.caption(finding)
+
 # Adjustments live in a quiet expander at the very bottom — the dashboard stays
 # summary-first, and this is a one-off setting, not something read every visit.
 with st.expander("Adjustments"):
