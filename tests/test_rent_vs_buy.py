@@ -186,9 +186,11 @@ TIMING = dict(
 )
 
 
-def test_best_buy_year_has_one_row_per_wait_year():
+def test_best_buy_year_covers_the_horizon_inclusively():
+    """A 15-year horizon must offer buying now through waiting all fifteen —
+    16 options, not 15 (the label says years of waiting)."""
     df = compute.best_buy_year(**TIMING)
-    assert list(df["wait_years"]) == list(range(TIMING["horizon_years"]))
+    assert list(df["wait_years"]) == list(range(TIMING["horizon_years"] + 1))
 
 
 def test_waiting_grows_the_corpus_and_shrinks_the_loan():
@@ -206,7 +208,7 @@ def test_savings_create_an_interior_optimum():
     last — waiting pays until appreciation and rent outrun the corpus."""
     df = compute.best_buy_year(**TIMING)
     best = int(df[df["feasible"]]["total_wasted"].idxmin())
-    assert 0 < best < TIMING["horizon_years"] - 1
+    assert 0 < best < TIMING["horizon_years"]
 
 
 def test_without_savings_buying_now_wins():
@@ -233,3 +235,52 @@ def test_a_small_corpus_marks_early_years_infeasible():
     df = compute.best_buy_year(**{**TIMING, "starting_corpus": 500_000, "monthly_saving": 50_000})
     assert not bool(df.iloc[0]["feasible"])
     assert bool(df.iloc[-1]["feasible"])
+
+
+def test_emi_budget_gates_feasibility_not_just_cash():
+    """Codex 2026-07-21: cash alone approved years whose EMI the household
+    could never service. A tiny budget must make even cash-rich years unusable."""
+    # Cash-rich enough to clear registration + the down payment, but still
+    # borrowing — a corpus that buys outright would owe no EMI at all.
+    rich = {**TIMING, "starting_corpus": 6_000_000, "monthly_saving": 0}
+    assert compute.best_buy_year(**rich, emi_budget=500_000)["feasible"].any()
+    tight = compute.best_buy_year(**rich, emi_budget=1_000)
+    early = tight[tight["wait_years"] < 5]
+    assert early["cash_ok"].any()          # the cash is there
+    assert not early["emi_ok"].any()       # but the EMI never fits
+    assert not early["feasible"].any()     # so the year is not affordable
+
+
+def test_zero_emi_budget_skips_the_serviceability_test():
+    """0 means 'no budget known' — fall back to the cash test rather than
+    silently marking every year unaffordable."""
+    df = compute.best_buy_year(**TIMING, emi_budget=0)
+    assert (df["feasible"] == df["cash_ok"]).all()
+
+
+def test_inflation_discounts_future_costs():
+    """Same nominal scenario, discounted: waste must come out lower, and more
+    so for later purchases whose costs sit further out."""
+    nominal = compute.best_buy_year(**TIMING, inflation_pct=0)
+    real = compute.best_buy_year(**TIMING, inflation_pct=6)
+    assert (real["total_wasted"] < nominal["total_wasted"]).all()
+    shrink = 1 - real["total_wasted"] / nominal["total_wasted"]
+    assert shrink.iloc[-1] > shrink.iloc[0]
+
+
+def test_maintenance_grows_with_inflation():
+    flat = compute.best_buy_year(**TIMING, inflation_pct=0).iloc[0]["maintenance_paid"]
+    base = TIMING["price"] * TIMING["maintenance_pct"] / 100
+    assert flat == pytest.approx(base * TIMING["tenure_years"])
+
+
+def test_starting_corpus_changes_the_recommendation():
+    """Codex 2026-07-21: the toggle test only checked a caption string. Prove
+    the model itself moves when the corpus is excluded."""
+    with_corpus = compute.best_buy_year(**TIMING)
+    without = compute.best_buy_year(**{**TIMING, "starting_corpus": 0})
+    assert (without["corpus"] < with_corpus["corpus"]).all()
+    assert (without["loan"] >= with_corpus["loan"]).all()
+    best_with = int(with_corpus[with_corpus["feasible"]]["total_wasted"].idxmin())
+    best_without = int(without[without["feasible"]]["total_wasted"].idxmin())
+    assert best_without > best_with  # no head start means waiting longer

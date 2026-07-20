@@ -72,8 +72,6 @@ EXPECTED_RETURNS = {
     "bonds_gsec_aif": 7.5, "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
-AFFORD_EMI_CAP_PCT = 50  # "affordable" = EMI at or under this share of monthly income
-
 # An EMI is really funded out of wants + investment: needs are committed
 # spending (an EMI can't come out of groceries), so a house is paid for by
 # giving up discretionary spend and investing less. This is the share of that

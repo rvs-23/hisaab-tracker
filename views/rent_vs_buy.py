@@ -43,10 +43,17 @@ return_source = ("the household expected_return_pct in config.yaml"
                  if d.config.expected_return_pct is not None
                  else "your target allocation's weighted expected return")
 
-sc1, sc2, _ = st.columns([1, 1, 2])
+sc1, sc2, sc3, _ = st.columns([1, 1, 1, 1])
 sc1.number_input("Start year (locked)", value=today_year, disabled=True, key=f"rvb_start_{k}",
                  help="Scenarios start from the current year; the chart reads in calendar years.")
 horizon_years = int(sc2.number_input("Horizon (years)", min_value=1, value=15, step=1, key=f"rvb_horizon_{k}"))
+inflation_pct = sc3.number_input(
+    "Inflation (% p.a.)", min_value=0.0, value=6.0, step=0.5, key=f"rvb_infl_{k}",
+    help="Used two ways in When to buy: maintenance rises with it, and every future "
+         "rupee is discounted back to today's money — otherwise a cost in 2060 counts "
+         "the same as one today. Rent and property have their own rates above. "
+         "Set 0 to work in nominal rupees.",
+)
 
 house_col, loan_col, renting_col, invest_col = st.columns(4)
 
@@ -216,6 +223,19 @@ metric_tile(cols[3], f"Wastes less by {horizon_year}", leaner, f"by {inr_short(a
             help="The lower waste line at the horizon, against a renter who invests the "
                  "difference. Says nothing about which side ends up with more assets.")
 
+opening = compute.opening_corpus(d.adjustments, profile.key)
+ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
+_, nw_potential = compute.net_worth_to_date(
+    profile, d.income, d.contributions, d.targets, today_year, opening=opening,
+    emergency_fund=ef_held, flat_return=d.config.expected_return_pct,
+)
+# net_worth_to_date folds in the emergency fund — the recorded one, or the
+# derived target when nothing is recorded. Subtract whichever it actually used,
+# or the reserve silently becomes down-payment money.
+ef_reserved = ef_held if ef_held is not None else compute.emergency_fund_target(
+    profile, d.income, today_year)
+investable = max(0.0, nw_potential - ef_reserved)
+
 # Affordability, from the budget rather than gross income. The envelope is
 # wants + investment: needs are already committed (an EMI can't come out of
 # groceries), so what a house can actually claim is discretionary spending plus
@@ -245,9 +265,15 @@ if not cur_row.empty and monthly_income > 0:
     )
     emi_budget = envelope * share_pct / 100
     max_loan = compute.max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
-    # The loan is (100 − down_pct) of the price, so the price it supports is the
-    # loan grossed back up. At 100% down there's no loan to size.
-    max_price = max_loan / (1 - down_pct / 100) if down_pct < 100 else 0.0
+    # Two ceilings, whichever binds. The EMI sizes a loan, which grosses up to a
+    # price; the cash on hand has to cover the down payment plus registration.
+    # At 100% down there is no loan at all, so only the cash ceiling applies.
+    loan_price = max_loan / (1 - down_pct / 100) if down_pct < 100 else float("inf")
+    cash_pct = down_pct + registration_pct
+    cash_price = investable / (cash_pct / 100) if cash_pct > 0 else float("inf")
+    max_price = min(loan_price, cash_price)
+    max_price = 0.0 if max_price == float("inf") else max_price
+    binding = "your cash" if cash_price <= loan_price else "your EMI budget"
 
     acols = st.columns(4)
     metric_tile(acols[0], "Wants + investment / month", inr_short(envelope),
@@ -257,7 +283,10 @@ if not cur_row.empty and monthly_income > 0:
     metric_tile(acols[2], "Loan it supports", inr_short(max_loan),
                 f"{loan_rate_pct:.1f}% over {tenure_years} years", big=True)
     metric_tile(acols[3], "House you can buy", inr_short(max_price),
-                f"at {down_pct}% down", color=PRIMARY, big=True)
+                f"at {down_pct}% down — capped by {binding}", color=PRIMARY, big=True,
+                help="The lower of two ceilings: the price your EMI budget can "
+                     "finance, and the price your savings can cover as down payment "
+                     "plus registration.")
 
     verdict = ("within reach" if monthly_emi <= emi_budget else "beyond that budget")
     share_of_envelope = 100 * monthly_emi / envelope if envelope else 0.0
@@ -280,6 +309,7 @@ if not cur_row.empty and monthly_income > 0:
 else:
     st.caption("Add this year's income to see what your budget can carry.")
     monthly_investment = 0.0
+    emi_budget = 0.0  # no budget known: the timing model skips the EMI test
 
 # When to buy. Renting isn't forever — every year of waiting is a real choice,
 # so price them all on the same terms and let the minimum speak.
@@ -292,14 +322,6 @@ chart_title(
          "loan, so waiting can't look free. Assumes ready-to-move-in: rent stops "
          "the day you buy.",
 )
-opening = compute.opening_corpus(d.adjustments, profile.key)
-ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
-_, nw_potential = compute.net_worth_to_date(
-    profile, d.income, d.contributions, d.targets, today_year, opening=opening,
-    emergency_fund=ef_held, flat_return=d.config.expected_return_pct,
-)
-investable = max(0.0, nw_potential - (ef_held or 0.0))  # the emergency fund stays reserved
-
 # Starting corpus: defaults to the dashboard's estimated value less the
 # emergency fund, but it's an estimate built on assumed returns — so it can be
 # overridden, or excluded entirely to see the timing on new savings alone.
@@ -326,7 +348,8 @@ timing = compute.best_buy_year(
     appreciation_pct=appreciation_pct, rent_monthly=rent_monthly,
     rent_inflation_pct=rent_inflation_pct, invest_return_pct=invest_return_pct,
     horizon_years=horizon_years, starting_corpus=starting_corpus,
-    monthly_saving=monthly_investment,
+    monthly_saving=monthly_investment, inflation_pct=inflation_pct,
+    emi_budget=emi_budget,
 )
 feasible = timing[timing["feasible"]]
 buy_years = (today_year + timing["wait_years"]).astype(str)
@@ -369,9 +392,11 @@ f2.update_xaxes(title_text="Year you buy", title_font=dict(size=12, color=CHART_
 st.plotly_chart(f2, width="stretch", config={"displayModeBar": False})
 
 if feasible.empty:
+    blocker = ("the EMI never fits your budget" if timing["cash_ok"].any()
+               else "your corpus never covers registration plus the minimum down payment")
     st.caption(
-        "Your corpus can't cover registration plus the minimum down payment in any "
-        "year of this horizon — stretch the horizon, or lower the price."
+        f"No year in this horizon works — {blocker}. Stretch the horizon, lower the "
+        "price, or raise the share of wants + investment an EMI may take."
     )
 elif starting_corpus <= 0 and monthly_investment <= 0:
     st.caption("Record your savings on Actuals, or set a starting corpus above, to price the waiting years.")
@@ -413,11 +438,12 @@ else:
     st.caption(
         "Each bar is one decision priced end to end: rent until you buy, then "
         "registration, every rupee of the loan's interest, and maintenance for the "
-        "whole tenure. Greyed bars are years your corpus can't fund."
-        if not timing["feasible"].all() else
-        "Each bar is one decision priced end to end: rent until you buy, then "
-        "registration, every rupee of the loan's interest, and maintenance for the "
-        "whole tenure."
+        "whole tenure"
+        + (f", all discounted to today's rupees at {inflation_pct:.1f}% inflation. "
+           if inflation_pct else ", in nominal rupees. ")
+        + ("Greyed bars fail one of the two affordability tests: enough cash for "
+           "registration plus the down payment, and an EMI inside your budget."
+           if not timing["feasible"].all() else "")
     )
 
 st.markdown(

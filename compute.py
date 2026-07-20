@@ -766,67 +766,12 @@ def sip_for_target(target_amount: float, annual_return_pct: float, years: float)
     return target_amount * r / ((1 + r) ** n - 1)
 
 
-def affordability_series(monthly_income: float, income_growth_pct: float, price: float,
-                         appreciation_pct: float, down_pct: float, registration_pct: float,
-                         loan_rate_pct: float, tenure_years: int, horizon_years: int,
-                         emi_cap_pct: float, starting_corpus: float = 0.0,
-                         monthly_investment: float = 0.0,
-                         invest_return_pct: float = 0.0) -> pd.DataFrame:
-    """When does this house become affordable — and what constraint is binding?
-
-    Two ceilings, each year — the true affordable price is the lower of them:
-
-      - **Income-limited**: the priciest house whose EMI stays at or under
-        ``emi_cap_pct`` of that year's monthly income (income grows at
-        ``income_growth_pct``), grossed up by the financed share.
-      - **Cash-limited**: the priciest house whose down payment + registration
-        your investable corpus can cover. The corpus starts at
-        ``starting_corpus``, grows at ``invest_return_pct``, and takes a yearly
-        ``monthly_investment`` top-up (itself growing with income).
-
-    The binding constraint typically flips: early on you're cash-constrained
-    (can't save the down payment fast enough); once the corpus outgrows the
-    down-payment need, income becomes the ceiling. With ``starting_corpus`` and
-    ``monthly_investment`` both zero the cash line is zero and income never
-    binds — pass the person's real numbers for a meaningful answer.
-
-    Returns:
-        One row per year offset 0..horizon: ``year_offset``, ``house_price``
-        (this house, appreciated), ``income_limited_price``,
-        ``cash_limited_price``, ``affordable_price`` (the min of the two), and
-        ``binding`` ("cash" or "income").
-    """
-    financed_share = 1 - down_pct / 100
-    upfront_share = (down_pct + registration_pct) / 100  # down + stamp duty, from corpus
-    corpus = starting_corpus
-    annual_topup = monthly_investment * 12
-    rows = []
-    for t in range(0, horizon_years + 1):
-        if t > 0:
-            corpus = corpus * (1 + invest_return_pct / 100) + annual_topup
-            annual_topup *= (1 + income_growth_pct / 100)  # the SIP grows with income
-        income_t = monthly_income * (1 + income_growth_pct / 100) ** t
-        emi_budget = income_t * emi_cap_pct / 100
-        loan = max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
-        income_price = loan / financed_share if financed_share > 0 else float("inf")
-        cash_price = corpus / upfront_share if upfront_share > 0 else float("inf")
-        affordable = min(income_price, cash_price)
-        rows.append({
-            "year_offset": t,
-            "house_price": price * (1 + appreciation_pct / 100) ** t,
-            "income_limited_price": income_price,
-            "cash_limited_price": cash_price,
-            "affordable_price": affordable,
-            "binding": "cash" if cash_price < income_price else "income",
-        })
-    return pd.DataFrame(rows)
-
-
 def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_years: int,
                   registration_pct: float, maintenance_pct: float, appreciation_pct: float,
                   rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
                   horizon_years: int, starting_corpus: float = 0.0,
-                  monthly_saving: float = 0.0) -> pd.DataFrame:
+                  monthly_saving: float = 0.0, inflation_pct: float = 0.0,
+                  emi_budget: float = 0.0) -> pd.DataFrame:
     """Total money wasted by the horizon, for every possible year of buying.
 
     Renting is not a permanent state: at some point the house gets bought, and
@@ -859,12 +804,19 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
     The corpus's growth is not subtracted anywhere — it already shows up as a
     smaller loan, and counting it twice would make waiting look free again.
     A year is ``feasible`` only if the corpus covers registration plus the
-    minimum down payment.
+    minimum down payment (``cash_ok``) *and* the resulting EMI fits
+    ``emi_budget`` for that year (``emi_ok``). Cash alone would approve a loan
+    the household cannot service.
+
+    Amounts are reported in today's rupees when ``inflation_pct`` is set: each
+    flow is discounted from the year it is paid, so rent in year 3 and interest
+    in year 25 are not added at face value.
 
     Assumes a ready-to-move-in property: rent stops the day the house is
     bought, with no construction gap and no pre-EMI period.
 
-    ``t`` runs 0..``horizon_years - 1``.
+    ``t`` runs 0..``horizon_years`` inclusive, so a 15-year horizon offers
+    buying now through waiting the full fifteen.
 
     Args:
         price: Property price today.
@@ -880,6 +832,11 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
         horizon_years: How many years of waiting to evaluate.
         starting_corpus: Investable savings available today.
         monthly_saving: Added to the corpus every month while waiting.
+        inflation_pct: General inflation. Grows maintenance year on year and
+            discounts every flow back to today's rupees, so costs decades apart
+            compare honestly. 0 leaves the model in nominal terms.
+        emi_budget: What the household can pay as EMI today; grown at
+            ``inflation_pct`` for later years. 0 skips the serviceability test.
 
     Returns:
         One row per buy year (``wait_years`` 0..horizon-1), with the price then,
@@ -888,8 +845,14 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
         with the smallest ``total_wasted``.
     """
     r_month = invest_return_pct / 100 / 12
+    discount = 1 + inflation_pct / 100
+
+    def pv(amount: float, year: float) -> float:
+        """``amount``, paid ``year`` years from today, in today's rupees."""
+        return amount / discount ** year if inflation_pct else amount
+
     rows = []
-    for wait in range(max(1, horizon_years)):
+    for wait in range(max(1, horizon_years) + 1):
         price_then = price * (1 + appreciation_pct / 100) ** wait
         registration_cost = price_then * registration_pct / 100
         # Corpus: today's savings compounded, plus the monthly additions made
@@ -902,18 +865,37 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
 
         min_down = price_then * down_pct / 100
         available = corpus - registration_cost  # registration is paid in cash
-        feasible = available >= min_down
         down_payment = min(max(available, min_down), price_then)
         loan_principal = max(0.0, price_then - down_payment)
         monthly_emi = emi(loan_principal, loan_rate_pct, tenure_years)
         interest_by_year, _ = _amortization_by_year(
             loan_principal, loan_rate_pct, tenure_years, monthly_emi
         )
+        # Affordable means both: the cash is there for registration plus the
+        # minimum down payment, AND the EMI fits the household budget of that
+        # year. Cash alone would green-light a loan nobody can service.
+        cash_ok = available >= min_down
+        budget_then = emi_budget * discount ** wait if emi_budget else 0.0
+        emi_ok = monthly_emi <= budget_then if emi_budget else True
+        feasible = bool(cash_ok and emi_ok)
+
+        # Every flow is discounted from the year it is actually paid: rent while
+        # waiting, registration at purchase, then interest and maintenance
+        # across the tenure. Without this, a rupee in 2060 counts the same as
+        # one today and waiting always looks cheaper than it is.
         rent_paid = sum(
-            rent_monthly * (1 + rent_inflation_pct / 100) ** y * 12 for y in range(wait)
+            pv(rent_monthly * (1 + rent_inflation_pct / 100) ** y * 12, y)
+            for y in range(wait)
         )
-        interest_paid = sum(interest_by_year)
-        maintenance_paid = price_then * maintenance_pct / 100 * tenure_years
+        interest_paid = sum(
+            pv(amount, wait + j + 1) for j, amount in enumerate(interest_by_year)
+        )
+        maintenance_base = price_then * maintenance_pct / 100
+        maintenance_paid = sum(
+            pv(maintenance_base * discount ** j, wait + j + 1)
+            for j in range(tenure_years)
+        )
+        registration_pv = pv(registration_cost, wait)
 
         rows.append({
             "wait_years": wait,
@@ -922,12 +904,16 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
             "down_payment": down_payment,
             "loan": loan_principal,
             "monthly_emi": monthly_emi,
+            "emi_budget": budget_then,
+            "cash_ok": cash_ok,
+            "emi_ok": emi_ok,
             "feasible": feasible,
             "rent_paid": rent_paid,
             "registration_cost": registration_cost,
+            "registration_pv": registration_pv,
             "interest_paid": interest_paid,
             "maintenance_paid": maintenance_paid,
-            "total_wasted": (rent_paid + registration_cost + interest_paid
+            "total_wasted": (rent_paid + registration_pv + interest_paid
                              + maintenance_paid),
         })
     return pd.DataFrame(rows)
