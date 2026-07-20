@@ -86,9 +86,9 @@ def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
     assert not at.error, [e.value for e in at.error]
 
 
-# Rent vs buy's "What would it take?" caption reads the person's own data —
-# rv has income in fake_data_dir, cheeni doesn't, so one profile exercises the
-# projection and the other exercises its "not enough data yet" fallback.
+# Rent vs buy's affordability section reads the person's own budget — rv has
+# income in fake_data_dir, cheeni doesn't, so one profile exercises the
+# needs+wants envelope and the other exercises its "no data yet" fallback.
 
 def test_rent_vs_buy_verdict_names_the_leaner_side(fake_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
@@ -99,16 +99,17 @@ def test_rent_vs_buy_verdict_names_the_leaner_side(fake_data_dir):
     assert "wastes" in captions and "less" in captions
     assert "sit idle" in captions
     assert "Interest is front-loaded" in captions  # the amortization table's caption
-    assert "against the" in captions  # the income projection line
+    assert "of your needs + wants" in captions  # the affordability verdict
 
 
-def test_rent_vs_buy_income_line_silent_without_data(fake_data_dir):
+def test_rent_vs_buy_affordability_silent_without_data(fake_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
     at.query_params["profile"] = "cheeni"  # no income in this fixture
     at.run()
     assert not at.exception, at.exception
     captions = " ".join(c.value for c in at.caption)
-    assert "Add income to see this against your own numbers" in captions
+    assert "Add this year's income to see what your budget can carry" in captions
+
 
 def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     """Saving without a real change must say so, not flash a misleading 'Saved.'

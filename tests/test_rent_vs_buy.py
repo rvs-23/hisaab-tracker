@@ -34,6 +34,44 @@ def test_interest_plus_principal_equals_emi_times_months():
     assert sum(principal_by_year) == pytest.approx(principal, rel=1e-6)
 
 
+def test_emi_matches_published_figure_50l_8_5pct_20y():
+    """The most-quoted Indian home-loan example: ₹50L at 8.5% over 20y ≈ ₹43,391."""
+    assert compute.emi(5_000_000, 8.5, 20) == pytest.approx(43_391.16, abs=0.01)
+
+
+def test_interest_falls_and_principal_rises_every_year():
+    """The defining property of an EMI: a fixed instalment on a shrinking
+    balance, so interest is heaviest in year 1 and principal overtakes it."""
+    principal, rate, tenure = 12_000_000, 8.5, 20
+    interest, repaid = compute._amortization_by_year(
+        principal, rate, tenure, compute.emi(principal, rate, tenure)
+    )
+    assert all(a > b for a, b in zip(interest, interest[1:]))
+    assert all(a < b for a, b in zip(repaid, repaid[1:]))
+    assert interest[0] > repaid[0]  # year 1 is mostly interest
+    assert interest[-1] < repaid[-1]  # the final year is mostly principal
+    assert len(interest) == tenure
+
+
+def test_max_loan_for_emi_is_the_exact_inverse_of_emi():
+    for principal, rate, tenure in [(5_000_000, 8.5, 20), (12_000_000, 9.25, 15),
+                                    (2_500_000, 7.0, 30)]:
+        monthly = compute.emi(principal, rate, tenure)
+        assert compute.max_loan_for_emi(monthly, rate, tenure) == pytest.approx(principal, rel=1e-9)
+
+
+def test_max_loan_for_emi_zero_rate_is_flat_multiplication():
+    assert compute.max_loan_for_emi(50_000, 0, 20) == pytest.approx(50_000 * 240)
+
+
+def test_sip_for_target_future_value_hits_the_target():
+    """The SIP inverse must round-trip through the standard FV formula."""
+    target, rate, years = 10_000_000, 11.5, 10
+    sip = compute.sip_for_target(target, rate, years)
+    r, n = rate / 1200, years * 12
+    assert sip * ((1 + r) ** n - 1) / r == pytest.approx(target, rel=1e-9)
+
+
 def test_amortization_zero_rate_is_all_principal():
     principal, tenure = 1_200_000, 10
     monthly = compute.emi(principal, 0, tenure)

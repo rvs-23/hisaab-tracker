@@ -6,7 +6,6 @@ views use so a view imports everything it needs from one place.
 
 from __future__ import annotations
 
-import html
 import math
 from contextlib import contextmanager
 
@@ -168,17 +167,6 @@ def pretty_category(category: str) -> str:
     return CATEGORY_LABELS.get(category, category.replace("_", " ").capitalize())
 
 
-def info_icon(text: str) -> str:
-    """Returns an (i) glyph with a native hover tooltip.
-
-    The help text is HTML-escaped so apostrophes/quotes/brackets (e.g. "you've")
-    can't terminate the ``title`` attribute early and silently swallow the tooltip.
-    """
-    safe = html.escape(text, quote=True)
-    return (f" <span title='{safe}' style='cursor:help;font-weight:400;"
-            f"font-size:.85em;color:var(--muted)'>&#9432;</span>")
-
-
 # Per-profile accents.
 
 def accent_primary() -> str:
@@ -277,13 +265,13 @@ def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = 
         help: Plain-language explanation shown as an (i) hover tooltip.
     """
     size = FS_HERO if big else FS_VALUE
-    info = info_icon(help) if help else ""
     col.markdown(
         f"<div class='tile'>"
-        f"<div class='lbl'>{label}{info}</div>"
+        f"<div class='lbl'>{label}</div>"
         f"<div class='val' style='font-size:{size};color:{color or 'var(--text)'}'>{value}</div>"
         f"<div class='sub'>{sub}</div></div>",
         unsafe_allow_html=True,
+        help=help or None,
     )
 
 
@@ -343,11 +331,14 @@ def chart_title(text: str, help: str = "") -> None:
         text: The heading.
         help: Optional plain-language note shown as an (i) hover tooltip.
     """
-    info = info_icon(help) if help else ""
+    # Streamlit's native ``help`` rather than a hand-rolled ``title`` attribute:
+    # the HTML sanitizer strips ``title``, so the old (i) glyph never showed
+    # anything on hover.
     st.markdown(
         f"<div style='font-weight:600;font-size:{FS_TITLE};color:var(--text);"
-        f"margin:.5rem 0 .4rem'>{text}{info}</div>",
+        f"margin:.5rem 0 .4rem'>{text}</div>",
         unsafe_allow_html=True,
+        help=help or None,
     )
 
 

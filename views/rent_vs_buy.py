@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import compute
-from config import AFFORD_EMI_CAP_PCT
+from config import EMI_SHARE_OF_NEEDS_WANTS_PCT
 from ui import (
     COST_LINE, FS_BODY, MARKER, accent_primary, accent_secondary, chart_title,
     inr_axis, inr_short, load_all, metric_tile, page_header, style_fig,
@@ -126,11 +126,17 @@ series = {
     "rent": shape("rent_wasted_cum"),
     "idle": shape("rent_wasted_no_invest_cum"),
 }
+# Label roughly every third point (always the first and last): a number on all
+# fifteen years is unreadable, and the rest are one hover away.
+stride = max(1, -(-len(df) // 5))
+labelled = {0, len(df) - 1} | set(range(0, len(df), stride))
+
 f = go.Figure()
 f.add_trace(go.Scatter(
     x=yr, y=series["buy"], name="Buying", mode="lines+markers+text",
     line=dict(color=PRIMARY, width=3), marker=dict(size=5),
-    text=[inr_short(v) for v in series["buy"]], textposition="top center",
+    text=[inr_short(v) if i in labelled else "" for i, v in enumerate(series["buy"])],
+    textposition="top center",
     textfont=dict(color=PRIMARY, size=11), cliponaxis=False,
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>",
 ))
@@ -161,7 +167,8 @@ buy_end = float(df.iloc[-1]["buy_wasted_cum"])
 rent_end = float(df.iloc[-1]["rent_wasted_cum"])
 idle_end = float(df.iloc[-1]["rent_wasted_no_invest_cum"])
 horizon_year = today_year + horizon_years - 1
-leaner, gap = ("Buying", rent_end - buy_end) if buy_end <= rent_end else ("Renting", buy_end - rent_end)
+leaner, gap = (("Buying", rent_end - buy_end) if buy_end <= rent_end
+               else ("Renting + investing", buy_end - rent_end))
 st.caption(
     f"By {horizon_year}, **{leaner.lower()} wastes {inr_short(abs(gap))} less**: buying burns "
     f"{inr_short(buy_end)} (registration + interest + maintenance) against {inr_short(rent_end)} "
@@ -209,46 +216,68 @@ metric_tile(cols[3], f"Wastes less by {horizon_year}", leaner, f"by {inr_short(a
             help="The lower waste line at the horizon, against a renter who invests the "
                  "difference. Says nothing about which side ends up with more assets.")
 
-# What would it take? One goal, saving from zero: the SIP for the down payment,
-# the EMI on the balance, and the salary that keeps that EMI under the cap.
-buy_year = today_year + horizon_years
+# Affordability, from the budget rather than gross income: an EMI is funded out
+# of needs + wants (a home replaces rent and squeezes discretionary spend), and
+# should never eat the investment slice. The share is yours to set.
 chart_title(
-    "What would it take?",
-    help="Isolated to this one goal, saving from zero: the monthly SIP to reach the "
-         "down payment + registration by the horizon (house price grown at the "
-         "appreciation rate), the EMI on the loan, and the salary that keeps the EMI "
-         f"under {AFFORD_EMI_CAP_PCT}% of income. Ignores your existing corpus and other goals.",
+    "What you can afford",
+    help="Your budget's needs + wants for the current year, not gross income — the "
+         "investment slice stays untouched. The share below is how much of that "
+         "envelope a home loan may consume; the rest keeps paying for everything "
+         "else you need and want.",
 )
-future_price = price * (1 + appreciation_pct / 100) ** horizon_years
-upfront_target = future_price * (down_pct + registration_pct) / 100
-sip = compute.sip_for_target(upfront_target, invest_return_pct, horizon_years)
-loan_then = future_price * (1 - down_pct / 100)
-emi_then = compute.emi(loan_then, loan_rate_pct, tenure_years)
-salary_needed = emi_then / (AFFORD_EMI_CAP_PCT / 100) if AFFORD_EMI_CAP_PCT else 0.0
-wcols = st.columns(3)
-metric_tile(wcols[0], "Save / month", inr_short(sip),
-            f"to reach {inr_short(upfront_target)} by {buy_year}", color=SECONDARY, big=True)
-metric_tile(wcols[1], "EMI after", inr_short(emi_then),
-            f"on a {inr_short(loan_then)} loan", big=True)
-metric_tile(wcols[2], f"Salary needed, {buy_year}", inr_short(salary_needed),
-            f"so EMI ≤ {AFFORD_EMI_CAP_PCT}% of it", color=PRIMARY, big=True)
-
 bs = compute.budget_series(profile, d.income)
 entered = bs[~bs["is_projected"]]
 monthly_income = float(entered.iloc[-1]["total_income"]) / 12 if not entered.empty else 0.0
 cur_row = bs[bs["year"] == today_year]
-monthly_investment = float(cur_row.iloc[0]["monthly_investment"]) if not cur_row.empty else 0.0
-if monthly_income > 0:
-    proj_income = monthly_income * (1 + appreciation_pct / 100) ** horizon_years
-    invest_bit = (f"You invest about {inr_short(monthly_investment)}/mo now vs the "
-                  f"{inr_short(sip)} this needs. " if monthly_investment > 0 else "")
-    st.caption(
-        invest_bit
-        + f"Your income would be roughly {inr_short(proj_income)}/mo by {buy_year} "
-        f"(growing at the appreciation rate) against the {inr_short(salary_needed)} needed."
+
+if not cur_row.empty and monthly_income > 0:
+    row = cur_row.iloc[0]
+    monthly_needs = float(row["monthly_needs"])
+    monthly_wants = float(row["monthly_wants"])
+    monthly_investment = float(row["monthly_investment"])
+    envelope = monthly_needs + monthly_wants
+
+    share_pct = st.slider(
+        "Share of needs + wants an EMI may take (%)", 10, 100,
+        EMI_SHARE_OF_NEEDS_WANTS_PCT, step=5, key=f"rvb_emishare_{k}",
     )
+    emi_budget = envelope * share_pct / 100
+    max_loan = compute.max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
+    # The loan is (100 − down_pct) of the price, so the price it supports is the
+    # loan grossed back up. At 100% down there's no loan to size.
+    max_price = max_loan / (1 - down_pct / 100) if down_pct < 100 else 0.0
+
+    acols = st.columns(4)
+    metric_tile(acols[0], "Needs + wants / month", inr_short(envelope),
+                f"{inr_short(monthly_needs)} needs + {inr_short(monthly_wants)} wants", big=True)
+    metric_tile(acols[1], "EMI you can carry", inr_short(emi_budget),
+                f"{share_pct}% of that envelope", color=SECONDARY, big=True)
+    metric_tile(acols[2], "Loan it supports", inr_short(max_loan),
+                f"{loan_rate_pct:.1f}% over {tenure_years} years", big=True)
+    metric_tile(acols[3], "House you can buy", inr_short(max_price),
+                f"at {down_pct}% down", color=PRIMARY, big=True)
+
+    verdict = ("within reach" if monthly_emi <= emi_budget else "beyond that budget")
+    share_of_envelope = 100 * monthly_emi / envelope if envelope else 0.0
+    afford_caption = (
+        f"This {inr_short(price)} house needs a {inr_short(monthly_emi)} EMI — "
+        f"{share_of_envelope:.0f}% of your needs + wants, so it's **{verdict}**. "
+    )
+    if monthly_emi > emi_budget:
+        afford_caption += (
+            f"Closing the gap means {inr_short(monthly_emi - emi_budget)} a month more, "
+            f"which comes out of the {inr_short(monthly_investment)} you currently invest "
+            "unless income grows first."
+        )
+    else:
+        afford_caption += (
+            f"That leaves {inr_short(emi_budget - monthly_emi)} a month of the envelope "
+            f"spare, with the {inr_short(monthly_investment)} investment slice untouched."
+        )
+    st.caption(afford_caption)
 else:
-    st.caption("Add income to see this against your own numbers.")
+    st.caption("Add this year's income to see what your budget can carry.")
 
 st.markdown(
     f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats: this compares "
