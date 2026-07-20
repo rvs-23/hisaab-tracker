@@ -13,7 +13,7 @@ INK = "#2b2b2b"
 GRAPHITE = "#334155"  # rv primary — dark gunmetal (the "platinum" scheme)
 STEEL = "#64748B"  # rv secondary — lighter steel, so planned recedes
 PINK = "#EC4899"  # cheeni primary — light bright pink (chart + large-text AA; small text is borderline ~3.5:1)
-MAGENTA = "#86198F"  # cheeni secondary — deep magenta anchors the contrast
+RASPBERRY = "#9D174D"  # cheeni secondary — deep raspberry, same pink family (not violet)
 MUTED = "#697077"  # ≈5:1 on white — the old #7c828c failed WCAG AA at small sizes
 CARD_BG = "#ffffff"
 CARD_BORDER = "#e7eaee"
@@ -33,10 +33,10 @@ FONT = "Inter"
 # both light and dark backgrounds *and* to pass WCAG AA (≥4.5:1) as small text
 # on white; the shared grays stay the neutral base.
 #   rv     → platinum monochrome (graphite + steel)
-#   cheeni → light pink (pink + deep magenta)
+#   cheeni → pink family (light pink + deep raspberry)
 PROFILE_ACCENTS = {
     "rv": (GRAPHITE, STEEL),
-    "cheeni": (PINK, MAGENTA),
+    "cheeni": (PINK, RASPBERRY),
 }
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
