@@ -626,3 +626,40 @@ def test_catch_up_uses_flat_return_when_set(rv):
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026, flat_return=10.0)
     assert cu == pytest.approx(250000 * 1.10 ** 2, rel=1e-6)
+
+
+def test_max_loan_inverts_emi():
+    """emi(max_loan_for_emi(budget)) must round-trip to the budget."""
+    loan = compute.max_loan_for_emi(69426, 8.5, 20)
+    assert compute.emi(loan, 8.5, 20) == pytest.approx(69426, abs=0.01)
+    assert compute.max_loan_for_emi(10000, 0, 10) == 10000 * 120  # zero-rate edge
+
+
+def test_adjusted_waste_columns_are_identities():
+    df = compute.rent_vs_buy(price=10_000_000, down_pct=20, loan_rate_pct=8.5, tenure_years=20,
+                             registration_pct=7, maintenance_pct=0.5, appreciation_pct=5,
+                             rent_monthly=30_000, rent_inflation_pct=5, invest_return_pct=10,
+                             horizon_years=10)
+    r1 = df.iloc[0]
+    assert r1["appreciation_gain"] == pytest.approx(10_000_000 * 0.05)
+    assert r1["buy_wasted_net"] == pytest.approx(r1["buy_wasted_cum"] - r1["appreciation_gain"])
+    assert r1["rent_wasted_net"] == pytest.approx(r1["rent_wasted_cum"] - r1["renter_gain"])
+    assert (df["renter_gain"] >= 0).all()  # positive-return growth never negative here
+
+
+def test_affordability_parallel_when_growth_matches_appreciation():
+    """Same growth rate on both sides → the affordability ratio never moves."""
+    df = compute.affordability_series(monthly_income=200000, income_growth_pct=5, price=15_000_000,
+                                      appreciation_pct=5, down_pct=20, loan_rate_pct=8.5,
+                                      tenure_years=20, horizon_years=10, emi_cap_pct=50)
+    ratio = df["affordable_price"] / df["house_price"]
+    assert ratio.std() == pytest.approx(0, abs=1e-9)
+
+
+def test_affordability_crosses_when_income_outpaces_house():
+    df = compute.affordability_series(monthly_income=150000, income_growth_pct=10, price=20_000_000,
+                                      appreciation_pct=3, down_pct=20, loan_rate_pct=8.5,
+                                      tenure_years=20, horizon_years=25, emi_cap_pct=50)
+    behind = df.iloc[0]["affordable_price"] < df.iloc[0]["house_price"]
+    ahead_later = (df["affordable_price"] >= df["house_price"]).any()
+    assert behind and ahead_later

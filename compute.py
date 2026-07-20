@@ -616,6 +616,13 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         buy_wasted_cum: registration + cumulative interest paid + cumulative
             maintenance, to date.
         rent_wasted_cum: cumulative rent paid, to date.
+        appreciation_gain: house value so far minus the price paid.
+        renter_gain: growth on the renter's invested savings (portfolio minus
+            what was put in).
+        buy_wasted_net / rent_wasted_net: the apples-to-apples pair — each
+            side's waste minus the asset gain that side ends up holding
+            (the buyer's appreciation; the renter's investment growth). Can go
+            negative when the asset gained more than the waste.
         buy_equity: down payment + principal repaid so far + property
             appreciation on the full price (interest/maintenance/registration
             build no equity, so they're excluded here).
@@ -679,14 +686,70 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         for k, diff in yearly_diff.items():
             renter_portfolio += diff * (1 + invest_return_pct / 100) ** (year - k)
 
+        renter_contributed = non_invested_base + sum(yearly_diff.values())
+        renter_gain = renter_portfolio - renter_contributed
+
         rows.append({
             "year": year,
             "buy_wasted_cum": buy_wasted_cum,
             "rent_wasted_cum": rent_wasted_cum,
             "buy_equity": buy_equity,
             "renter_portfolio": renter_portfolio,
+            "appreciation_gain": appreciation_gain,
+            "renter_gain": renter_gain,
+            "buy_wasted_net": buy_wasted_cum - appreciation_gain,
+            "rent_wasted_net": rent_wasted_cum - renter_gain,
             "buy_net": buy_equity - buy_wasted_cum,
             "rent_net": renter_portfolio - rent_wasted_cum,
+        })
+    return pd.DataFrame(rows)
+
+
+def max_loan_for_emi(monthly_emi_budget: float, annual_rate_pct: float,
+                     tenure_years: int) -> float:
+    """The largest loan a monthly EMI budget can service (inverse of ``emi``).
+
+    Args:
+        monthly_emi_budget: The EMI one can afford per month.
+        annual_rate_pct: Annual loan rate, in percent.
+        tenure_years: Loan tenure in years.
+    """
+    months = tenure_years * 12
+    r = annual_rate_pct / 100 / 12
+    if r == 0:
+        return monthly_emi_budget * months
+    return monthly_emi_budget * ((1 + r) ** months - 1) / (r * (1 + r) ** months)
+
+
+def affordability_series(monthly_income: float, income_growth_pct: float, price: float,
+                         appreciation_pct: float, down_pct: float, loan_rate_pct: float,
+                         tenure_years: int, horizon_years: int,
+                         emi_cap_pct: float) -> pd.DataFrame:
+    """When does this house become affordable — and what house is, each year?
+
+    "Affordable" means the EMI stays at or under ``emi_cap_pct`` of that
+    year's monthly income. Income grows at ``income_growth_pct``; the house
+    appreciates at ``appreciation_pct``. The affordable price assumes the
+    down payment itself is available (it only inverts the EMI constraint).
+    Note the built-in honesty: if income and the house grow at the same rate,
+    the two curves stay parallel forever — affordability then never changes.
+
+    Returns:
+        One row per year offset 0..horizon: ``year_offset``, ``house_price``
+        (this house, appreciated), ``affordable_price`` (the priciest house
+        the EMI cap allows that year).
+    """
+    rows = []
+    for t in range(0, horizon_years + 1):
+        income_t = monthly_income * (1 + income_growth_pct / 100) ** t
+        emi_budget = income_t * emi_cap_pct / 100
+        loan = max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
+        financed_share = 1 - down_pct / 100
+        affordable = loan / financed_share if financed_share > 0 else float("inf")
+        rows.append({
+            "year_offset": t,
+            "house_price": price * (1 + appreciation_pct / 100) ** t,
+            "affordable_price": affordable,
         })
     return pd.DataFrame(rows)
 

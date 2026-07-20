@@ -71,6 +71,7 @@ EXPECTED_RETURNS = {
     "ppf_nps": 8.0, "bonds_gsec_aif": 7.5, "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
+AFFORD_EMI_CAP_PCT = 50  # "affordable" = EMI at or under this share of monthly income
 
 # Emergency-fund *target* = this many months of the needs bucket (essential
 # spending only; wants pause in an emergency). The target is derived; the
