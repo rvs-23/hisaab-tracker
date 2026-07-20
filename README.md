@@ -72,11 +72,14 @@ The two write pages:
   forward until replaced.
 
 **Rent vs buy** is a calculator, not a save — stateless, nothing written to
-disk. It frames the decision as **money wasted** (registration + loan
-interest + maintenance for buying, the rent itself for renting) rather than
-net worth, defaults its invest-return input to your own allocation-weighted
-expected return, and closes with an honest "assumptions dominate this"
-caveat on the fuller net-position view.
+disk. Inputs sit in four bordered groups (the house / the loan / renting /
+investing) under a locked start-year. It shows **money wasted** (registration
++ loan interest + maintenance vs the rent itself), then the verdict as one
+line — buyer's assets minus renter's assets, with a dashed twin against a
+renter who never invests the difference — plus an affordability chart (EMI
+capped at `AFFORD_EMI_CAP_PCT` of income) and a plain-sentence bottom line
+against your own income and net worth. The invest-return input defaults to
+the household expected return.
 
 ## The numbers
 

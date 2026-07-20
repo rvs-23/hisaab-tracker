@@ -79,19 +79,19 @@ and the **secondary accent means "what was planned"**.
 
 ## Rent vs buy
 
-A calculator on its own page — nothing you enter here is saved, and inputs
-sit in three labelled groups (the house, the loan, renting & investing).
-It frames the decision the same way as everywhere else in the app: what's
-*wasted*, not what you're worth — and it's apples to apples: buying's waste
-(registration, loan **interest** — never principal — and maintenance) is
-netted against the house's appreciation, renting's waste (the rent itself)
-against the growth on what a renter invests instead. An affordability chart
+A calculator on its own page — nothing you enter here is saved. Inputs sit
+in four groups: the house, the loan, renting (just its cost), and investing
+(what a renter does with the money buying would have consumed). The first
+chart is **money wasted** — registration, loan *interest* (never principal)
+and maintenance for buying, the rent itself for renting. The second is the
+verdict in one line: the buyer's assets minus the renter's, year by year —
+above zero, buying has you ahead; a dashed twin shows the same verdict
+against a renter who leaves the difference as cash, and the gap between the
+two lines is what investing the difference is worth. An affordability chart
 shows when this house's price crosses what your income can carry (EMI capped
-at half your monthly income, income growing at the appreciation rate), and
-"The bottom line" says it plainly against your own numbers: what buying
-costs upfront and monthly as a share of your take-home, and what renting
-costs the same way. The investment-return assumption defaults to the same
-single expected return the dashboard uses.
+at half your monthly income), and "The bottom line" says it plainly against
+your own numbers. The investment-return input defaults to the same single
+expected return the dashboard uses.
 
 ## What to do, and when
 
