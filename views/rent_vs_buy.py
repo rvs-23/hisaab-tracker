@@ -145,10 +145,9 @@ f.add_trace(go.Scatter(
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
 f.update_layout(xaxis=dict(type="category"))
-# 50L gridlines suit the cumulative totals; per-year values are a tenth of that,
-# so let the auto step pick there.
-inr_axis(f, max(s.max() for s in series.values()) * 1.08,
-         step=None if per_year else 50_00_000)
+# Auto step both ways (≈5 round gridlines). A fixed 50L grid fits the per-year
+# magnitudes but crowds the cumulative totals with ten-plus lines.
+inr_axis(f, max(s.max() for s in series.values()) * 1.08)
 style_fig(f, height=440)
 # After style_fig — it sets both legend and margin, so anything set before it is
 # silently overwritten. Legend sits above the plot, left-aligned (the names are
