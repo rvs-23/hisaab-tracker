@@ -101,21 +101,33 @@ yr = (today_year - 1 + df["year"]).astype(str)  # calendar years from the locked
 # straight off the page. Assets (equity, appreciation, a portfolio) are not
 # waste and are deliberately absent; the table below shows where the money went.
 chart_title(
-    "Money wasted, cumulative",
+    "Money wasted",
     help="Waste = money you never get back. Buying wastes registration + loan interest "
          "+ maintenance — never the principal, which becomes your equity. Renting wastes "
          "the rent. A renter who leaves the difference in idle cash also wastes the growth "
-         "they gave up, so that line sits higher. Lower = less wasted.",
+         "they gave up. Lower = less wasted. Per year shows each year on its own "
+         "(registration lands once, in year 1); cumulative is the running total.",
 )
+view = st.radio("View", ["Per year", "Cumulative"], horizontal=True,
+                label_visibility="collapsed", key=f"rvb_view_{k}")
+# Per-year is the difference of the running totals, keeping year 1 whole —
+# cumulative hides the shape (year 1 carries registration and the heaviest
+# interest, so it towers over every year after it).
+per_year = view == "Per year"
+
+
+def shape(col: str):
+    """The chart series for ``col``: per-year deltas, or the running total."""
+    return df[col].diff().fillna(df[col].iloc[0]) if per_year else df[col]
 # Mixed encoding: the two real alternatives are bars (side by side, easy to
 # compare height at any year), and the idle-cash case rides above them as a
 # dashed reference line — it's an order of magnitude larger, so as a bar it
 # would flatten the pair you're actually choosing between. Only the Buying bars
 # carry value labels; three sets of numbers collided into noise.
 series = {
-    "buy": df["buy_wasted_cum"],
-    "rent": df["rent_wasted_cum"],
-    "idle": df["rent_wasted_no_invest_cum"],
+    "buy": shape("buy_wasted_cum"),
+    "rent": shape("rent_wasted_cum"),
+    "idle": shape("rent_wasted_no_invest_cum"),
 }
 f = go.Figure()
 f.add_trace(go.Bar(
@@ -125,21 +137,25 @@ f.add_trace(go.Bar(
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>",
 ))
 f.add_trace(go.Bar(
-    x=yr, y=series["rent"], name="Renting + investing the difference",
-    marker_color=SECONDARY,
-    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting</extra>",
+    x=yr, y=series["rent"], name="Renting", marker_color=SECONDARY,
+    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference invested</extra>",
 ))
 f.add_trace(go.Scatter(
-    x=yr, y=series["idle"], name="Renting, cash left idle", mode="lines",
+    x=yr, y=series["idle"], name="Renting, idle cash", mode="lines",
     line=dict(color=COST_LINE, width=2, dash="dash"),
-    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Cash left idle</extra>",
+    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
-# Legend below the plot: above it, it crowded the section title.
+# Legend top-right, on the title's line: short labels fit there, it costs no
+# vertical space, and the full wording lives in the hover.
 f.update_layout(barmode="group", bargap=0.28, bargroupgap=0.06,
                 xaxis=dict(type="category"),
-                legend=dict(orientation="h", yanchor="top", y=-0.18, x=0),
-                margin=dict(t=20, b=70))
-inr_axis(f, max(s.max() for s in series.values()) * 1.05, step=50_00_000)
+                legend=dict(orientation="h", yanchor="bottom", y=1.0,
+                            xanchor="right", x=1),
+                margin=dict(t=30, b=30))
+# 50L gridlines suit the cumulative totals; per-year values are a tenth of that,
+# so let the auto step pick there.
+inr_axis(f, max(s.max() for s in series.values()) * 1.08,
+         step=None if per_year else 50_00_000)
 style_fig(f, height=440)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
