@@ -106,7 +106,7 @@ def _nice_step(rough_step: float) -> float:
 
 
 def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
-             min_value: float = 0.0) -> None:
+             min_value: float = 0.0, min_step: float | None = None) -> None:
     """Sets compact lakh/crore ₹ tick labels on a Plotly axis.
 
     Plotly's ``tickformat="~s"`` renders ₹ amounts as "2M" — the wrong idiom for
@@ -123,10 +123,16 @@ def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
         min_value: The lowest value the axis must cover — pass the data's
             minimum when a series goes negative, else the axis shows only ₹0
             and nothing below.
+        min_step: Floor for the automatic step (e.g. 1_00_00_000 to never draw
+            gridlines closer than 1Cr). The step still grows past it as the data
+            demands, so a large scenario doesn't end up with thirty lines.
+            Ignored when ``step`` is given.
     """
     max_value = max(float(max_value), 1.0)
     min_value = min(float(min_value), 0.0)
     step = step or _nice_step((max_value - min_value) / 5)
+    if min_step:
+        step = max(step, min_step)
     lo = math.floor(min_value / step) * step
     tickvals = [lo]
     while tickvals[-1] < max_value:

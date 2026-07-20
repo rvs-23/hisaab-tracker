@@ -150,11 +150,10 @@ f.add_trace(go.Scatter(
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
 f.update_layout(xaxis=dict(type="category"))
-# Fixed gridline steps, one per view: the cumulative totals run to crores, the
-# per-year amounts to tens of lakhs. Both get a taller canvas so the extra
-# lines have room to breathe.
+# Gridlines start at 1Cr cumulative / 25L per year and coarsen from there — a
+# fixed step would draw thirty lines once the house is a 15Cr scenario.
 top = max(s.max() for s in series.values()) * 1.08
-inr_axis(f, top, step=25_00_000 if per_year else 1_00_00_000)
+inr_axis(f, top, min_step=25_00_000 if per_year else 1_00_00_000)
 style_fig(f, height=560)
 # After style_fig — it sets both legend and margin, so anything set before it is
 # silently overwritten. Legend sits above the plot, left-aligned (the names are
@@ -280,12 +279,93 @@ if not cur_row.empty and monthly_income > 0:
     st.caption(afford_caption)
 else:
     st.caption("Add this year's income to see what your budget can carry.")
+    monthly_investment = 0.0
+
+# When to buy. Renting isn't forever — every year of waiting is a real choice,
+# so price them all on the same terms and let the minimum speak.
+chart_title(
+    "When to buy",
+    help="Total waste over the whole ownership — rent while you wait, plus "
+         "registration, all the loan's interest, and maintenance once you own. "
+         "Waiting costs rent and a pricier house, but your corpus compounds into a "
+         "bigger down payment and a smaller loan. Every option carries its full "
+         "loan, so waiting can't look free. Assumes ready-to-move-in: rent stops "
+         "the day you buy.",
+)
+opening = compute.opening_corpus(d.adjustments, profile.key)
+ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
+_, nw_potential = compute.net_worth_to_date(
+    profile, d.income, d.contributions, d.targets, today_year, opening=opening,
+    emergency_fund=ef_held, flat_return=d.config.expected_return_pct,
+)
+investable = max(0.0, nw_potential - (ef_held or 0.0))  # the emergency fund stays reserved
+
+timing = compute.best_buy_year(
+    price=price, down_pct=down_pct, loan_rate_pct=loan_rate_pct, tenure_years=tenure_years,
+    registration_pct=registration_pct, maintenance_pct=maintenance_pct,
+    appreciation_pct=appreciation_pct, rent_monthly=rent_monthly,
+    rent_inflation_pct=rent_inflation_pct, invest_return_pct=invest_return_pct,
+    horizon_years=horizon_years, starting_corpus=investable,
+    monthly_saving=monthly_investment,
+)
+feasible = timing[timing["feasible"]]
+buy_years = (today_year + timing["wait_years"]).astype(str)
+
+f2 = go.Figure()
+f2.add_trace(go.Bar(
+    x=buy_years, y=timing["total_wasted"],
+    marker_color=[PRIMARY if row.feasible else COST_LINE for row in timing.itertuples()],
+    hovertemplate="Buy in %{x}: ₹%{y:,.0f} wasted<extra></extra>",
+))
+if not feasible.empty:
+    best = timing.loc[feasible["total_wasted"].idxmin()]
+    f2.add_annotation(x=str(today_year + int(best["wait_years"])), y=float(best["total_wasted"]),
+                      text=f"best — {inr_short(best['total_wasted'])}", showarrow=True,
+                      arrowhead=0, ay=-30, font=dict(color=PRIMARY, size=12))
+inr_axis(f2, timing["total_wasted"].max() * 1.15, min_step=1_00_00_000)
+style_fig(f2, height=380)
+f2.update_layout(margin=dict(l=8, r=8, t=34, b=8))
+st.plotly_chart(f2, width="stretch", config={"displayModeBar": False})
+
+if feasible.empty:
+    st.caption(
+        "Your corpus can't cover registration plus the minimum down payment in any "
+        "year of this horizon — stretch the horizon, or lower the price."
+    )
+elif investable <= 0:
+    st.caption("Record your savings on Actuals to price the waiting years against your own corpus.")
+else:
+    best_year = today_year + int(best["wait_years"])
+    now_row = timing.iloc[0]
+    saving = float(now_row["total_wasted"] - best["total_wasted"])
+    if int(best["wait_years"]) == 0:
+        st.caption(
+            f"**Buy now.** Every year of waiting costs more in rent and appreciation "
+            f"than your corpus gains — by {today_year + 1} the same house is "
+            f"{inr_short(timing.iloc[1]['price_then'])} and total waste rises "
+            f"{inr_short(float(timing.iloc[1]['total_wasted'] - now_row['total_wasted']))}."
+        )
+    else:
+        st.caption(
+            f"**{best_year} is the cheapest year to buy** — {inr_short(best['total_wasted'])} "
+            f"wasted against {inr_short(now_row['total_wasted'])} buying today, a "
+            f"{inr_short(saving)} difference. By then the house is "
+            f"{inr_short(best['price_then'])} and your corpus {inr_short(best['corpus'])}, "
+            f"so the loan drops to {inr_short(best['loan'])} "
+            f"(from {inr_short(now_row['loan'])} today) — less interest is what pays for "
+            f"the {inr_short(best['rent_paid'])} of rent along the way."
+        )
+    if not timing["feasible"].all():
+        first = int(timing["feasible"].idxmax())
+        st.caption(f"Greyed years are out of reach — the corpus first covers registration "
+                   f"plus the minimum down payment in {today_year + first}.")
 
 st.markdown(
     f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats: this compares "
     "waste, not wealth — the buyer also ends up owning a house, which this chart "
-    "deliberately ignores. Interest follows a real monthly amortization; maintenance, "
-    "rent and returns compound yearly. No tax breaks modelled (Section 24/80C, HRA), and "
-    "no selling or brokerage costs.</div>",
+    "deliberately ignores. Assumes a ready-to-move-in property: rent stops the day you "
+    "buy, with no construction gap or pre-EMI. Interest follows a real monthly "
+    "amortization; maintenance, rent and returns compound yearly. No tax breaks modelled "
+    "(Section 24/80C, HRA), and no selling or brokerage costs.</div>",
     unsafe_allow_html=True,
 )

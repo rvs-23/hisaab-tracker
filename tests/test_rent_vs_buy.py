@@ -174,3 +174,62 @@ def test_renter_contributed_is_portfolio_minus_gain():
     df = compute.rent_vs_buy(**DEFAULTS)
     row = df.iloc[5]
     assert row["renter_portfolio"] == pytest.approx(row["renter_contributed"] + row["renter_gain"])
+
+
+# best_buy_year — timing the purchase.
+
+TIMING = dict(
+    price=15_000_000, down_pct=20, loan_rate_pct=8.5, tenure_years=20,
+    registration_pct=7, maintenance_pct=0.5, appreciation_pct=5,
+    rent_monthly=40_000, rent_inflation_pct=5, invest_return_pct=11.5,
+    horizon_years=15, starting_corpus=5_000_000, monthly_saving=150_000,
+)
+
+
+def test_best_buy_year_has_one_row_per_wait_year():
+    df = compute.best_buy_year(**TIMING)
+    assert list(df["wait_years"]) == list(range(TIMING["horizon_years"]))
+
+
+def test_waiting_grows_the_corpus_and_shrinks_the_loan():
+    """The whole reason waiting can win: savings compound into a bigger down
+    payment, so the loan falls even though the house costs more."""
+    df = compute.best_buy_year(**TIMING)
+    assert df["price_then"].is_monotonic_increasing
+    assert df["corpus"].is_monotonic_increasing
+    assert df["loan"].is_monotonic_decreasing
+    assert df.iloc[-1]["loan"] == 0.0  # eventually bought outright
+
+
+def test_savings_create_an_interior_optimum():
+    """With real monthly saving the cheapest year is neither the first nor the
+    last — waiting pays until appreciation and rent outrun the corpus."""
+    df = compute.best_buy_year(**TIMING)
+    best = int(df[df["feasible"]]["total_wasted"].idxmin())
+    assert 0 < best < TIMING["horizon_years"] - 1
+
+
+def test_without_savings_buying_now_wins():
+    """No monthly saving means waiting buys nothing but rent and a pricier
+    house, so the optimum collapses to year 0."""
+    # The corpus must clear registration + the minimum down payment today, or
+    # year 0 is simply unaffordable and the earliest feasible year wins by default.
+    df = compute.best_buy_year(**{**TIMING, "monthly_saving": 0, "starting_corpus": 6_000_000})
+    assert bool(df.iloc[0]["feasible"])
+    assert int(df[df["feasible"]]["total_wasted"].idxmin()) == 0
+
+
+def test_interest_is_charged_over_the_full_tenure_not_the_horizon():
+    """Guards the bias that made waiting look free: buying late must still be
+    charged for every rupee of its loan."""
+    df = compute.best_buy_year(**{**TIMING, "starting_corpus": 0, "monthly_saving": 0})
+    late = df.iloc[-1]
+    monthly = compute.emi(late["loan"], TIMING["loan_rate_pct"], TIMING["tenure_years"])
+    full_interest = monthly * TIMING["tenure_years"] * 12 - late["loan"]
+    assert late["interest_paid"] == pytest.approx(full_interest, rel=1e-6)
+
+
+def test_a_small_corpus_marks_early_years_infeasible():
+    df = compute.best_buy_year(**{**TIMING, "starting_corpus": 500_000, "monthly_saving": 50_000})
+    assert not bool(df.iloc[0]["feasible"])
+    assert bool(df.iloc[-1]["feasible"])

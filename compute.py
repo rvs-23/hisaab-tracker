@@ -822,6 +822,117 @@ def affordability_series(monthly_income: float, income_growth_pct: float, price:
     return pd.DataFrame(rows)
 
 
+def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_years: int,
+                  registration_pct: float, maintenance_pct: float, appreciation_pct: float,
+                  rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
+                  horizon_years: int, starting_corpus: float = 0.0,
+                  monthly_saving: float = 0.0) -> pd.DataFrame:
+    """Total money wasted by the horizon, for every possible year of buying.
+
+    Renting is not a permanent state: at some point the house gets bought, and
+    *when* changes the total. Buying now means interest on a big loan from day
+    one and no rent; waiting means paying rent and a pricier house, but the down
+    payment keeps compounding meanwhile.
+
+    The tension is real in both directions. Waiting costs rent and buys a
+    pricier house, but the corpus keeps compounding *and* keeps being added to,
+    so the down payment grows and the loan — the expensive part — shrinks. An
+    interior optimum exists whenever savings outrun property appreciation.
+
+    Every option is charged for the *whole* loan, not just the part that lands
+    inside the horizon. Counting only the horizon's interest would make waiting
+    look free — buy in the final year and almost none of the loan falls inside
+    the window, though every rupee of it still gets paid. Ownership therefore
+    lasts ``tenure_years`` in each scenario, just starting later, and the
+    horizon only bounds how long waiting is allowed.
+
+    For a purchase after ``t`` years of renting:
+        - rent for years 1..t, inflating at ``rent_inflation_pct``;
+        - the house costs ``price`` grown at ``appreciation_pct`` for t years,
+          registration scaled to that price and paid in cash;
+        - the down payment is whatever the corpus can put in after registration
+          (never less than ``down_pct``, never more than the whole price), so
+          waiting converts compounding into a smaller loan;
+        - the loan's full interest over ``tenure_years``;
+        - maintenance for those same ``tenure_years`` of ownership.
+
+    The corpus's growth is not subtracted anywhere — it already shows up as a
+    smaller loan, and counting it twice would make waiting look free again.
+    A year is ``feasible`` only if the corpus covers registration plus the
+    minimum down payment.
+
+    Assumes a ready-to-move-in property: rent stops the day the house is
+    bought, with no construction gap and no pre-EMI period.
+
+    ``t`` runs 0..``horizon_years - 1``.
+
+    Args:
+        price: Property price today.
+        down_pct: Down payment as % of the price at purchase.
+        loan_rate_pct: Annual home-loan interest rate, in percent.
+        tenure_years: Loan tenure in years.
+        registration_pct: One-time registration + stamp duty, as % of price.
+        maintenance_pct: Annual maintenance/property tax, as % of price.
+        appreciation_pct: Assumed annual property appreciation, in percent.
+        rent_monthly: Starting monthly rent.
+        rent_inflation_pct: Annual rent inflation, in percent.
+        invest_return_pct: Annual return on the corpus while it stays invested.
+        horizon_years: How many years of waiting to evaluate.
+        starting_corpus: Investable savings available today.
+        monthly_saving: Added to the corpus every month while waiting.
+
+    Returns:
+        One row per buy year (``wait_years`` 0..horizon-1), with the price then,
+        the corpus, the down payment it funds, the loan, each waste component,
+        ``feasible``, and ``total_wasted``. The best choice is the feasible row
+        with the smallest ``total_wasted``.
+    """
+    r_month = invest_return_pct / 100 / 12
+    rows = []
+    for wait in range(max(1, horizon_years)):
+        price_then = price * (1 + appreciation_pct / 100) ** wait
+        registration_cost = price_then * registration_pct / 100
+        # Corpus: today's savings compounded, plus the monthly additions made
+        # while waiting (standard SIP future value; flat sum at a 0% return).
+        months = wait * 12
+        corpus = starting_corpus * (1 + invest_return_pct / 100) ** wait
+        if monthly_saving:
+            corpus += (monthly_saving * (((1 + r_month) ** months - 1) / r_month)
+                       if r_month else monthly_saving * months)
+
+        min_down = price_then * down_pct / 100
+        available = corpus - registration_cost  # registration is paid in cash
+        feasible = available >= min_down
+        down_payment = min(max(available, min_down), price_then)
+        loan_principal = max(0.0, price_then - down_payment)
+        monthly_emi = emi(loan_principal, loan_rate_pct, tenure_years)
+        interest_by_year, _ = _amortization_by_year(
+            loan_principal, loan_rate_pct, tenure_years, monthly_emi
+        )
+        rent_paid = sum(
+            rent_monthly * (1 + rent_inflation_pct / 100) ** y * 12 for y in range(wait)
+        )
+        interest_paid = sum(interest_by_year)
+        maintenance_paid = price_then * maintenance_pct / 100 * tenure_years
+
+        rows.append({
+            "wait_years": wait,
+            "price_then": price_then,
+            "corpus": corpus,
+            "down_payment": down_payment,
+            "loan": loan_principal,
+            "monthly_emi": monthly_emi,
+            "feasible": feasible,
+            "rent_paid": rent_paid,
+            "registration_cost": registration_cost,
+            "interest_paid": interest_paid,
+            "maintenance_paid": maintenance_paid,
+            "total_wasted": (rent_paid + registration_cost + interest_paid
+                             + maintenance_paid),
+        })
+    return pd.DataFrame(rows)
+
+
 def rent_vs_buy_crossover_year(df: pd.DataFrame) -> int | None:
     """The first year where buying's cumulative waste drops to or below
     renting's — the point buying becomes the less wasteful choice — or
