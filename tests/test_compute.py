@@ -243,9 +243,9 @@ def test_selectable_years_locked_from_baseline(income, contributions):
     assert yrs == list(range(2022, 2027))  # 2022 floor, 2026 current
 
 
-def test_emergency_fund_target_is_four_months_of_full_spend(rv, income):
+def test_emergency_fund_target_is_four_months_of_needs(rv, income):
     bs = compute.budget_series(rv, income).set_index("year")
-    expected = 4 * (bs.loc[2024, "monthly_needs"] + bs.loc[2024, "monthly_wants"])
+    expected = 4 * bs.loc[2024, "monthly_needs"]
     assert compute.emergency_fund_target(rv, income, 2024) == pytest.approx(expected)
     # No income → no budget → no emergency-fund target.
     assert compute.emergency_fund_target(rv, pd.DataFrame(columns=storage.INCOME_COLUMNS)) == 0.0

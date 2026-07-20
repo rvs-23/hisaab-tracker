@@ -253,10 +253,10 @@ def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
 
 def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None) -> float:
     """The emergency-fund *target*: ``EMERGENCY_FUND_MONTHS`` months of the
-    needs + wants buckets (4 months of full monthly spending). Derived from
-    income like the rest of the budget; the *actual* fund held is a hand-entered
-    adjustment (see ``emergency_fund_actual``). Defaults to the latest
-    non-projected year."""
+    needs bucket (essential spending only — wants pause in an emergency).
+    Derived from income like the rest of the budget; the *actual* fund held is
+    a hand-entered adjustment (see ``emergency_fund_actual``). Defaults to the
+    latest non-projected year."""
     bs = budget_series(profile, income)
     if bs.empty:
         return 0.0
@@ -266,8 +266,7 @@ def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | No
     row = pool[pool["year"] == year] if year is not None else pool.iloc[[-1]]
     if row.empty:
         row = pool.iloc[[-1]]
-    monthly_spend = float(row.iloc[0]["monthly_needs"]) + float(row.iloc[0]["monthly_wants"])
-    return monthly_spend * EMERGENCY_FUND_MONTHS
+    return float(row.iloc[0]["monthly_needs"]) * EMERGENCY_FUND_MONTHS
 
 
 def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,

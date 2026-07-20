@@ -72,9 +72,9 @@ EXPECTED_RETURNS = {
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 
-# Emergency-fund *target* = this many months of the needs + wants buckets (4
-# months of full spending, current year). The target is derived; the *actual*
-# fund held is entered by hand as an adjustment (see storage.ALLOWED_ADJUSTMENTS).
+# Emergency-fund *target* = this many months of the needs bucket (essential
+# spending only; wants pause in an emergency). The target is derived; the
+# *actual* fund held is entered by hand (see storage.ALLOWED_ADJUSTMENTS).
 EMERGENCY_FUND_MONTHS = 4
 
 # The components that sum to a year's total income. "other" catches anything
