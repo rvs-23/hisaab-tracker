@@ -108,7 +108,7 @@ chart_title(
          "they gave up. Lower = less wasted. Per year shows each year on its own "
          "(registration lands once, in year 1); cumulative is the running total.",
 )
-view = st.radio("View", ["Per year", "Cumulative"], horizontal=True,
+view = st.radio("View", ["Cumulative", "Per year"], horizontal=True,
                 label_visibility="collapsed", key=f"rvb_view_{k}")
 # Per-year is the difference of the running totals, keeping year 1 whole —
 # cumulative hides the shape (year 1 carries registration and the heaviest
@@ -119,25 +119,24 @@ per_year = view == "Per year"
 def shape(col: str):
     """The chart series for ``col``: per-year deltas, or the running total."""
     return df[col].diff().fillna(df[col].iloc[0]) if per_year else df[col]
-# Mixed encoding: the two real alternatives are bars (side by side, easy to
-# compare height at any year), and the idle-cash case rides above them as a
-# dashed reference line — it's an order of magnitude larger, so as a bar it
-# would flatten the pair you're actually choosing between. Only the Buying bars
-# carry value labels; three sets of numbers collided into noise.
+# Three lines. Only Buying carries value labels — three sets of numbers
+# collided into noise; the rest read off the grid and the hover.
 series = {
     "buy": shape("buy_wasted_cum"),
     "rent": shape("rent_wasted_cum"),
     "idle": shape("rent_wasted_no_invest_cum"),
 }
 f = go.Figure()
-f.add_trace(go.Bar(
-    x=yr, y=series["buy"], name="Buying", marker_color=PRIMARY,
-    text=[inr_short(v) for v in series["buy"]], textposition="outside",
-    textangle=-90, textfont=dict(size=10), cliponaxis=False,
+f.add_trace(go.Scatter(
+    x=yr, y=series["buy"], name="Buying", mode="lines+markers+text",
+    line=dict(color=PRIMARY, width=3), marker=dict(size=5),
+    text=[inr_short(v) for v in series["buy"]], textposition="top center",
+    textfont=dict(color=PRIMARY, size=11), cliponaxis=False,
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>",
 ))
-f.add_trace(go.Bar(
-    x=yr, y=series["rent"], name="Renting", marker_color=SECONDARY,
+f.add_trace(go.Scatter(
+    x=yr, y=series["rent"], name="Renting", mode="lines+markers",
+    line=dict(color=SECONDARY, width=3), marker=dict(size=5),
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference invested</extra>",
 ))
 f.add_trace(go.Scatter(
@@ -145,18 +144,18 @@ f.add_trace(go.Scatter(
     line=dict(color=COST_LINE, width=2, dash="dash"),
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
-# Legend top-right, on the title's line: short labels fit there, it costs no
-# vertical space, and the full wording lives in the hover.
-f.update_layout(barmode="group", bargap=0.28, bargroupgap=0.06,
-                xaxis=dict(type="category"),
-                legend=dict(orientation="h", yanchor="bottom", y=1.0,
-                            xanchor="right", x=1),
-                margin=dict(t=30, b=30))
+f.update_layout(xaxis=dict(type="category"))
 # 50L gridlines suit the cumulative totals; per-year values are a tenth of that,
 # so let the auto step pick there.
 inr_axis(f, max(s.max() for s in series.values()) * 1.08,
          step=None if per_year else 50_00_000)
 style_fig(f, height=440)
+# After style_fig — it sets both legend and margin, so anything set before it is
+# silently overwritten. Legend rides top-right on the title's line: short labels
+# fit, it costs no vertical space, and the plot keeps the full width (l/r 8).
+f.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.0,
+                            xanchor="right", x=1),
+                margin=dict(l=8, r=8, t=34, b=8))
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 buy_end = float(df.iloc[-1]["buy_wasted_cum"])
