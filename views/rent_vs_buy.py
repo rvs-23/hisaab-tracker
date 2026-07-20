@@ -118,10 +118,13 @@ for name, series, color, dash, width in lines:
         hovertemplate="%{x}: %{y:,.0f}<extra>" + name + "</extra>",
     ))
     # End-of-line value label, so the chart reads without the legend or a hover.
-    f.add_annotation(x=yr.iloc[-1], y=float(series.iloc[-1]), text=inr_short(series.iloc[-1]),
-                     showarrow=False, xanchor="left", xshift=6, font=dict(color=color, size=12))
+    # Anchored in paper x (not data x): on a category axis Plotly reads an
+    # annotation's x as a category *index*, so "2040" would stretch the axis to
+    # 2040 slots and squash the real years into a sliver.
+    f.add_annotation(xref="paper", x=1.0, y=float(series.iloc[-1]), text=inr_short(series.iloc[-1]),
+                     showarrow=False, xanchor="left", xshift=8, font=dict(color=color, size=12))
 f.update_layout(xaxis=dict(type="category"), legend=dict(orientation="h", y=1.12, x=0),
-                margin=dict(r=80))
+                margin=dict(r=90))
 all_values = [v for _, s, *_ in lines for v in (s.max(), s.min())]
 inr_axis(f, max(max(all_values), 0), min_value=min(min(all_values), 0))
 style_fig(f, height=380)
