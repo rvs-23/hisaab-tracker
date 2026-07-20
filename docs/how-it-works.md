@@ -49,8 +49,8 @@ pages.
 Top to bottom:
 
 1. **Four lifetime tiles** — earned to date, invested to date, what it could
-   be worth today at conservative growth, and how far behind the plan you are
-   right now (the current year counts only the fraction of it that's elapsed).
+   be worth today at conservative growth, and the year's **total goal**: this
+   year's plan plus any shortfall carried over from past years.
 2. **The journey, year on year** — bars show total income and the planned
    goal side by side; a line shows what you actually invested, so plan and
    reality read against each other at once.
@@ -100,8 +100,8 @@ and the **secondary accent means "what was planned"**.
   lost.
 - **A year you earned nothing** simply has no budget — it won't distort other
   years.
-- **The current year's goal is pro-rated** — the catch-up figure only counts
-  the year elapsed so far, so you're never "behind" on a raise the calendar
-  hasn't reached yet.
+- **Catch-up means past years only** — this year's remaining goal is shown as
+  "left to go", never as catch-up. (On the journey chart, the current year's
+  goal bar is drawn pro-rated to the elapsed year so the bar stays fair.)
 - The ₹ figures use Indian grouping and short forms: `₹55.8L` is 55.8 lakh,
   `₹3.40Cr` is 3.40 crore.

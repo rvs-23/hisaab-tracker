@@ -84,9 +84,9 @@ The two write pages:
   first tracked year and grown at your allocation-weighted expected return; it
   counts toward "Invested till date" and net worth, but never touches the
   budget, goals, catch-up, or plan-vs-actual.
-- **Catch-up** = the lump sum, invested today, that pulls you level with every
-  missed year (shortfalls grown at expected returns; the current year counts
-  only its elapsed fraction; overshooting is fine).
+- **Catch-up** = the lump sum, invested today, that erases every *past* year's
+  shortfall (grown at expected returns; the current year's gap is "left to go",
+  not catch-up; overshooting is fine).
 
 ## Layout
 
