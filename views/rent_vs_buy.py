@@ -26,27 +26,33 @@ k = profile.key  # per-person widget key suffix, so switching profile keeps inpu
 st.caption(
     "A calculator, not a save — nothing here is written to your data. It frames both "
     "choices as **money wasted**: spending that buys you nothing lasting, rather than "
-    "net worth."
+    "net worth. Defaults and context come from your own data; every number is overridable."
 )
 
 target = compute.resolve_target(profile, d.targets, today_year)
 default_return = round(compute.expected_return_for_target(target), 1)
 
 section("Your numbers")
-c1, c2, c3, c4 = st.columns(4)
+c0, c1, c2, c3 = st.columns(4)
+# Locked: the scenario starts now — every projection reads in calendar years.
+c0.number_input("Start year (locked)", value=today_year, disabled=True, key=f"rvb_start_{k}",
+                help="Scenarios start from the current year; the charts below read in calendar years.")
 price = c1.number_input("Property price (₹)", min_value=0, value=15_000_000, step=100_000, key=f"rvb_price_{k}")
+c1.caption(f"= {inr_short(price)}")
 down_pct = c2.slider("Down payment (%)", 0, 100, 20, key=f"rvb_down_{k}")
+c2.caption(f"= {inr_short(price * down_pct / 100)}")
 loan_rate_pct = c3.number_input("Home-loan rate (% p.a.)", min_value=0.0, value=8.5, step=0.1, key=f"rvb_rate_{k}")
+
+c4, c5, c6, c7 = st.columns(4)
 tenure_years = int(c4.number_input("Loan tenure (years)", min_value=1, value=20, step=1, key=f"rvb_tenure_{k}"))
 
-c5, c6, c7, c8 = st.columns(4)
 registration_pct = c5.number_input("Registration + stamp duty (% of price)", min_value=0.0, value=7.0, step=0.5, key=f"rvb_reg_{k}")
 maintenance_pct = c6.number_input("Maintenance (% of price / yr)", min_value=0.0, value=0.5, step=0.1, key=f"rvb_maint_{k}")
 appreciation_pct = c7.number_input("Property appreciation (% p.a.)", min_value=0.0, value=5.0, step=0.5, key=f"rvb_appr_{k}")
+c8, c9, c10, c11 = st.columns(4)
 horizon_years = int(c8.number_input("Horizon (years)", min_value=1, value=15, step=1, key=f"rvb_horizon_{k}"))
-
-c9, c10, c11, _ = st.columns(4)
 rent_monthly = c9.number_input("Starting rent (₹ / month)", min_value=0, value=40_000, step=1_000, key=f"rvb_rent_{k}")
+c9.caption(f"= {inr_short(rent_monthly)}/mo")
 rent_inflation_pct = c10.number_input("Rent inflation (% p.a.)", min_value=0.0, value=5.0, step=0.5, key=f"rvb_rentinfl_{k}")
 invest_return_pct = c11.number_input(
     "Expected investment return (% p.a.)", min_value=0.0, value=default_return, step=0.1,
@@ -57,6 +63,55 @@ st.caption(
     f"Investment return defaults to {default_return:.1f}% — your current target allocation's "
     "expected return, weighted the same way the corpus projection is."
 )
+
+# Derived once, up front, so both "For you" and the tile row below reuse the
+# same numbers as the calculator itself (no separate recompute path).
+down_payment = price * down_pct / 100
+loan_principal = price - down_payment
+registration_cost = price * registration_pct / 100
+monthly_emi = compute.emi(loan_principal, loan_rate_pct, tenure_years)
+maintenance_annual = price * maintenance_pct / 100
+
+# "For you": how these numbers stack up against the person's own real data —
+# read-only context (via load_all), not an input. Recomputes live as the
+# calculator's inputs change above; kept to muted captions so it stays
+# subordinate to the money-wasted chart below, not competing with it.
+bs = compute.budget_series(profile, d.income)
+entered = bs[~bs["is_projected"]]
+monthly_income = float(entered.iloc[-1]["total_income"]) / 12 if not entered.empty else 0.0
+cur_row = bs[bs["year"] == today_year]
+monthly_goal = float(cur_row.iloc[0]["monthly_investment"]) if not cur_row.empty else 0.0
+opening = compute.opening_corpus(d.adjustments, profile.key)
+ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
+_, nw_potential = compute.net_worth_to_date(
+    profile, d.income, d.contributions, d.targets, today_year, opening=opening, emergency_fund=ef_held
+)
+
+context_lines = []
+if monthly_income > 0:
+    emi_pct = 100 * monthly_emi / monthly_income
+    line = f"EMI is **{emi_pct:.0f}%** of your monthly income."
+    if emi_pct > 40:
+        line += " That's a heavy monthly commitment — many guidelines suggest staying under 40%."
+    context_lines.append(line)
+if nw_potential > 0:
+    upfront_cost = down_payment + registration_cost
+    upfront_pct = 100 * upfront_cost / nw_potential
+    context_lines.append(
+        f"Upfront cost (down payment + registration) is {inr_short(upfront_cost)}, about "
+        f"**{upfront_pct:.0f}%** of your estimated net worth today."
+    )
+if monthly_goal > 0:
+    monthly_buy_cost = monthly_emi + maintenance_annual / 12
+    goal_pct = 100 * monthly_buy_cost / monthly_goal
+    context_lines.append(
+        f"Buying at these numbers would consume **{goal_pct:.0f}%** of your planned "
+        f"monthly investment goal."
+    )
+if context_lines:
+    section("For you")
+    for line in context_lines:
+        st.caption(line)
 
 df = compute.rent_vs_buy(
     price=price, down_pct=down_pct, loan_rate_pct=loan_rate_pct, tenure_years=tenure_years,
@@ -72,7 +127,7 @@ chart_title(
     help="Waste = money that buys you nothing lasting. Buying wastes registration + loan "
          "interest + maintenance; renting wastes the rent itself.",
 )
-yr = df["year"].astype(str)
+yr = (today_year - 1 + df["year"]).astype(str)  # calendar years from the locked start
 f = go.Figure()
 f.add_trace(go.Scatter(x=yr, y=df["buy_wasted_cum"], name="Buying", mode="lines+markers",
                        line=dict(color=PRIMARY, width=3)))
@@ -93,10 +148,7 @@ if crossover is not None:
 st.caption(waste_caption)
 
 # 2. Tile row: the headline figures.
-loan_principal = price * (1 - down_pct / 100)
-monthly_emi = compute.emi(loan_principal, loan_rate_pct, tenure_years)
 total_interest = monthly_emi * tenure_years * 12 - loan_principal
-registration_cost = price * registration_pct / 100
 wasted_buy, wasted_rent = df.iloc[-1]["buy_wasted_cum"], df.iloc[-1]["rent_wasted_cum"]
 
 cols = st.columns(4)

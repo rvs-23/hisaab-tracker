@@ -26,8 +26,9 @@ Income  →  Budget  →  Allocation  →  Actuals
   You never type a budget; changing income changes it.
 - **Allocation** is where you say how the investment slice spreads across
   instruments (mutual funds 45%, gold 25%, …). Percentages must sum to 100.
-  A year's allocation carries forward until you set a newer one. It's edited
-  right on the **Actuals** page, not a separate stop.
+  A year's allocation carries forward until you set a newer one. It lives on
+  the **Budget** page, right under the monthly split — so you can see how each
+  monthly goal is consumed per instrument.
 - **Actuals** is where you record what you really invested, and see it against
   the plan.
 
@@ -54,12 +55,9 @@ Top to bottom:
 2. **The journey, year on year** — bars show total income and the planned
    goal side by side; a line shows what you actually invested, so plan and
    reality read against each other at once.
-3. **Net worth chart** — an *estimate*: your contributions compounded at
-   conservative expected returns, plus an emergency-fund buffer (and any
-   opening corpus, see below). Not your real portfolio value.
-4. **Allocation today** — everything you've contributed so far, split across
+3. **Allocation today** — everything you've contributed so far, split across
    instruments, stacked by the year each rupee went in (lightest = oldest).
-5. **Catch up** — the closing action item. If past years fell short of the
+4. **Catch up** — the closing action item. If past years fell short of the
    plan, this is the lump sum that, invested today, pulls you level. Zero (a
    calm note) means you're on plan. Investing *more* than planned is always
    fine.
@@ -91,6 +89,15 @@ the fuller picture (equity/portfolio built minus waste) with an honest note
 that the assumptions — appreciation, investment return, rent inflation —
 drive that number far more than the waste comparison above.
 
+Every input starts from a sensible default and can be typed over freely —
+including the investment-return assumption, which defaults to *your* target
+allocation's weighted expected return. A quiet **For you** strip reads your
+own income, net worth, and budget goal to say how the numbers you've entered
+actually land on you: EMI as a share of your monthly income, the upfront
+cost against your estimated net worth today, and what buying would eat into
+your planned monthly investing. It only shows what it can actually compute
+from your data, and stays out of the way otherwise.
+
 ## What to do, and when
 
 - **Monthly (2 minutes):** nothing required — but recording contributions on
@@ -109,9 +116,9 @@ drive that number far more than the waste comparison above.
 ## Things that surprise people
 
 - **The emergency-fund *target* is automatic** — a configured number of months
-  (`EMERGENCY_FUND_MONTHS`) of your full monthly spending (needs + wants); earn
-  more and the target grows. What you *actually*
-  hold is entered by hand on the Actuals page and counts in your net worth.
+  (`EMERGENCY_FUND_MONTHS`) of your essential spending (the needs bucket); earn
+  more and the target grows. What you *actually* hold is entered by hand on
+  the Actuals page and counts in your net worth.
 - **Saving is safe**: every save is checked first (sums, duplicates, negative
   numbers — except income's *other*, which is allowed to go negative) and
   refused with a message if something's off — and every change is also

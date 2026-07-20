@@ -84,3 +84,33 @@ def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20).run()
     assert not at.exception, at.exception
     assert not at.error, [e.value for e in at.error]
+
+
+# Rent vs buy's "For you" context strip: reads the person's own data (income,
+# contributions, adjustments) to evaluate the calculator's current inputs —
+# rv has data in fake_data_dir, cheeni doesn't, so one profile exercises the
+# strip and the other exercises its "not enough data yet" silence.
+
+def test_for_you_strip_shows_when_data_present(fake_data_dir):
+    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
+    at.query_params["profile"] = "rv"
+    at.run()
+    assert not at.exception, at.exception
+    captions = " ".join(c.value for c in at.caption)
+    assert "of your monthly income" in captions
+    assert "of your estimated net worth today" in captions
+    assert "of your planned" in captions
+
+
+def test_for_you_strip_silent_without_data(fake_data_dir):
+    """cheeni has no income/contributions/adjustments in this fixture — every
+    "For you" line divides by something that's zero, so the whole section
+    should be skipped rather than crash or show garbage percentages."""
+    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
+    at.query_params["profile"] = "cheeni"
+    at.run()
+    assert not at.exception, at.exception
+    captions = " ".join(c.value for c in at.caption)
+    assert "of your monthly income" not in captions
+    assert "of your estimated net worth today" not in captions
+    assert "of your planned" not in captions

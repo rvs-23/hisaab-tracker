@@ -96,10 +96,10 @@ with edit_card(f"Enter {year}"):
         key=f"{base}_{ss[vkey]}",
         column_config={
             "Month": st.column_config.TextColumn("Month", disabled=True),
-            "salary": st.column_config.NumberColumn("Salary (₹)", required=True),
-            "bonus": st.column_config.NumberColumn("Bonus (₹)", required=True),
-            "other": st.column_config.NumberColumn("Other (₹)", required=True),
-            "Total": st.column_config.NumberColumn("Total (₹)", disabled=True),
+            "salary": st.column_config.NumberColumn("Salary (₹)", required=True, format="localized"),
+            "bonus": st.column_config.NumberColumn("Bonus (₹)", required=True, format="localized"),
+            "other": st.column_config.NumberColumn("Other (₹)", required=True, format="localized"),
+            "Total": st.column_config.NumberColumn("Total (₹)", disabled=True, format="localized"),
         },
     )
     # Recompute the (disabled) Total live as the user types.

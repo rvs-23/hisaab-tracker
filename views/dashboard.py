@@ -7,7 +7,7 @@ import streamlit as st
 import compute
 import storage
 from ui import (
-    CHART_TEXT, COST_LINE, FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary,
+    CHART_TEXT, FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary,
     accent_secondary, chart_title, inr_axis, inr_short, load_all, metric_tile,
     page_header, pretty_category, section, style_fig, tint,
 )
@@ -101,48 +101,29 @@ else:
     income_bars = trend["total_income"].tolist()
     growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in trend["total_income"].pct_change() * 100]
 
+    # The target % of income (the plan's investment share) rides each goal bar
+    # as a small outside label — outside, so tiny bars can't clip it.
+    target_pct = [f"{100 * inv / tot:.0f}%" if tot else ""
+                  for inv, tot in zip(trend["investment"], trend["total_income"])]
     f = go.Figure()
     f.add_bar(
         x=xs, y=income_bars, name="Income", marker_color=SAND,
         text=growth, textposition="outside", textfont=dict(size=11, color=CHART_TEXT),
     )
-    f.add_bar(x=xs, y=goal, name="Goal", marker_color=SECONDARY)
+    f.add_bar(x=xs, y=goal, name="Goal", marker_color=SECONDARY,
+              text=target_pct, textposition="outside",
+              textfont=dict(size=10, color=SECONDARY))
     f.add_trace(go.Scatter(
         x=xs, y=actual_invested, name="Invested", mode="lines+markers",
         line=dict(color=PRIMARY, width=3), marker=dict(size=6, color=PRIMARY),
     ))
+    f.update_traces(cliponaxis=False, selector=dict(type="bar"))
     f.update_layout(barmode="group", xaxis=dict(type="category"), showlegend=True)
-    inr_axis(f, max(income_bars + goal + actual_invested))
+    inr_axis(f, max(income_bars + goal + actual_invested), step=10_00_000)
     style_fig(f, height=360)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-    st.caption("Bars: income and the planned goal. Line: what you actually invested.")
+    st.caption("Bars: income and the planned goal (the small % is the share of income the plan targets to invest). Line: what you actually invested.")
 
-# Net worth: invested vs projected value.
-nw = compute.net_worth_series(profile, d.income, d.contributions, d.targets, today_year,
-                               opening=opening, emergency_fund=ef_held)
-chart_title("Net worth — invested vs projected value",
-            help="An estimate, not your real portfolio value. It compounds what you've "
-                 "contributed at conservative per-category expected returns (plus the emergency "
-                 "fund) — it does not read live prices or what your holdings are actually worth today.")
-if nw.empty:
-    st.caption("Record contributions on the Actuals page to project net worth.")
-else:
-    nyr = nw["year"].astype(int).astype(str)
-    past = nw[~nw["is_projected"]]
-    proj = nw[nw["year"] >= today_year]
-    f = go.Figure()
-    f.add_trace(go.Scatter(x=nyr, y=nw["cost_basis"], name="Invested (cost)",
-                           mode="lines", line=dict(color=COST_LINE, width=2)))
-    f.add_trace(go.Scatter(x=past["year"].astype(int).astype(str), y=past["potential"],
-                           name="Net worth", mode="lines+markers", line=dict(color=PRIMARY, width=3)))
-    if len(proj) > 1:
-        f.add_trace(go.Scatter(x=proj["year"].astype(int).astype(str), y=proj["potential"],
-                               name="Projected", mode="lines", line=dict(color=PRIMARY, width=3, dash="dash")))
-    f.update_layout(xaxis=dict(type="category"))
-    inr_axis(f, nw["potential"].max())
-    style_fig(f, height=320)
-    st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-    st.caption("Solid: contributions compounded at conservative returns. Dashed: if you keep investing the plan. Grey: money put in (no growth).")
 
 # Allocation today: cumulative contributions to date, by category — still
 # cumulative across all years, but stacked by the year each rupee went in.
@@ -223,6 +204,7 @@ with st.expander("Adjustments"):
         "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,
         key=f"opening_corpus_{profile.key}",
     )
+    st.caption(f"= {inr_short(new_opening)}")
     if st.button("Save", key=f"save_adjustments_{profile.key}", type="primary"):
         others = d.adjustments[
             ~((d.adjustments["profile"] == profile.key) & (d.adjustments["field"] == "opening_corpus"))

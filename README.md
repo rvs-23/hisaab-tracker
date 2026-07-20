@@ -46,11 +46,10 @@ Each page shows **one person at a time** via `?profile=<key>` (`rv` or
 
 ## Pages
 
-**Dashboard** and **Budget** are read-only — they recompute from what you enter
-elsewhere. Dashboard opens with four lifetime tiles, then the year-on-year
-journey (bars: income and the planned goal; line: what you actually
-invested), the net-worth projection, cumulative allocation by category
-(stacked by the year each rupee went in), and the catch-up callout. A quiet
+**Dashboard** is read-only — it recomputes from what you enter elsewhere. Dashboard opens with four lifetime tiles, then the year-on-year
+journey (bars: income and the planned goal with its target-% of income; line:
+what you actually invested), cumulative allocation by category (stacked by the
+year each rupee went in), and the catch-up callout. A quiet
 **Adjustments** expander at the bottom holds one-off audited figures —
 currently just **opening corpus** (see below). Budget shows how income splits
 and how the investment slice grows.
@@ -63,12 +62,14 @@ The two write pages:
   change** if you switched jobs. A new year pre-fills last year's monthly
   salary; *Copy January down* fills the rest. Everything else derives from
   this.
-- **Actuals** → `contributions.csv` and `targets.csv`. One row per instrument
-  for the picked year — what you actually invested, shown against the plan and
-  the derived emergency-fund target. A read-only "Target allocation" table
-  shows the active %-mix; its editor (Save enables only at 100%, ₹/year and
-  ₹/month live) sits in an expander. A saved year carries forward until
-  replaced. Saves never touch other people, other years, or the other file.
+- **Actuals** → `contributions.csv`. One row per instrument for the picked
+  year — what you actually invested, shown against the plan and the derived
+  emergency-fund target (plus the hand-entered fund you hold). Saves never
+  touch other people or other years.
+- **Budget** also owns `targets.csv`: the target-allocation table sits under
+  the monthly split (how each monthly goal is consumed per instrument), with
+  its editor in an expander (Save enables only at 100%). A saved year carries
+  forward until replaced.
 
 **Rent vs buy** is a calculator, not a save — stateless, nothing written to
 disk. It frames the decision as **money wasted** (registration + loan
@@ -89,7 +90,7 @@ caveat on the fuller net-position view.
 - **Potential net worth** = contributions compounded at conservative
   per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (what you
   actually hold — or, until entered, the derived target of
-  `EMERGENCY_FUND_MONTHS` of needs + wants) plus any **opening corpus**. A projection, not a valuation.
+  `EMERGENCY_FUND_MONTHS` of the needs bucket) plus any **opening corpus**. A projection, not a valuation.
 - **Opening corpus** (optional, set in Dashboard → Adjustments) is money
   invested before tracking began. It's assumed invested at the start of your
   first tracked year and grown at your allocation-weighted expected return; it
