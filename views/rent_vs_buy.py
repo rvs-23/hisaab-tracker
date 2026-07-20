@@ -13,6 +13,7 @@ active person's real numbers.
 """
 
 import datetime as dt
+import math
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -126,10 +127,9 @@ series = {
     "rent": shape("rent_wasted_cum"),
     "idle": shape("rent_wasted_no_invest_cum"),
 }
-# Label roughly every third point (always the first and last): a number on all
-# fifteen years is unreadable, and the rest are one hover away.
-stride = max(1, -(-len(df) // 5))
-labelled = {0, len(df) - 1} | set(range(0, len(df), stride))
+# Three labels only — start, middle, end. Any more and the line disappears
+# behind its own numbers; every other year is one hover away.
+labelled = {0, (len(df) - 1) // 2, len(df) - 1}
 
 f = go.Figure()
 f.add_trace(go.Scatter(
@@ -151,9 +151,12 @@ f.add_trace(go.Scatter(
     hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting, difference left idle</extra>",
 ))
 f.update_layout(xaxis=dict(type="category"))
-# Auto step both ways (≈5 round gridlines). A fixed 50L grid fits the per-year
-# magnitudes but crowds the cumulative totals with ten-plus lines.
-inr_axis(f, max(s.max() for s in series.values()) * 1.08)
+# Gridlines in whole 25L multiples: 25L itself where the values are small (per
+# year), rounding up to 50L/1Cr as they grow, so the cumulative axis doesn't end
+# up with twenty lines.
+top = max(s.max() for s in series.values()) * 1.08
+step = max(25_00_000, math.ceil(top / 6.5 / 25_00_000) * 25_00_000)
+inr_axis(f, top, step=step)
 style_fig(f, height=440)
 # After style_fig — it sets both legend and margin, so anything set before it is
 # silently overwritten. Legend sits above the plot, left-aligned (the names are
