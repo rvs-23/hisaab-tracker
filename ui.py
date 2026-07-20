@@ -239,6 +239,29 @@ def inject_theme() -> None:
     )
 
 
+def inject_accent(primary: str) -> None:
+    """Paints Streamlit's own widgets in the active person's accent.
+
+    ``.streamlit/config.toml`` sets a single static ``primaryColor`` for the
+    whole app and can't vary per person, so the native Save button, links, and
+    focus accents would stay neutral while charts/tiles turn to the profile
+    colour. This re-applies the accent every render (page_header calls it), so
+    the colour carries everywhere and survives Streamlit's CSS teardown on nav.
+    """
+    st.markdown(
+        f"<style>"
+        f":root, .stApp {{--primary-color:{primary};}}"
+        f"[data-testid='stBaseButton-primary']{{background-color:{primary}!important;"
+        f"border-color:{primary}!important}}"
+        f"[data-testid='stBaseButton-primary']:hover{{filter:brightness(.93)}}"
+        f"a,a:visited{{color:{primary}}}"
+        f"[data-baseweb='checkbox'] [data-testid='stWidgetLabel']~div [aria-checked='true']"
+        f"{{background-color:{primary}!important;border-color:{primary}!important}}"
+        f"</style>",
+        unsafe_allow_html=True,
+    )
+
+
 def metric_tile(col, label: str, value: str, sub: str = "", color: str | None = None,
                 big: bool = False, help: str = "") -> None:
     """Renders a bordered KPI tile (uppercase label, bold value, muted sub).
@@ -401,6 +424,7 @@ def page_header(title: str, profiles):
     st.session_state["active_profile"] = active
     st.query_params["profile"] = active  # keep the URL shareable/bookmarkable
     _set_accents(active)
+    inject_accent(accent_primary())  # native widgets follow the active person too
 
     profile = next(p for p in profiles if p.key == active)
     st.title(title)
