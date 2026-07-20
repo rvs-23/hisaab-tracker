@@ -21,8 +21,8 @@ import streamlit as st
 import compute
 from config import EMI_SHARE_OF_WANTS_INVESTMENT_PCT
 from ui import (
-    COST_LINE, FS_BODY, MARKER, accent_primary, accent_secondary, chart_title,
-    inr_axis, inr_short, load_all, metric_tile, page_header, style_fig,
+    CHART_TEXT, COST_LINE, FS_BODY, MARKER, accent_primary, accent_secondary,
+    chart_title, inr_axis, inr_short, load_all, metric_tile, page_header, style_fig,
 )
 
 d = load_all()
@@ -320,11 +320,16 @@ f2.add_trace(go.Bar(
 if not feasible.empty:
     best = timing.loc[feasible["total_wasted"].idxmin()]
     f2.add_annotation(x=str(today_year + int(best["wait_years"])), y=float(best["total_wasted"]),
-                      text=f"best — {inr_short(best['total_wasted'])}", showarrow=True,
-                      arrowhead=0, ay=-30, font=dict(color=PRIMARY, size=12))
+                      text=f"cheapest: {inr_short(best['total_wasted'])} wasted",
+                      showarrow=True, arrowhead=0, ay=-32, font=dict(color=PRIMARY, size=12))
 inr_axis(f2, timing["total_wasted"].max() * 1.15, min_step=1_00_00_000)
 style_fig(f2, height=380)
+# Both axes carry a title here: bare rupee bars over bare years don't say what
+# is being measured, and "lower is better" is the opposite of the usual reading.
 f2.update_layout(margin=dict(l=8, r=8, t=34, b=8))
+f2.update_yaxes(title_text="Total wasted over the whole loan — lower is better",
+                title_font=dict(size=12, color=CHART_TEXT))
+f2.update_xaxes(title_text="Year you buy", title_font=dict(size=12, color=CHART_TEXT))
 st.plotly_chart(f2, width="stretch", config={"displayModeBar": False})
 
 if feasible.empty:
