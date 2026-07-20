@@ -97,7 +97,8 @@ if not row.empty:
         invested_ty = float(d.contributions.loc[
             (d.contributions["profile"] == active.key) & (d.contributions["year"] == year), "amount"
         ].sum())
-        catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year)
+        catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year,
+                                           flat_return=d.config.expected_return_pct)
         months_left = 13 - dt.date.today().month
         adj_monthly = (catch_up + max(0.0, year_goal - invested_ty)) / months_left
         inv_sub += f"<br>adjusted: {inr_short(adj_monthly)}/mo to be on track"

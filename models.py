@@ -37,7 +37,15 @@ class Profile(BaseModel):
 
 
 class Config(BaseModel):
-    """Household-wide settings from config.yaml — just the shared category
-    vocabulary. Targets are per-profile; unknown YAML keys are ignored."""
+    """Household-wide settings from config.yaml. Unknown YAML keys are ignored.
+
+    Attributes:
+        categories: The shared asset-class vocabulary.
+        expected_return_pct: Optional single expected annual return (% p.a.).
+            When set, it is THE growth rate everywhere — net worth, corpus,
+            catch-up, and the Rent-vs-buy default — replacing the per-category
+            ``config.EXPECTED_RETURNS``. Absent, per-category rates apply.
+    """
 
     categories: list[str]
+    expected_return_pct: float | None = None

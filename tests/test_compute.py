@@ -608,3 +608,21 @@ def test_save_adjustments_appends_audit_log(tmp_path, rv):
     assert rec["rows_after"] == 1
     assert len(rec["added"]) == 1 and rec["added"][0]["value"] == 2000000
     assert rec["removed"] == []
+
+def test_flat_return_overrides_per_category(rv):
+    """config.yaml expected_return_pct: one household rate wins everywhere."""
+    contrib = pd.DataFrame([{"year": 2020, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None}])
+    no_income = pd.DataFrame(columns=storage.INCOME_COLUMNS)
+    targets = pd.DataFrame(columns=storage.TARGETS_COLUMNS)
+    actual, potential = compute.net_worth_to_date(rv, no_income, contrib, targets, 2025, flat_return=10.0)
+    assert potential == round(100000 * 1.10 ** 5)  # flat 10%, not mfs's 11.5%
+    assert compute.expected_return_for_target({"mfs": 100}, flat_return=9.0) == 9.0
+    assert compute.category_return("mfs") == 11.5
+    assert compute.category_return("mfs", 10.0) == 10.0
+
+
+def test_catch_up_uses_flat_return_when_set(rv):
+    income, targets = _one_year()
+    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
+    cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026, flat_return=10.0)
+    assert cu == pytest.approx(250000 * 1.10 ** 2, rel=1e-6)

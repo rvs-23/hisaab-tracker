@@ -35,7 +35,9 @@ year_range = (
     else "no years yet"
 )
 
-catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year)
+flat_return = d.config.expected_return_pct  # "we only use one" — config.yaml override
+catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year,
+                                   flat_return=flat_return)
 earned = float(trend["total_income"].sum())
 opening = compute.opening_corpus(d.adjustments, profile.key)
 # The actual emergency fund (entered on Actuals) beats the derived target in
@@ -44,7 +46,7 @@ ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
 invested = float(contrib["amount"].sum()) + opening
 nw_actual, nw_potential = compute.net_worth_to_date(
     profile, d.income, d.contributions, d.targets, today_year, opening=opening,
-    emergency_fund=ef_held)
+    emergency_fund=ef_held, flat_return=flat_return)
 
 section("Lifetime")
 c = st.columns(4)

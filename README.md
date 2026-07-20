@@ -87,10 +87,13 @@ caveat on the fuller net-position view.
   no budget row; an income drop scales the split down proportionally. Projects
   to current + 3 at `forward_increment_pct`.
 - **Goal** for a year = its investment amount × target %, per category.
-- **Potential net worth** = contributions compounded at conservative
-  per-category returns (`EXPECTED_RETURNS`) plus the emergency fund (what you
-  actually hold — or, until entered, the derived target of
-  `EMERGENCY_FUND_MONTHS` of the needs bucket) plus any **opening corpus**. A projection, not a valuation.
+- **Potential net worth** = contributions compounded at the expected return,
+  plus the emergency fund (what you actually hold — or, until entered, the
+  derived target of `EMERGENCY_FUND_MONTHS` of the needs bucket) plus any
+  **opening corpus**. A projection, not a valuation. **One rate everywhere**:
+  set `expected_return_pct` in the data folder's `config.yaml` and it becomes
+  the single growth rate for net worth, corpus, catch-up, and the Rent-vs-buy
+  default; remove it to fall back to per-category `EXPECTED_RETURNS`.
 - **Opening corpus** (optional, set in Dashboard → Adjustments) is money
   invested before tracking began. It's assumed invested at the start of your
   first tracked year and grown at your allocation-weighted expected return; it

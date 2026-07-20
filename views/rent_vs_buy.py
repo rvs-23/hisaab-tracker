@@ -30,7 +30,10 @@ st.caption(
 )
 
 target = compute.resolve_target(profile, d.targets, today_year)
-default_return = round(compute.expected_return_for_target(target), 1)
+default_return = round(compute.expected_return_for_target(target, d.config.expected_return_pct), 1)
+return_source = ("the household expected_return_pct in config.yaml"
+                 if d.config.expected_return_pct is not None
+                 else "your target allocation's weighted expected return")
 
 section("Your numbers")
 c0, c1, c2, c3 = st.columns(4)
@@ -57,11 +60,11 @@ rent_inflation_pct = c10.number_input("Rent inflation (% p.a.)", min_value=0.0, 
 invest_return_pct = c11.number_input(
     "Expected investment return (% p.a.)", min_value=0.0, value=default_return, step=0.1,
     key=f"rvb_return_{k}",
-    help=f"Defaults to your target allocation's weighted expected return ({default_return:.1f}%) — edit to model something else.",
+    help=f"Defaults to {return_source} ({default_return:.1f}%) — edit to model something else.",
 )
 st.caption(
-    f"Investment return defaults to {default_return:.1f}% — your current target allocation's "
-    "expected return, weighted the same way the corpus projection is."
+    f"Investment return defaults to {default_return:.1f}% — {return_source}, the same "
+    "number behind the dashboard's Est. value today."
 )
 
 # Derived once, up front, so both "For you" and the tile row below reuse the

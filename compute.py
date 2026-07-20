@@ -134,6 +134,20 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     return pd.DataFrame(out)
 
 
+def category_return(category: str, flat_return: float | None = None) -> float:
+    """The expected annual return (% p.a.) for a category.
+
+    Args:
+        category: Asset-class key.
+        flat_return: Optional single household rate (config.yaml
+            ``expected_return_pct``). When given it wins for every category —
+            "we only use one" — else the per-category ``EXPECTED_RETURNS``.
+    """
+    if flat_return is not None:
+        return flat_return
+    return EXPECTED_RETURNS.get(category, 0)
+
+
 def opening_corpus(adjustments: pd.DataFrame, profile_key: str) -> float:
     """Returns a person's opening corpus — money invested before tracking
     began — or ``0.0`` if none is recorded (see ``storage.load_adjustments``)."""
@@ -279,7 +293,7 @@ def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,
     return years[0] if years else None
 
 
-def expected_return_for_target(target: dict[str, float]) -> float:
+def expected_return_for_target(target: dict[str, float], flat_return: float | None = None) -> float:
     """The allocation-weighted expected annual return for a target mix (%).
 
     E.g. 45% mfs @ 11.5% + 25% gold @ 7.5% + ... Used for the opening
@@ -287,10 +301,13 @@ def expected_return_for_target(target: dict[str, float]) -> float:
     other callers (e.g. the rent-vs-buy calculator's default invest return)
     can reuse the same weighting instead of hard-coding a number.
     """
-    return sum(pct / 100 * EXPECTED_RETURNS.get(cat, 0) for cat, pct in target.items())
+    if flat_return is not None:
+        return flat_return
+    return sum(pct / 100 * category_return(cat) for cat, pct in target.items())
 
 
-def _corpus_growth_rate(profile: Profile, targets: pd.DataFrame, vintage: int) -> float:
+def _corpus_growth_rate(profile: Profile, targets: pd.DataFrame, vintage: int,
+                        flat_return: float | None = None) -> float:
     """The opening corpus's assumed annual return: the target allocation in
     force at its vintage year, weighted by each category's expected return."""
     return expected_return_for_target(resolve_target(profile, targets, vintage))
@@ -310,7 +327,8 @@ def emergency_fund_actual(adjustments: pd.DataFrame, profile_key: str) -> float:
 def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,
                       targets: pd.DataFrame, today_year: int,
                       opening: float = 0.0,
-                      emergency_fund: float | None = None) -> tuple[int, int]:
+                      emergency_fund: float | None = None,
+                      flat_return: float | None = None) -> tuple[int, int]:
     """Returns (actual, potential) net worth as of ``today_year``.
 
     ``actual`` is contributions put in (cost basis) plus the emergency fund.
@@ -332,14 +350,14 @@ def net_worth_to_date(profile: Profile, income: pd.DataFrame, contributions: pd.
     c = contributions[contributions["profile"] == profile.key]
     invested = float(c["amount"].sum())
     grown = sum(
-        float(r.amount) * (1 + EXPECTED_RETURNS.get(r.category, 0) / 100) ** max(0, today_year - int(r.year))
+        float(r.amount) * (1 + category_return(r.category, flat_return) / 100) ** max(0, today_year - int(r.year))
         for r in c.itertuples()
     )
     ef = emergency_fund if emergency_fund is not None else emergency_fund_target(profile, income, today_year)
     vintage = corpus_vintage_year(income, contributions, profile.key)
     corpus_actual = corpus_potential = 0.0
     if opening and vintage is not None and today_year >= vintage:
-        rate = _corpus_growth_rate(profile, targets, vintage)
+        rate = _corpus_growth_rate(profile, targets, vintage, flat_return)
         corpus_actual = opening
         corpus_potential = opening * (1 + rate / 100) ** (today_year - vintage)
     return round(invested + ef + corpus_actual), round(grown + ef + corpus_potential)
@@ -362,7 +380,8 @@ def elapsed_year_fraction(today: dt.date | None = None) -> float:
 
 
 def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
-                    contributions: pd.DataFrame, today_year: int) -> float:
+                    contributions: pd.DataFrame, today_year: int,
+                    flat_return: float | None = None) -> float:
     """Lump sum to invest today to erase every *past* year's shortfall.
 
     For each planned year strictly before ``today_year``, the per-category
@@ -380,7 +399,7 @@ def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFram
         exp = expected_contributions(profile, income, targets, y)
         act = c[c["year"] == y].groupby("category")["amount"].sum().to_dict()
         for cat in set(exp) | set(act):
-            grow = (1 + EXPECTED_RETURNS.get(cat, 0) / 100) ** (today_year - y)
+            grow = (1 + category_return(cat, flat_return) / 100) ** (today_year - y)
             planned_fv += exp.get(cat, 0.0) * grow
             actual_fv += act.get(cat, 0.0) * grow
     return max(0.0, planned_fv - actual_fv)
@@ -390,7 +409,8 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
                      targets: pd.DataFrame, today_year: int,
                      ahead: int = NETWORTH_PROJECTION_YEARS,
                      opening: float = 0.0,
-                     emergency_fund: float | None = None) -> pd.DataFrame:
+                     emergency_fund: float | None = None,
+                     flat_return: float | None = None) -> pd.DataFrame:
     """Net worth year by year, actual past plus a projected future.
 
     Past years use actual contributions. Future years assume the plan continues:
@@ -408,7 +428,7 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
     include_corpus = bool(opening) and vintage is not None
     candidates = years + ([vintage] if include_corpus else [])
     first = min(candidates) if candidates else today_year
-    corpus_rate = _corpus_growth_rate(profile, targets, vintage) if include_corpus else 0.0
+    corpus_rate = _corpus_growth_rate(profile, targets, vintage, flat_return) if include_corpus else 0.0
 
     streams: dict[int, dict[str, float]] = {}
     for y in range(first, today_year + 1):
@@ -428,7 +448,7 @@ def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.D
         potential = basis = ef
         for y in range(first, horizon + 1):
             for cat, amt in streams.get(y, {}).items():
-                potential += amt * (1 + EXPECTED_RETURNS.get(cat, 0) / 100) ** (horizon - y)
+                potential += amt * (1 + category_return(cat, flat_return) / 100) ** (horizon - y)
                 basis += amt
         if include_corpus and horizon >= vintage:
             basis += opening
