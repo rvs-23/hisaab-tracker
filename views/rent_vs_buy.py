@@ -277,68 +277,19 @@ if not cur_row.empty and monthly_income > 0:
     )
     emi_budget = envelope * share_pct / 100
     max_loan = compute.max_loan_for_emi(emi_budget, loan_rate_pct, tenure_years)
-    # Two ceilings, whichever binds. The EMI sizes a loan, which grosses up to a
-    # price; the cash on hand has to cover the down payment plus registration.
-    # At 100% down there is no loan at all, so only the cash ceiling applies.
-    loan_price = max_loan / (1 - down_pct / 100) if down_pct < 100 else float("inf")
-    cash_pct = down_pct + registration_pct
-    cash_price = investable / (cash_pct / 100) if cash_pct > 0 else float("inf")
-    max_price = min(loan_price, cash_price)
-    max_price = 0.0 if max_price == float("inf") else max_price
-    binding = "your cash" if cash_price <= loan_price else "your EMI budget"
 
-    acols = st.columns(4)
+    acols = st.columns(3)
     metric_tile(acols[0], "Wants + investment / month", inr_short(envelope),
                 f"{inr_short(monthly_wants)} wants + {inr_short(monthly_investment)} invested", big=True)
     metric_tile(acols[1], "EMI you can carry", inr_short(emi_budget),
                 f"{share_pct}% of that envelope", color=SECONDARY, big=True)
     metric_tile(acols[2], "Loan it supports", inr_short(max_loan),
-                f"{loan_rate_pct:.1f}% over {tenure_years} years", big=True)
-    metric_tile(acols[3], "Max house right now", inr_short(max_price),
-                f"at {down_pct}% down — capped by {binding}", color=PRIMARY, big=True,
-                help="The most house you can buy today: the lower of two ceilings — the "
-                     "price your EMI budget can finance, and the price your savings can "
-                     "cover as down payment plus registration.")
-
-    # The typed house is reachable only if BOTH ceilings clear it — the EMI fits
-    # the budget AND the cash covers the down payment + registration. Checking
-    # only the EMI is what let a "₹2Cr within reach" contradict a ₹1.09Cr tile.
-    cash_needed = price * (down_pct + registration_pct) / 100
-    emi_ok = monthly_emi <= emi_budget
-    cash_ok = investable >= cash_needed
-    share_of_envelope = 100 * monthly_emi / envelope if envelope else 0.0
-
-    # Lead with the honest ceiling — the most house you can buy right now — then
-    # place the house you typed against it.
-    afford_caption = (
-        f"**The most you can buy right now is about {inr_short(max_price)}** — capped by "
-        f"{binding} ({'the down payment + registration you can cover' if binding == 'your cash' else 'the EMI your budget carries'}). "
+                f"{loan_rate_pct:.1f}% over {tenure_years} years", color=PRIMARY, big=True)
+    st.caption(
+        f"At {share_pct}% of your {inr_short(envelope)} wants + investment, you can carry a "
+        f"{inr_short(emi_budget)} EMI — a {inr_short(max_loan)} loan over {tenure_years} years. "
+        "That's the borrowing alone; a house also needs your down payment on top (see When to buy)."
     )
-    if emi_ok and cash_ok:
-        afford_caption += (
-            f"Your {inr_short(price)} target clears both: its {inr_short(monthly_emi)} EMI is "
-            f"{share_of_envelope:.0f}% of your wants + investment, and your {inr_short(investable)} "
-            f"savings cover the {inr_short(cash_needed)} down payment + registration."
-        )
-    elif not cash_ok and not emi_ok:
-        afford_caption += (
-            f"Your {inr_short(price)} target is out of reach on both: it needs a "
-            f"{inr_short(cash_needed)} down payment + registration (you have {inr_short(investable)}) "
-            f"and a {inr_short(monthly_emi)} EMI ({share_of_envelope:.0f}% of the envelope)."
-        )
-    elif not cash_ok:
-        afford_caption += (
-            f"Your {inr_short(price)} target's EMI fits, but its {inr_short(cash_needed)} down "
-            f"payment + registration is beyond your {inr_short(investable)} savings — that cash "
-            f"gap, not the EMI, is what holds it back."
-        )
-    else:
-        afford_caption += (
-            f"You have the cash for your {inr_short(price)} target, but its {inr_short(monthly_emi)} "
-            f"EMI is {share_of_envelope:.0f}% of your wants + investment — over the "
-            f"{inr_short(emi_budget)} you set."
-        )
-    st.caption(afford_caption)
 else:
     st.caption("Add this year's income to see what your budget can carry.")
     monthly_investment = 0.0
