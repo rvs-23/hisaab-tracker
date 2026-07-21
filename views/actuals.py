@@ -8,7 +8,7 @@ from config import EMERGENCY_FUND_MONTHS
 from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
     html_table, inr_axis, inr_short, load_all, metric_tile, page_header,
-    pretty_category, section, style_fig,
+    pretty_category, section, seed_slice_sig, slice_sig, stale_since_open, style_fig,
 )
 
 d = load_all()
@@ -87,13 +87,14 @@ with st.expander("Update emergency fund"):
                              step=10000, key=f"ef_{active.key}")
     st.caption(f"= {inr_short(new_ef)}")
     if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
-        others = d.adjustments[
-            ~((d.adjustments["profile"] == active.key) & (d.adjustments["field"] == "emergency_fund"))
-        ]
-        rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
-        rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
-        merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
         try:
+            fresh = storage.load_adjustments(d.root, d.profiles)
+            others = fresh[
+                ~((fresh["profile"] == active.key) & (fresh["field"] == "emergency_fund"))
+            ]
+            rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
+            rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
+            merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
             storage.validate_adjustments(merged, d.profiles)
             storage.save_adjustments(d.root, merged)
             st.success("Saved.")
@@ -112,13 +113,19 @@ html_table(
 
 section("Fill in")
 
+def contrib_slice(df):
+    """This person's rows for the picked year, from ``df``."""
+    return df[(df["profile"] == active.key) & (df["year"] == year)]
+
+
 with edit_card(f"Record what you actually invested in {year}"):
     st.caption("One row per instrument. Add rows as you invest; other years are untouched.")
     # Scoped like the rest of the page: this person, this year. The key carries
     # both, so pending edits can never leak across a profile or year switch.
-    mine = d.contributions[
-        (d.contributions["profile"] == active.key) & (d.contributions["year"] == year)
-    ].drop(columns=["profile", "year"])
+    sig_cols = ["category", "amount", "notes"]
+    seed_key = f"contrib_{active.key}_{year}_seed"
+    mine = contrib_slice(d.contributions).drop(columns=["profile", "year"])
+    seed_slice_sig(seed_key, slice_sig(mine, sig_cols))  # what disk held when this grid opened
     edited = st.data_editor(
         mine.sort_values("category").reset_index(drop=True),
         num_rows="dynamic", hide_index=True, width="stretch",
@@ -131,14 +138,18 @@ with edit_card(f"Record what you actually invested in {year}"):
     )
     if st.button("Save contributions", type="primary"):
         try:
-            # Everyone else's rows and this person's other years stay untouched.
-            others = d.contributions[
-                ~((d.contributions["profile"] == active.key) & (d.contributions["year"] == year))
-            ]
+            # Re-read fresh so another tab's edit to a *different* slice survives,
+            # and bail if *this* slice changed under us (a real conflict).
+            fresh = storage.load_contributions(d.root, d.config, d.profiles)
+            fresh_mine = contrib_slice(fresh).drop(columns=["profile", "year"])
+            if stale_since_open(seed_key, slice_sig(fresh_mine, sig_cols), f"{year}'s contributions"):
+                st.stop()
+            others = fresh[~((fresh["profile"] == active.key) & (fresh["year"] == year))]
             mine_now = edited.assign(profile=active.key, year=year)
             combined = pd.concat([others, mine_now], ignore_index=True)[storage.CONTRIB_COLUMNS]
             storage.validate_contributions(combined, d.config, d.profiles)
             storage.save_contributions(d.root, combined)
+            st.session_state.pop(seed_key, None)
             st.success("Saved.")
             st.rerun()
         except Exception as exc:

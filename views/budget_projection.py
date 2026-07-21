@@ -13,7 +13,7 @@ from config import (
 from ui import (
     FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
     html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
-    resync, section, style_fig,
+    resync, section, seed_slice_sig, slice_sig, stale_since_open, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -162,16 +162,27 @@ with st.expander("Edit allocation"):
     st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
                 unsafe_allow_html=True)
 
+    seed_key = f"{abase}_seed"
+    tmask = lambda df: (df["profile"] == active.key) & (df["year"] == year)
+    seed_slice_sig(seed_key, slice_sig(d.targets[tmask(d.targets)], ["category", "pct"]))
+
     if st.button(f"Save {year}", key=f"save_alloc_{active.key}_{year}",
                  type="primary", disabled=not ok):
-        rows = pd.DataFrame({"profile": active.key, "year": year,
-                             "category": d.config.categories, "pct": alloc_edited["pct"].values})
-        rows = rows[rows["pct"] > 0]
-        others = d.targets[~((d.targets["profile"] == active.key) & (d.targets["year"] == year))]
-        merged = pd.concat([others, rows], ignore_index=True)
         try:
+            # Fresh read so another year/person's targets aren't reverted, and a
+            # stale guard for this exact profile+year.
+            fresh = storage.load_targets(d.root, d.config, d.profiles)
+            if stale_since_open(seed_key, slice_sig(fresh[tmask(fresh)], ["category", "pct"]),
+                                f"{year}'s target allocation"):
+                st.stop()
+            rows = pd.DataFrame({"profile": active.key, "year": year,
+                                 "category": d.config.categories, "pct": alloc_edited["pct"].values})
+            rows = rows[rows["pct"] > 0]
+            others = fresh[~tmask(fresh)]
+            merged = pd.concat([others, rows], ignore_index=True)
             storage.validate_targets(merged, d.config, d.profiles)
             storage.save_targets(d.root, merged)
+            st.session_state.pop(seed_key, None)
             del st.session_state[agkey]
             st.success("Saved.")
             st.rerun()

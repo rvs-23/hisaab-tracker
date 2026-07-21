@@ -154,3 +154,4 @@ def test_rent_vs_buy_starting_corpus_can_be_excluded(fake_data_dir):
     after = " ".join(c.value for c in at.caption)
     assert "= ₹0" in after
     assert before != after
+

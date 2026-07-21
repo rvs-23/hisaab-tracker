@@ -374,6 +374,68 @@ def resync(grid_key: str, version_key: str, recomputed, derived_cols: list[str])
     st.session_state[grid_key] = recomputed
 
 
+def slice_sig(df: pd.DataFrame, columns: list[str]) -> tuple:
+    """An order-independent fingerprint of a dataframe slice.
+
+    Used to tell whether the on-disk rows behind an editor changed while it was
+    open. Every value is canonicalised to a string (floats to 2 dp, NaN to an
+    empty string) so the tuple is hashable, comparable, and free of the
+    int-vs-float and NaN-vs-NaN noise that a naive compare trips on.
+
+    Args:
+        df: The slice to fingerprint (a single profile/year, say).
+        columns: Columns to include, in a fixed order.
+    """
+    if df is None or df.empty:
+        return ()
+
+    def norm(v) -> str:
+        if isinstance(v, bool):
+            return str(v)
+        if isinstance(v, (int, float)):
+            return "" if v != v else f"{float(v):.2f}"  # v != v is the NaN test
+        return str(v)
+
+    return tuple(sorted(
+        tuple(norm(v) for v in row)
+        for row in df[columns].itertuples(index=False, name=None)
+    ))
+
+
+def seed_slice_sig(seed_key: str, sig: tuple) -> None:
+    """Records a slice's fingerprint the first time its editor is drawn.
+
+    Call once when the editor opens; the value is what ``stale_since_open``
+    compares the on-disk data against at save time. Re-seeding on every rerun
+    would defeat the check, so it only writes when the key is absent.
+    """
+    if seed_key not in st.session_state:
+        st.session_state[seed_key] = sig
+
+
+def stale_since_open(seed_key: str, current_sig: tuple, label: str) -> bool:
+    """Returns True if the on-disk slice changed since the editor opened.
+
+    The guard every multi-tab save needs: two tabs (or two people) editing the
+    same slice would otherwise silently overwrite each other. On a conflict it
+    warns, drops the seed, and reruns so the page reloads the newer data — the
+    caller should stop before writing.
+
+    Args:
+        seed_key: The key ``seed_slice_sig`` stored the opening fingerprint under.
+        current_sig: ``slice_sig`` of the same slice read fresh from disk now.
+        label: Human name of what changed, for the warning ("2025's contributions").
+    """
+    seeded = st.session_state.get(seed_key)
+    if seeded is not None and seeded != current_sig:
+        st.warning(f"{label} changed on disk since you opened this — reloaded with the "
+                   "newer data, so please redo your edit.")
+        st.session_state.pop(seed_key, None)
+        st.rerun()
+        return True
+    return False
+
+
 @contextmanager
 def edit_card(title: str):
     """A bordered card with a teal heading that marks an editable 'fill here' zone.

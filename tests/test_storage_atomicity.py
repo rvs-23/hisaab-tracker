@@ -57,3 +57,35 @@ def test_config_rejects_empty_or_duplicated_categories():
 def test_config_rejects_an_implausible_return():
     with _pytest.raises(ValidationError, match="0-30"):
         models.Config(categories=["mfs"], expected_return_pct=95)
+
+
+# Stale-tab guard helpers (Codex #7): fingerprint a slice, detect an on-disk
+# change since an editor opened.
+
+import ui
+
+
+def test_slice_sig_is_order_independent_and_ignores_float_noise():
+    a = pd.DataFrame({"category": ["mfs", "gold_metals"], "amount": [100.0, 200.0]})
+    b = pd.DataFrame({"category": ["gold_metals", "mfs"], "amount": [200, 100]})  # reordered, ints
+    assert ui.slice_sig(a, ["category", "amount"]) == ui.slice_sig(b, ["category", "amount"])
+
+
+def test_slice_sig_distinguishes_a_real_change():
+    a = pd.DataFrame({"category": ["mfs"], "amount": [100.0]})
+    b = pd.DataFrame({"category": ["mfs"], "amount": [101.0]})
+    assert ui.slice_sig(a, ["category", "amount"]) != ui.slice_sig(b, ["category", "amount"])
+
+
+def test_stale_since_open_true_when_disk_moved(monkeypatch):
+    ss = {"seed": ("x",)}
+    monkeypatch.setattr(ui.st, "session_state", ss)
+    monkeypatch.setattr(ui.st, "warning", lambda *a, **k: None)
+    monkeypatch.setattr(ui.st, "rerun", lambda: None)
+    assert ui.stale_since_open("seed", ("y",), "test") is True
+
+
+def test_stale_since_open_false_when_unchanged(monkeypatch):
+    ss = {"seed": ("x",)}
+    monkeypatch.setattr(ui.st, "session_state", ss)
+    assert ui.stale_since_open("seed", ("x",), "test") is False

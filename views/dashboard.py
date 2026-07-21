@@ -208,13 +208,16 @@ with st.expander("Adjustments"):
     )
     st.caption(f"= {inr_short(new_opening)}")
     if st.button("Save", key=f"save_adjustments_{profile.key}", type="primary"):
-        others = d.adjustments[
-            ~((d.adjustments["profile"] == profile.key) & (d.adjustments["field"] == "opening_corpus"))
-        ]
-        rows = pd.DataFrame([{"profile": profile.key, "field": "opening_corpus", "value": new_opening}])
-        rows = rows[rows["value"] > 0]  # a zero corpus is just "nothing recorded"
-        merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
         try:
+            # Fresh read so the emergency-fund row (same file, different field)
+            # saved from Actuals isn't reverted by this opening-corpus save.
+            fresh = storage.load_adjustments(d.root, d.profiles)
+            others = fresh[
+                ~((fresh["profile"] == profile.key) & (fresh["field"] == "opening_corpus"))
+            ]
+            rows = pd.DataFrame([{"profile": profile.key, "field": "opening_corpus", "value": new_opening}])
+            rows = rows[rows["value"] > 0]  # a zero corpus is just "nothing recorded"
+            merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
             storage.validate_adjustments(merged, d.profiles)
             storage.save_adjustments(d.root, merged)
             st.success("Saved.")
