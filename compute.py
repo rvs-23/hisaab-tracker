@@ -771,7 +771,7 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
                   rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
                   horizon_years: int, starting_corpus: float = 0.0,
                   monthly_saving: float = 0.0, inflation_pct: float = 0.0,
-                  emi_budget: float = 0.0) -> pd.DataFrame:
+                  emi_budget: float = 0.0, corpus_deploy_pct: float = 100.0) -> pd.DataFrame:
     """Total money wasted by the horizon, for every possible year of buying.
 
     Renting is not a permanent state: at some point the house gets bought, and
@@ -837,6 +837,10 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
             compare honestly. 0 leaves the model in nominal terms.
         emi_budget: What the household can pay as EMI today; grown at
             ``inflation_pct`` for later years. 0 skips the serviceability test.
+        corpus_deploy_pct: The most of the corpus, in percent, that goes into
+            the house (down payment + registration). Below 100 keeps the rest
+            invested rather than draining the portfolio for a bigger down
+            payment, which — realistically — pushes the cheapest year later.
 
     Returns:
         One row per buy year (``wait_years`` 0..horizon-1), with the price then,
@@ -864,7 +868,11 @@ def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_ye
                        if r_month else monthly_saving * months)
 
         min_down = price_then * down_pct / 100
-        available = corpus - registration_cost  # registration is paid in cash
+        # Only part of the corpus is ever put into a house — nobody drains their
+        # whole portfolio for a bigger down payment. ``corpus_deploy_pct`` caps
+        # what's available; registration is paid from that same deployable pot.
+        deployable = corpus * corpus_deploy_pct / 100
+        available = deployable - registration_cost  # registration is paid in cash
         down_payment = min(max(available, min_down), price_then)
         loan_principal = max(0.0, price_then - down_payment)
         monthly_emi = emi(loan_principal, loan_rate_pct, tenure_years)

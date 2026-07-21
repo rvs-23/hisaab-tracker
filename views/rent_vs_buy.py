@@ -342,6 +342,15 @@ cc2.caption(f"= {inr_short(starting_corpus)}")
 if use_corpus and abs(corpus_input - investable) > 1:
     cc1.caption(f"Your data says {inr_short(investable)}.")
 
+deploy_pct = st.slider(
+    "Share of savings you'd put into the house (%)", 10, 100, 60, step=5,
+    key=f"rvb_deploy_{k}",
+    help="How much of your corpus you'd actually spend on the down payment + "
+         "registration — the rest stays invested. Draining all of it minimises "
+         "the loan but leaves you illiquid, so the realistic answer is below 100%, "
+         "which pushes the cheapest year later.",
+)
+
 timing = compute.best_buy_year(
     price=price, down_pct=down_pct, loan_rate_pct=loan_rate_pct, tenure_years=tenure_years,
     registration_pct=registration_pct, maintenance_pct=maintenance_pct,
@@ -349,7 +358,7 @@ timing = compute.best_buy_year(
     rent_inflation_pct=rent_inflation_pct, invest_return_pct=invest_return_pct,
     horizon_years=horizon_years, starting_corpus=starting_corpus,
     monthly_saving=monthly_investment, inflation_pct=inflation_pct,
-    emi_budget=emi_budget,
+    emi_budget=emi_budget, corpus_deploy_pct=deploy_pct,
 )
 feasible = timing[timing["feasible"]]
 buy_years = (today_year + timing["wait_years"]).astype(str)
@@ -450,9 +459,9 @@ st.markdown(
     f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats. "
     "<b>Waste, not wealth</b> — the buyer ends up owning a house and the renter a "
     "portfolio; neither asset is counted here, so a low bar is not the same as being "
-    "better off. <b>When to buy assumes the whole corpus goes into the house</b> "
-    "(everything except your emergency fund), which minimises interest but leaves you "
-    "illiquid — in practice you'd keep some back, which pushes the cheapest year later. "
+    "better off. <b>When to buy deploys the share of your corpus you set above</b> into "
+    "the house; the rest stays invested. A bigger share shrinks the loan but leaves you "
+    "less liquid. "
     "<b>Affordability is deliberately conservative</b>: rent lives in your needs bucket, "
     "so buying frees up money the envelope doesn't credit you with. "
     "<b>Ready-to-move-in</b> — rent stops the day you buy, no construction gap or "
