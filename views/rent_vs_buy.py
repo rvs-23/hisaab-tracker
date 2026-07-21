@@ -19,7 +19,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import compute
-from config import EMI_SHARE_OF_WANTS_INVESTMENT_PCT
+from config import EMI_SHARE_OF_WANTS_INVESTMENT_PCT, RENTER_INVEST_DISCIPLINE_PCT
 from ui import (
     CHART_TEXT, COST_LINE, FS_BODY, MARKER, accent_primary, accent_secondary,
     chart_title, inr_axis, inr_short, load_all, metric_tile, page_header, style_fig,
@@ -87,6 +87,13 @@ with invest_col, st.container(border=True):
         help=f"Defaults to {return_source} ({default_return:.1f}%) — the same number "
              "behind the dashboard's Est. value today. Edit to model something else.",
     )
+    invest_discipline_pct = st.number_input(
+        "Of the difference, actually invested (%)", min_value=0.0, max_value=100.0,
+        value=float(RENTER_INVEST_DISCIPLINE_PCT), step=5.0, key=f"rvb_discipline_{k}",
+        help="A buyer's EMI is forced saving; a renter with a smaller outgoing tends "
+             "to spend part of the gap rather than invest it all. 100% is the "
+             "idealised renter who invests every spare rupee.",
+    )
 
 # Derived once, up front — tiles and chart reuse the same numbers as the model.
 down_payment = price * down_pct / 100
@@ -99,7 +106,7 @@ df = compute.rent_vs_buy(
     registration_pct=registration_pct, maintenance_pct=maintenance_pct,
     appreciation_pct=appreciation_pct, rent_monthly=rent_monthly,
     rent_inflation_pct=rent_inflation_pct, invest_return_pct=invest_return_pct,
-    horizon_years=horizon_years,
+    horizon_years=horizon_years, invest_discipline_pct=invest_discipline_pct,
 )
 yr = (today_year - 1 + df["year"]).astype(str)  # calendar years from the locked start
 
@@ -176,11 +183,16 @@ idle_end = float(df.iloc[-1]["rent_wasted_no_invest_cum"])
 horizon_year = today_year + horizon_years - 1
 leaner, gap = (("Buying", rent_end - buy_end) if buy_end <= rent_end
                else ("Renting + investing", buy_end - rent_end))
+discipline_note = (f"assuming the renter invests {invest_discipline_pct:.0f}% of the monthly "
+                   f"difference (a buyer's EMI is forced saving; a renter tends to spend some)"
+                   if invest_discipline_pct < 100 else
+                   "assuming the renter invests every spare rupee")
 st.caption(
     f"By {horizon_year}, **{leaner.lower()} wastes {inr_short(abs(gap))} less**: buying burns "
     f"{inr_short(buy_end)} (registration + interest + maintenance) against {inr_short(rent_end)} "
     f"of rent. Letting the rest sit idle instead of investing it pushes renting's waste to "
-    f"{inr_short(idle_end)} — the {inr_short(idle_end - rent_end)} gap is what the investing is worth."
+    f"{inr_short(idle_end)} — the {inr_short(idle_end - rent_end)} gap is what the investing is "
+    f"worth, {discipline_note}."
 )
 
 # Year by year, in rupees — the chart's numbers as a table, and the only place

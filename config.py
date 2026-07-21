@@ -78,6 +78,12 @@ NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 # envelope a home loan may claim — the default the affordability slider opens at.
 EMI_SHARE_OF_WANTS_INVESTMENT_PCT = 70
 
+# A buyer is forced to "save" via the EMI; a renter with a smaller outgoing
+# rarely invests the whole difference — some leaks into lifestyle. This is the
+# share of that monthly gap the renter actually invests, in the rent-vs-buy
+# comparison. Below 100 stops the renting side from looking unrealistically good.
+RENTER_INVEST_DISCIPLINE_PCT = 80
+
 # Emergency-fund *target* = this many months of the needs bucket (essential
 # spending only; wants pause in an emergency). The target is derived; the
 # *actual* fund held is entered by hand (see storage.ALLOWED_ADJUSTMENTS).

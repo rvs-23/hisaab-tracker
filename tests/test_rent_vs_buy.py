@@ -284,3 +284,22 @@ def test_starting_corpus_changes_the_recommendation():
     best_with = int(with_corpus[with_corpus["feasible"]]["total_wasted"].idxmin())
     best_without = int(without[without["feasible"]]["total_wasted"].idxmin())
     assert best_without > best_with  # no head start means waiting longer
+
+
+def test_invest_discipline_haircuts_the_renters_growth():
+    """Rv 2026-07-21: a renter rarely invests the whole EMI-vs-rent gap.
+    Investing less of the difference must yield a smaller portfolio gain, while
+    the rent actually paid (their baseline waste) is unchanged."""
+    full = compute.rent_vs_buy(**DEFAULTS, invest_discipline_pct=100)
+    lean = compute.rent_vs_buy(**DEFAULTS, invest_discipline_pct=80)
+    assert lean.iloc[-1]["renter_gain"] < full.iloc[-1]["renter_gain"]
+    assert lean.iloc[-1]["rent_wasted_cum"] == pytest.approx(full.iloc[-1]["rent_wasted_cum"])
+    # The idle line (rent + forgone growth) drops with less-disciplined investing.
+    assert lean.iloc[-1]["rent_wasted_no_invest_cum"] < full.iloc[-1]["rent_wasted_no_invest_cum"]
+
+
+def test_invest_discipline_default_is_the_full_amount():
+    """The compute default stays 100% — the haircut is opt-in from the view."""
+    a = compute.rent_vs_buy(**DEFAULTS)
+    b = compute.rent_vs_buy(**DEFAULTS, invest_discipline_pct=100)
+    assert a.iloc[-1]["renter_gain"] == pytest.approx(b.iloc[-1]["renter_gain"])

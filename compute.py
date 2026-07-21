@@ -598,7 +598,7 @@ def _amortization_by_year(principal: float, annual_rate_pct: float, tenure_years
 def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_years: int,
                registration_pct: float, maintenance_pct: float, appreciation_pct: float,
                rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
-               horizon_years: int) -> pd.DataFrame:
+               horizon_years: int, invest_discipline_pct: float = 100.0) -> pd.DataFrame:
     """Year-by-year money-wasted comparison between buying and renting.
 
     One row per year 1..``horizon_years``. Buying wastes registration/stamp
@@ -701,11 +701,18 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         appreciation_gain = price * (1 + appreciation_pct / 100) ** year - price
         buy_equity = down_payment + cum_principal + appreciation_gain
 
+        # The renter invests only ``invest_discipline_pct`` of each year's spare
+        # difference — a buyer's EMI is forced saving, a renter tends to spend
+        # some of the gap. A year where rent already exceeds EMI+maintenance
+        # (a negative diff) is a genuine outflow and isn't discounted.
+        def invested(diff: float) -> float:
+            return diff * invest_discipline_pct / 100 if diff > 0 else diff
+
         renter_portfolio = non_invested_base * (1 + invest_return_pct / 100) ** year
         for k, diff in yearly_diff.items():
-            renter_portfolio += diff * (1 + invest_return_pct / 100) ** (year - k)
+            renter_portfolio += invested(diff) * (1 + invest_return_pct / 100) ** (year - k)
 
-        renter_contributed = non_invested_base + sum(yearly_diff.values())
+        renter_contributed = non_invested_base + sum(invested(v) for v in yearly_diff.values())
         renter_gain = renter_portfolio - renter_contributed
 
         rows.append({
