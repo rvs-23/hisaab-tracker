@@ -40,18 +40,16 @@ PROFILE_ACCENTS = {
 }
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
-# Budget model, per person. The anchor year (a person's first earning year)
-# splits income needs/wants/investment per their base split; every later year
-# splits only the income *increment* per their increment split (needs and
-# investment mirror, wants held), so raises flow mostly to investing.
-# Per-person since 2026-07-19: rv starts at 25% investment, cheeni at 30%.
-# UI text derives from these dicts — never hard-code the numbers in a caption.
-DEFAULT_BASE_SPLIT = {"needs": 50, "wants": 20, "investment": 30}
+# Budget model. The anchor year (first earning year) splits income 50/30/20
+# needs/wants/investment (2026-07-25 — the shared anchor for both people). Every
+# later year splits only the income *increment* per the increment split below,
+# so most of each raise flows to investing while the anchor buckets carry
+# forward. UI text derives from these dicts — never hard-code them in a caption.
+DEFAULT_BASE_SPLIT = {"needs": 50, "wants": 30, "investment": 20}
 DEFAULT_INCREMENT_SPLIT = {"needs": 30, "wants": 20, "investment": 50}
-PROFILE_BASE_SPLITS = {
-    "rv": {"needs": 50, "wants": 25, "investment": 25},
-    "cheeni": {"needs": 50, "wants": 20, "investment": 30},
-}
+# Both people share the 50/30/20 anchor (no base override). Increment stays
+# per-person, unchanged.
+PROFILE_BASE_SPLITS = {}
 PROFILE_INCREMENT_SPLITS = {
     "rv": {"needs": 25, "wants": 25, "investment": 50},
     "cheeni": {"needs": 30, "wants": 20, "investment": 50},
@@ -69,7 +67,7 @@ BASELINE_YEAR = 2022
 EXPECTED_RETURNS = {
     "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
     "ppf_nps": 10.0,  # EPF / PPF / NPS blended
-    "bonds_gsec_aif": 7.5, "fixed_deposit": 7.0,
+    "bonds_gsec_fd": 7.5, "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 # An EMI is really funded out of wants + investment: needs are committed
@@ -100,6 +98,6 @@ CATEGORY_LABELS = {
     "mfs": "Mutual funds",
     "fixed_deposit": "Fixed deposit",
     "ppf_nps": "EPF / PPF / NPS",
-    "bonds_gsec_aif": "Bonds / Gsec / AIF",
+    "bonds_gsec_fd": "Bonds / Gsec / FD",
     "gold_metals": "Gold / metals",
 }

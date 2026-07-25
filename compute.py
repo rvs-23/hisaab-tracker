@@ -1,12 +1,13 @@
 """The financial model, as pure functions over the loaded data.
 
 Budget is *derived from income*, not entered. The philosophy is fixed; the
-split percentages are per person (config.PROFILE_BASE_SPLITS / _INCREMENT_SPLITS):
+split percentages come from config (DEFAULT_BASE_SPLIT / _INCREMENT_SPLIT, with
+per-person increment overrides in PROFILE_INCREMENT_SPLITS):
 
-  - In a person's anchor year (their first earning year), total income splits
-    across needs / wants / investment per their base split.
+  - In the anchor year (first earning year), total income splits across
+    needs / wants / investment per the base split (50/30/20, shared).
   - Every year after, last year's rupee amounts carry forward and only the
-    *increment* in income splits per their increment split — so more of each
+    *increment* in income splits per the increment split — so more of each
     raise is invested.
 
 Then, for contributions tracking, the goal is that year's investment amount
