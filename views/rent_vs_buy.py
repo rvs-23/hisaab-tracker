@@ -145,11 +145,11 @@ def end_labels(series):
 f = go.Figure()
 f.add_trace(go.Bar(x=yr, y=buy, name="Buying", marker_color=PRIMARY,
                    text=end_labels(buy), textposition="outside", cliponaxis=False,
-                   textfont=dict(color=PRIMARY, size=12),
+                   textfont=dict(color=PRIMARY, size=16),
                    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>"))
 f.add_trace(go.Bar(x=yr, y=rent, name="Renting + investing the rest", marker_color=SECONDARY,
                    text=end_labels(rent), textposition="outside", cliponaxis=False,
-                   textfont=dict(color=SECONDARY, size=12),
+                   textfont=dict(color=SECONDARY, size=16),
                    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting</extra>"))
 f.update_layout(barmode="group", bargap=0.25, bargroupgap=0.06, xaxis=dict(type="category"))
 lo = min(buy.min(), rent.min(), 0)
@@ -164,6 +164,7 @@ st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 buy_gain = -float(df.iloc[-1]["buy_wasted_net"])
 rent_gain = -float(df.iloc[-1]["rent_wasted_net"])
+home_value = float(df.iloc[-1]["buy_equity"])  # what you own outright at the horizon
 horizon_year = today_year + horizon_years - 1
 leader, gap = (("Buying", buy_gain - rent_gain) if buy_gain >= rent_gain
                else ("Renting + investing", rent_gain - buy_gain))
@@ -171,13 +172,44 @@ appr_end = float(df.iloc[-1]["appreciation_gain"])
 discipline_note = (f", with the renter investing {invest_discipline_pct:.0f}% of the monthly "
                    "difference" if invest_discipline_pct < 100 else "")
 st.caption(
-    f"By {horizon_year}, **{leader.lower()} comes out ahead by {inr_short(gap)}**{discipline_note}. "
-    f"Buying nets {inr_short(buy_gain)} — {inr_short(appr_end)} of home appreciation less "
-    f"{inr_short(df.iloc[-1]['buy_wasted_cum'])} of registration + interest + maintenance. "
-    f"Renting nets {inr_short(rent_gain)} — the growth on what's invested less "
-    f"{inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent. A number below zero means that "
-    "side is still behind its own spending at the horizon."
+    f"**Yes — by {horizon_year} you'd own the home outright, worth about {inr_short(home_value)}** "
+    f"(the {inr_short(price)} you paid, grown by {inr_short(appr_end)} of appreciation). But that "
+    f"{inr_short(price)} was your own money — the *gain* is only the appreciation, less the "
+    f"{inr_short(df.iloc[-1]['buy_wasted_cum'])} you spent on registration, interest and "
+    f"maintenance: **{inr_short(buy_gain)}**. Renting nets **{inr_short(rent_gain)}** — the growth "
+    f"on what's invested, less {inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent — so "
+    f"**{leader.lower()} comes out ahead by {inr_short(gap)}**{discipline_note}. It wins because "
+    f"{invest_return_pct:.0f}% investing outpaces {appreciation_pct:.0f}% appreciation over "
+    f"{tenure_years} years, even with the leverage of a loan."
 )
+
+# "Rent now, buy later" — the payoff of the renting path made concrete: the
+# portfolio it builds, measured against what the same house costs by then.
+portfolio_end = float(df.iloc[-1]["renter_portfolio"])
+future_price = price + appr_end
+coverage_pct = 100 * portfolio_end / future_price if future_price else 0.0
+with st.container(border=True):
+    if leader.startswith("Renting"):
+        if coverage_pct >= 100:
+            reach = (f"more than the home's whole **{inr_short(future_price)}** price by then — "
+                     f"you could **buy it outright in cash** ({coverage_pct:.0f}% of the price, "
+                     f"{inr_short(portfolio_end - future_price)} to spare)")
+        else:
+            reach = (f"enough to put **{coverage_pct:.0f}% down** on the home's "
+                     f"**{inr_short(future_price)}** price by then")
+        st.markdown(
+            f"💡 **Rent now, buy later.** Investing {invest_discipline_pct:.0f}% of the "
+            f"difference leaves you **{inr_short(gap)} ahead** by {horizon_year}, and your "
+            f"portfolio grows to **{inr_short(portfolio_end)}** — {reach}. So renting doesn't "
+            "mean never owning; it can mean owning the same house later with far less borrowed."
+        )
+    else:
+        st.markdown(
+            f"💡 **Buying wins here** by **{inr_short(gap)}** — {appreciation_pct:.0f}% "
+            f"appreciation plus the leverage of a {down_pct:.0f}%-down loan beats "
+            f"{invest_return_pct:.0f}% investing over {tenure_years} years. Push the "
+            "investment return up or appreciation down to see renting retake the lead."
+        )
 
 # Year by year — the equity story in numbers: the down payment and principal
 # build an asset that appreciates, alongside the interest/maintenance that don't.
