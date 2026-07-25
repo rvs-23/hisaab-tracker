@@ -86,29 +86,18 @@ def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
     assert not at.error, [e.value for e in at.error]
 
 
-# Rent vs buy's affordability section reads the person's own budget — rv has
-# income in fake_data_dir, cheeni doesn't, so one profile exercises the
-# needs+wants envelope and the other exercises its "no data yet" fallback.
+# Rent vs buy is now a single net-cost chart (no budget/timing sections) — it
+# reads none of the person's own data, so it renders the same for both profiles.
 
-def test_rent_vs_buy_verdict_names_the_leaner_side(fake_data_dir):
+def test_rent_vs_buy_states_the_net_cost_verdict(fake_data_dir):
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     assert not at.exception, at.exception
     captions = " ".join(c.value for c in at.caption)
-    assert "wastes" in captions and "less" in captions
-    assert "sit idle" in captions
-    assert "Interest is front-loaded" in captions  # the amortization table's caption
-    assert "you can carry a" in captions  # the What-you-can-afford caption
-
-
-def test_rent_vs_buy_affordability_silent_without_data(fake_data_dir):
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "cheeni"  # no income in this fixture
-    at.run()
-    assert not at.exception, at.exception
-    captions = " ".join(c.value for c in at.caption)
-    assert "Add this year's income to see what your budget can carry" in captions
+    assert "is ahead by" in captions          # the verdict
+    assert "net cost" in captions.lower()      # framed as net cost
+    assert "Home equity starts at" in captions  # the equity-story table caption
 
 
 def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
@@ -126,32 +115,11 @@ def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     assert "Saved" not in " ".join(s.value for s in at.success)
 
 
-def test_rent_vs_buy_timing_compares_against_an_affordable_year(fake_data_dir):
-    """When the corpus can't fund a purchase today, the verdict must say so
-    rather than claim a later year is 'cheaper than buying today' — that
-    comparison is against something the person cannot do (and read as a
-    negative saving)."""
+def test_rent_vs_buy_per_year_view_switches_the_chart(fake_data_dir):
+    """The Cumulative/Per year toggle must recompute without error."""
     at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
+    at.radio(key="rvb_view_rv").set_value("Per year").run()
     assert not at.exception, at.exception
-    captions = " ".join(c.value for c in at.caption)
-    assert "You can't buy this house yet" in captions
-    # The baseline it compares against must be a year the corpus can fund —
-    # never "buying today" when today is out of reach.
-    assert "buying today" not in captions
-
-
-def test_rent_vs_buy_starting_corpus_can_be_excluded(fake_data_dir):
-    """Unchecking 'use my current savings' must actually zero the corpus the
-    timing model starts from, not just grey the input out."""
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    before = " ".join(c.value for c in at.caption)
-    at.checkbox(key="rvb_usecorpus_rv").uncheck().run()
-    assert not at.exception, at.exception
-    after = " ".join(c.value for c in at.caption)
-    assert "= ₹0" in after
-    assert before != after
 
