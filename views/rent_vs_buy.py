@@ -192,16 +192,18 @@ with st.container(border=True):
     if leader.startswith("Renting"):
         if coverage_pct >= 100:
             reach = (f"more than the home's whole **{inr_short(future_price)}** price by then — "
-                     f"you could **buy it outright in cash** ({coverage_pct:.0f}% of the price, "
+                     f"enough to **buy it outright in cash** ({coverage_pct:.0f}% of the price, "
                      f"{inr_short(portfolio_end - future_price)} to spare)")
         else:
             reach = (f"enough to put **{coverage_pct:.0f}% down** on the home's "
                      f"**{inr_short(future_price)}** price by then")
         st.markdown(
-            f"💡 **Rent now, buy later.** Investing {invest_discipline_pct:.0f}% of the "
-            f"difference leaves you **{inr_short(gap)} ahead** by {horizon_year}, and your "
-            f"portfolio grows to **{inr_short(portfolio_end)}** — {reach}. So renting doesn't "
-            "mean never owning; it can mean owning the same house later with far less borrowed."
+            f"💡 **Rent now, buy later.** The chart shows your *net gain* ({inr_short(rent_gain)}, "
+            f"after the {inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent you pay along the way). "
+            f"Your actual **savings pot** is bigger — **{inr_short(portfolio_end)}** by "
+            f"{horizon_year} (the down payment you never spent plus the invested difference, and "
+            f"their growth; see the *Portfolio* column below). That's {reach}. So renting doesn't "
+            "mean never owning — it can mean owning the same house later with far less borrowed."
         )
     else:
         st.markdown(
@@ -223,6 +225,7 @@ with st.expander("Year by year — where each rupee goes"):
         "Home equity": df["buy_equity"],
         "Net gain buying": -df["buy_wasted_net"],
         "Rent": df["rent_paid"],
+        "Portfolio": df["renter_portfolio"],
         "Net gain renting": -df["rent_wasted_net"],
     })
     st.dataframe(
@@ -232,11 +235,14 @@ with st.expander("Year by year — where each rupee goes"):
     first, last = df.iloc[0], df.iloc[-1]
     if first["interest_paid"] > 0:
         st.caption(
-            f"Home equity starts at your {inr_short(down_payment)} down payment and grows as "
-            f"principal is repaid and the home appreciates — {inr_short(first['buy_equity'])} in "
-            f"{yr.iloc[0]} to {inr_short(last['buy_equity'])} by {yr.iloc[-1]}. Interest is "
-            f"front-loaded: {inr_short(first['interest_paid'])} vs {inr_short(first['principal_paid'])} "
-            f"principal in {yr.iloc[0]}, flipping to {inr_short(last['interest_paid'])} vs "
+            f"**Home equity** (what the buyer owns) and **Portfolio** (what the renter owns) are "
+            f"the two asset piles; the **Net gain** columns are those assets minus the money each "
+            f"side spent, and are what the chart plots. So the renter's {inr_short(last['renter_portfolio'])} "
+            f"portfolio by {yr.iloc[-1]} is a bigger number than their "
+            f"{inr_short(-last['rent_wasted_net'])} net gain, which nets out the "
+            f"{inr_short(last['rent_wasted_cum'])} of rent paid. Interest is front-loaded: "
+            f"{inr_short(first['interest_paid'])} vs {inr_short(first['principal_paid'])} principal in "
+            f"{yr.iloc[0]}, flipping to {inr_short(last['interest_paid'])} vs "
             f"{inr_short(last['principal_paid'])} by {yr.iloc[-1]}."
         )
 

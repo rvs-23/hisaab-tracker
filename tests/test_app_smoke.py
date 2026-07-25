@@ -97,7 +97,7 @@ def test_rent_vs_buy_states_the_net_cost_verdict(fake_data_dir):
     captions = " ".join(c.value for c in at.caption)
     assert "comes out ahead by" in captions    # the verdict
     assert "net gain" in captions.lower()       # framed as net gain
-    assert "Home equity starts at" in captions  # the equity-story table caption
+    assert "the two asset piles" in captions    # the equity-vs-gain table caption
 
 
 def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
