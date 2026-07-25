@@ -80,7 +80,7 @@ EMI_SHARE_OF_WANTS_INVESTMENT_PCT = 70
 # rarely invests the whole difference — some leaks into lifestyle. This is the
 # share of that monthly gap the renter actually invests, in the rent-vs-buy
 # comparison. Below 100 stops the renting side from looking unrealistically good.
-RENTER_INVEST_DISCIPLINE_PCT = 80
+RENTER_INVEST_DISCIPLINE_PCT = 60
 
 # Emergency-fund *target* = this many months of the needs bucket (essential
 # spending only; wants pause in an emergency). The target is derived; the

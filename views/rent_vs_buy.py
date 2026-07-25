@@ -44,16 +44,16 @@ return_source = ("the household expected_return_pct in config.yaml"
                  if d.config.expected_return_pct is not None
                  else "your target allocation's weighted expected return")
 
-sc1, sc2, _ = st.columns([1, 1, 2])
+sc1, _ = st.columns([1, 3])
 sc1.number_input("Start year (locked)", value=today_year, disabled=True, key=f"rvb_start_{k}",
-                 help="Scenarios start from the current year; the chart reads in calendar years.")
-horizon_years = int(sc2.number_input("Horizon (years)", min_value=1, value=15, step=1, key=f"rvb_horizon_{k}"))
+                 help="Scenarios start from the current year; the chart reads in calendar "
+                      "years and runs the length of the loan tenure.")
 
 house_col, loan_col, renting_col, invest_col = st.columns(4)
 
 with house_col, st.container(border=True):
     st.markdown("**The house**")
-    price = st.number_input("Property price (₹)", min_value=0, value=15_000_000, step=100_000, key=f"rvb_price_{k}")
+    price = st.number_input("Property price (₹)", min_value=0, value=30_000_000, step=100_000, key=f"rvb_price_{k}")
     st.caption(f"= {inr_short(price)}")
     registration_pct = st.number_input("Registration + stamp duty (% of price)", min_value=0.0, value=7.0, step=0.5, key=f"rvb_reg_{k}")
     maintenance_pct = st.number_input("Maintenance (% of price / yr)", min_value=0.0, value=0.5, step=0.1, key=f"rvb_maint_{k}")
@@ -61,10 +61,14 @@ with house_col, st.container(border=True):
 
 with loan_col, st.container(border=True):
     st.markdown("**The loan**")
-    down_pct = st.slider("Down payment (%)", 0, 100, 20, key=f"rvb_down_{k}")
+    down_pct = st.slider("Down payment (%)", 0, 100, 25, key=f"rvb_down_{k}")
     st.caption(f"= {inr_short(price * down_pct / 100)}")
     loan_rate_pct = st.number_input("Loan rate (% p.a.)", min_value=0.0, value=8.5, step=0.1, key=f"rvb_rate_{k}")
     tenure_years = int(st.number_input("Tenure (years)", min_value=1, value=20, step=1, key=f"rvb_tenure_{k}"))
+
+# The comparison runs the length of the loan — after that a buyer has no EMI and
+# the two paths stop diverging on financing.
+horizon_years = tenure_years
 
 with renting_col, st.container(border=True):
     st.markdown("**Renting**")
@@ -76,10 +80,10 @@ with invest_col, st.container(border=True):
     st.markdown("**Investing**")
     st.caption("What a renter does with the money buying would have consumed.")
     invest_return_pct = st.number_input(
-        "Investment return (% p.a.)", min_value=0.0, value=default_return, step=0.1,
+        "Investment return (% p.a.)", min_value=0.0, value=11.0, step=0.1,
         key=f"rvb_return_{k}",
-        help=f"Defaults to {return_source} ({default_return:.1f}%) — the same number "
-             "behind the dashboard's Est. value today. Edit to model something else.",
+        help=f"Default 11%. For reference, {return_source} is {default_return:.1f}% — "
+             "the number behind the dashboard's Est. value today. Edit to model anything.",
     )
     invest_discipline_pct = st.number_input(
         "Of the difference, actually invested (%)", min_value=0.0, max_value=100.0,
