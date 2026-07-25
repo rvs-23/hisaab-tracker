@@ -95,8 +95,8 @@ def test_rent_vs_buy_states_the_net_cost_verdict(fake_data_dir):
     at.run()
     assert not at.exception, at.exception
     captions = " ".join(c.value for c in at.caption)
-    assert "is ahead by" in captions          # the verdict
-    assert "net cost" in captions.lower()      # framed as net cost
+    assert "comes out ahead by" in captions    # the verdict
+    assert "net gain" in captions.lower()       # framed as net gain
     assert "Home equity starts at" in captions  # the equity-story table caption
 
 

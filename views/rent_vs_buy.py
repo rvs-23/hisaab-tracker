@@ -1,15 +1,15 @@
 """Rent vs buy: a stateless calculator, not a save.
 
-Compares the two choices as **net cost** — money that left your hands, minus the
-asset you ended up owning:
+Compares the two choices as **net gain** — the asset you end up owning, minus
+the money that left your hands:
 
-    buying  = registration + loan interest + maintenance − the home's appreciation
-    renting = rent paid − the growth on the difference the renter invests
+    buying  = the home's appreciation − (registration + loan interest + maintenance)
+    renting = growth on the invested difference − rent paid
 
-The buyer's down payment and repaid principal are not costs — they become equity
+The buyer's down payment and repaid principal aren't costs — they become equity
 in a home that appreciates. The renter's own savings aren't costs either. So a
-low (or negative) bar means the asset grew more than the money spent on it.
-Nothing here reads or writes the data CSVs; it's pure what-if.
+higher bar means the asset grew more than the money spent on it; the taller bar
+comes out ahead. Nothing here reads or writes the data CSVs; it's pure what-if.
 """
 
 import datetime as dt
@@ -33,9 +33,9 @@ k = profile.key  # per-person widget key suffix, so switching profile keeps inpu
 
 st.caption(
     "A calculator, not a save — nothing here is written to your data. Both choices are "
-    "measured the same way: **net cost** — what you paid out, minus the asset you end up "
-    "owning (the buyer's appreciating home, the renter's invested savings). Lower is "
-    "better; below zero means the asset outgrew the spend. Every number is overridable."
+    "measured the same way: **net gain** — the asset you end up owning (the buyer's "
+    "appreciating home, the renter's invested savings) minus what you paid out. Higher "
+    "is better; the taller bar comes out ahead. Every number is overridable."
 )
 
 target = compute.resolve_target(profile, d.targets, today_year)
@@ -109,11 +109,12 @@ yr = (today_year - 1 + df["year"]).astype(str)  # calendar years from the locked
 # difference's growth for the renter). Cumulative by default; per-year shows each
 # year on its own so year 1's registration + heavy interest stands out.
 chart_title(
-    "Net cost — what you spend minus what you own",
-    help="Buying: registration + loan interest + maintenance, minus the home's "
-         "appreciation (the down payment and repaid principal are equity, not cost). "
-         "Renting: rent paid, minus the growth on the difference the renter invests. "
-         "Lower is better; a bar below zero means the asset grew more than you spent.",
+    "Net gain — what you own minus what you spend",
+    help="Buying: the home's appreciation, minus registration + loan interest + "
+         "maintenance (the down payment and repaid principal are equity, already "
+         "yours). Renting: the growth on the difference the renter invests, minus the "
+         "rent. Higher is better; the taller bar comes out ahead. A bar below zero "
+         "means you're behind — you've spent more than the asset has gained so far.",
 )
 view = st.radio("View", ["Cumulative", "Per year"], horizontal=True,
                 label_visibility="collapsed", key=f"rvb_view_{k}")
@@ -121,17 +122,30 @@ per_year = view == "Per year"
 
 
 def shape(col: str):
-    """The chart series for ``col``: per-year deltas, or the running total."""
-    return df[col].diff().fillna(df[col].iloc[0]) if per_year else df[col]
+    """The net-gain chart series for ``col``: per-year deltas, or the running
+    total. Negated because the model stores net *cost* (spend − asset); gain is
+    its mirror, so higher = better on the chart."""
+    gain = -df[col]
+    return gain.diff().fillna(gain.iloc[0]) if per_year else gain
 
 
 buy = shape("buy_wasted_net")
 rent = shape("rent_wasted_net")
 
+# Label only the final pair of bars — the horizon verdict — so the two numbers
+# that matter are legible without a hover, and the rest stay clean.
+def end_labels(series):
+    return ["" if i != len(series) - 1 else inr_short(v) for i, v in enumerate(series)]
+
+
 f = go.Figure()
 f.add_trace(go.Bar(x=yr, y=buy, name="Buying", marker_color=PRIMARY,
+                   text=end_labels(buy), textposition="outside", cliponaxis=False,
+                   textfont=dict(color=PRIMARY, size=12),
                    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Buying</extra>"))
 f.add_trace(go.Bar(x=yr, y=rent, name="Renting + investing the rest", marker_color=SECONDARY,
+                   text=end_labels(rent), textposition="outside", cliponaxis=False,
+                   textfont=dict(color=SECONDARY, size=12),
                    hovertemplate="%{x}: ₹%{y:,.0f}<extra>Renting</extra>"))
 f.update_layout(barmode="group", bargap=0.25, bargroupgap=0.06, xaxis=dict(type="category"))
 lo = min(buy.min(), rent.min(), 0)
@@ -141,23 +155,24 @@ style_fig(f, height=460)
 # After style_fig — it resets legend and margin. Legend above, left-aligned.
 f.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.0, x=0),
                 margin=dict(l=8, r=8, t=44, b=8))
-f.update_yaxes(title_text="Net cost — lower is better", title_font=dict(size=12, color=CHART_TEXT))
+f.update_yaxes(title_text="Net gain — higher is better", title_font=dict(size=12, color=CHART_TEXT))
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-buy_end = float(df.iloc[-1]["buy_wasted_net"])
-rent_end = float(df.iloc[-1]["rent_wasted_net"])
+buy_gain = -float(df.iloc[-1]["buy_wasted_net"])
+rent_gain = -float(df.iloc[-1]["rent_wasted_net"])
 horizon_year = today_year + horizon_years - 1
-leaner, gap = (("Buying", rent_end - buy_end) if buy_end <= rent_end
-               else ("Renting + investing", buy_end - rent_end))
+leader, gap = (("Buying", buy_gain - rent_gain) if buy_gain >= rent_gain
+               else ("Renting + investing", rent_gain - buy_gain))
 appr_end = float(df.iloc[-1]["appreciation_gain"])
 discipline_note = (f", with the renter investing {invest_discipline_pct:.0f}% of the monthly "
                    "difference" if invest_discipline_pct < 100 else "")
 st.caption(
-    f"By {horizon_year}, **{leaner.lower()} is ahead by {inr_short(abs(gap))}**{discipline_note}. "
-    f"Buying's net cost is {inr_short(buy_end)} — its "
-    f"{inr_short(df.iloc[-1]['buy_wasted_cum'])} of registration + interest + maintenance "
-    f"less {inr_short(appr_end)} of home appreciation. Renting's is {inr_short(rent_end)} — "
-    f"{inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent less the growth on what's invested."
+    f"By {horizon_year}, **{leader.lower()} comes out ahead by {inr_short(gap)}**{discipline_note}. "
+    f"Buying nets {inr_short(buy_gain)} — {inr_short(appr_end)} of home appreciation less "
+    f"{inr_short(df.iloc[-1]['buy_wasted_cum'])} of registration + interest + maintenance. "
+    f"Renting nets {inr_short(rent_gain)} — the growth on what's invested less "
+    f"{inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent. A number below zero means that "
+    "side is still behind its own spending at the horizon."
 )
 
 # Year by year — the equity story in numbers: the down payment and principal
@@ -170,9 +185,9 @@ with st.expander("Year by year — where each rupee goes"):
         "Maintenance": df["maintenance_paid"],
         "Loan left": df["loan_balance"],
         "Home equity": df["buy_equity"],
-        "Net cost buying": df["buy_wasted_net"],
+        "Net gain buying": -df["buy_wasted_net"],
         "Rent": df["rent_paid"],
-        "Net cost renting": df["rent_wasted_net"],
+        "Net gain renting": -df["rent_wasted_net"],
     })
     st.dataframe(
         table.style.format({c: "₹{:,.0f}" for c in table.columns if c != "Year"}),
@@ -195,10 +210,10 @@ cols = st.columns(4)
 metric_tile(cols[0], "EMI / month", inr_short(monthly_emi), f"{tenure_years}-year loan", big=True)
 metric_tile(cols[1], "Total interest", inr_short(total_interest), "over the full tenure", big=True)
 metric_tile(cols[2], "Registration cost", inr_short(registration_cost), f"{registration_pct:.1f}% of price", big=True)
-metric_tile(cols[3], f"Ahead by {horizon_year}", leaner, f"by {inr_short(abs(gap))}",
+metric_tile(cols[3], f"Ahead by {horizon_year}", leader, f"by {inr_short(gap)}",
             color=PRIMARY, big=True,
-            help="The lower net-cost bar at the horizon — money spent minus the asset "
-                 "you own. Assumes the renter reinvests the difference.")
+            help="The taller net-gain bar at the horizon — the asset you own minus what "
+                 "you spent. Assumes the renter reinvests the difference.")
 
 st.markdown(
     f"<div style='color:var(--muted);font-size:{FS_BODY}'>Honest caveats. The verdict swings "
