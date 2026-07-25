@@ -17,7 +17,7 @@ TRADEBOOK_HEADER = "symbol,isin,trade_date,exchange,segment,series,trade_type,qu
 @pytest.fixture
 def data_root(tmp_path):
     (tmp_path / "config.yaml").write_text(
-        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_fd, gold_metals]\n"
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
     profiles.mkdir()

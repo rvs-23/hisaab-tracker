@@ -18,14 +18,14 @@ PAGES = [
 ]
 
 TARGET = (
-    "default_target: {mfs: 45, gold_metals: 25, indian_stocks: 5, us_market: 10, ppf_nps: 5, bonds_gsec_fd: 10}\n"
+    "default_target: {mfs: 45, gold_metals: 25, indian_stocks: 5, us_market: 10, ppf_nps: 5, fixed_deposit: 10}\n"
 )
 
 
 @pytest.fixture
 def fake_data_dir(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
-        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_fd, gold_metals]\n"
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
     profiles.mkdir()
@@ -54,7 +54,7 @@ def fake_data_dir(tmp_path, monkeypatch):
 def fresh_data_dir(tmp_path, monkeypatch):
     """A brand-new folder: only config.yaml + profiles/, no history CSVs yet."""
     (tmp_path / "config.yaml").write_text(
-        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_fd, gold_metals]\n"
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
     profiles.mkdir()

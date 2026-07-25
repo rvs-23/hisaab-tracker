@@ -18,7 +18,7 @@ def rv():
     return Profile(
         key="rv", name="Rv", birth_year=1998, forward_increment_pct=5,
         default_target={"mfs": 45, "gold_metals": 25, "indian_stocks": 5,
-                        "us_market": 10, "ppf_nps": 5, "bonds_gsec_fd": 10},
+                        "us_market": 10, "ppf_nps": 5, "fixed_deposit": 10},
     )
 
 
@@ -461,7 +461,7 @@ def test_inr_indian_grouping():
 def config():
     from models import Config
     return Config(categories=["mfs", "gold_metals", "indian_stocks", "us_market",
-                              "ppf_nps", "bonds_gsec_fd", "fixed_deposit"])
+                              "ppf_nps", "fixed_deposit"])
 
 
 def test_load_missing_csvs_returns_empty(tmp_path, rv, config):

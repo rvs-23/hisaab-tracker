@@ -67,7 +67,7 @@ BASELINE_YEAR = 2022
 EXPECTED_RETURNS = {
     "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
     "ppf_nps": 10.0,  # EPF / PPF / NPS blended
-    "bonds_gsec_fd": 7.5, "fixed_deposit": 7.0,
+    "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 # An EMI is really funded out of wants + investment: needs are committed
@@ -98,6 +98,5 @@ CATEGORY_LABELS = {
     "mfs": "Mutual funds",
     "fixed_deposit": "Fixed deposit",
     "ppf_nps": "EPF / PPF / NPS",
-    "bonds_gsec_fd": "Bonds / Gsec / FD",
     "gold_metals": "Gold / metals",
 }
