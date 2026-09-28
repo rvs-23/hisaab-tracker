@@ -428,17 +428,50 @@ def stale_since_open(seed_key: str, current_sig: tuple, label: str) -> bool:
     """
     seeded = st.session_state.get(seed_key)
     if seeded is not None and seeded != current_sig:
-        st.warning(f"{label} changed on disk since you opened this — reloaded with the "
-                   "newer data, so please redo your edit.")
+        flash("warning", f"{label} changed on disk since you opened this — reloaded with "
+                         "the newer data, so please redo your edit.")
         st.session_state.pop(seed_key, None)
         st.rerun()
         return True
     return False
 
 
+def flash(kind: str, message: str) -> None:
+    """Queues a message to show at the top of the page on the next run.
+
+    A message rendered right before ``st.rerun()`` is wiped by the rerun, so a
+    save confirmation or a "reloaded" warning would never be seen. Queue it
+    here instead; ``page_header`` renders and clears it.
+
+    Args:
+        kind: ``"success"``, ``"warning"`` or ``"error"`` — the ``st`` call used.
+        message: Markdown text to show.
+    """
+    st.session_state["_flash"] = (kind, message)
+
+
+def saved(message: str = "Saved.") -> None:
+    """Confirms a successful save and reruns so the page shows the new data."""
+    flash("success", message)
+    st.rerun()
+
+
+def save_failed(exc: Exception) -> None:
+    """Reports a failed save honestly.
+
+    ``storage.AuditLogError`` means the CSV *was* written and only its audit
+    record failed, so it must not read as "Not saved" — the page reloads with
+    the new data and says the change went through unaudited.
+    """
+    if isinstance(exc, storage.AuditLogError):
+        flash("warning", f"Saved, but the audit log (changes.jsonl) could not be written: {exc}")
+        st.rerun()
+    st.error(f"Not saved: {exc}")
+
+
 @contextmanager
 def edit_card(title: str):
-    """A bordered card with a teal heading that marks an editable 'fill here' zone.
+    """A bordered card, headed in the active accent, that marks a 'fill here' zone.
 
     Use as a context manager; everything in the body renders inside the card::
 
@@ -493,4 +526,11 @@ def page_header(title: str, profiles):
         f"background:{accent_primary()}'></span></div>",
         unsafe_allow_html=True,
     )
+    # Always claim the slot, filled or not, so a flash never shifts the page's
+    # element positions between runs.
+    slot = st.empty()
+    queued = st.session_state.pop("_flash", None)
+    if queued:
+        kind, message = queued
+        getattr(slot, kind)(message)
     return profile

@@ -171,6 +171,13 @@ leader, gap = (("Buying", buy_gain - rent_gain) if buy_gain >= rent_gain
 appr_end = float(df.iloc[-1]["appreciation_gain"])
 discipline_note = (f", with the renter investing {invest_discipline_pct:.0f}% of the monthly "
                    "difference" if invest_discipline_pct < 100 else "")
+# Why the leader leads, phrased for whichever side actually won.
+why = (f"{invest_return_pct:.0f}% investing outpaces {appreciation_pct:.0f}% appreciation "
+       f"over {tenure_years} years, even against the leverage of a loan"
+       if leader.startswith("Renting")
+       else f"{appreciation_pct:.0f}% appreciation on the whole price, bought with a "
+            f"{down_pct:.0f}%-down loan, beats {invest_return_pct:.0f}% investing over "
+            f"{tenure_years} years")
 st.caption(
     f"**Yes — by {horizon_year} you'd own the home outright, worth about {inr_short(home_value)}** "
     f"(the {inr_short(price)} you paid, grown by {inr_short(appr_end)} of appreciation). But that "
@@ -179,8 +186,7 @@ st.caption(
     f"maintenance: **{inr_short(buy_gain)}**. Renting nets **{inr_short(rent_gain)}** — the growth "
     f"on what's invested, less {inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent — so "
     f"**{leader.lower()} comes out ahead by {inr_short(gap)}**{discipline_note}. It wins because "
-    f"{invest_return_pct:.0f}% investing outpaces {appreciation_pct:.0f}% appreciation over "
-    f"{tenure_years} years, even with the leverage of a loan."
+    f"{why}."
 )
 
 # "Rent now, buy later" — the payoff of the renting path made concrete: the
@@ -198,7 +204,7 @@ with st.container(border=True):
             reach = (f"enough to put **{coverage_pct:.0f}% down** on the home's "
                      f"**{inr_short(future_price)}** price by then")
         st.markdown(
-            f"💡 **Rent now, buy later.** The chart shows your *net gain* ({inr_short(rent_gain)}, "
+            f"**Rent now, buy later.** The chart shows your *net gain* ({inr_short(rent_gain)}, "
             f"after the {inr_short(df.iloc[-1]['rent_wasted_cum'])} of rent you pay along the way). "
             f"Your actual **savings pot** is bigger — **{inr_short(portfolio_end)}** by "
             f"{horizon_year} (the down payment you never spent plus the invested difference, and "
@@ -207,7 +213,7 @@ with st.container(border=True):
         )
     else:
         st.markdown(
-            f"💡 **Buying wins here** by **{inr_short(gap)}** — {appreciation_pct:.0f}% "
+            f"**Buying wins here** by **{inr_short(gap)}** — {appreciation_pct:.0f}% "
             f"appreciation plus the leverage of a {down_pct:.0f}%-down loan beats "
             f"{invest_return_pct:.0f}% investing over {tenure_years} years. Push the "
             "investment return up or appreciation down to see renting retake the lead."

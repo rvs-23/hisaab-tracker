@@ -13,7 +13,8 @@ from config import (
 from ui import (
     FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
     html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
-    resync, section, seed_slice_sig, slice_sig, stale_since_open, style_fig,
+    resync, save_failed, saved, section, seed_slice_sig, slice_sig,
+    stale_since_open, style_fig,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -184,10 +185,9 @@ with st.expander("Edit allocation"):
             storage.save_targets(d.root, merged)
             st.session_state.pop(seed_key, None)
             del st.session_state[agkey]
-            st.success("Saved.")
-            st.rerun()
+            saved()
         except Exception as exc:
-            st.error(f"Not saved: {exc}")
+            save_failed(exc)
     st.caption("A saved year carries forward until you set a newer one.")
 
 # Then the slice shifting over the actual years (100% stacked), with the
