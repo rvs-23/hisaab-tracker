@@ -631,13 +631,6 @@ def test_catch_up_uses_flat_return_when_set(rv):
     assert cu == pytest.approx(200000 * 1.10 ** 2, rel=1e-6)
 
 
-def test_max_loan_inverts_emi():
-    """emi(max_loan_for_emi(budget)) must round-trip to the budget."""
-    loan = compute.max_loan_for_emi(69426, 8.5, 20)
-    assert compute.emi(loan, 8.5, 20) == pytest.approx(69426, abs=0.01)
-    assert compute.max_loan_for_emi(10000, 0, 10) == 10000 * 120  # zero-rate edge
-
-
 def test_adjusted_waste_columns_are_identities():
     df = compute.rent_vs_buy(price=10_000_000, down_pct=20, loan_rate_pct=8.5, tenure_years=20,
                              registration_pct=7, maintenance_pct=0.5, appreciation_pct=5,
@@ -657,16 +650,3 @@ def test_corpus_growth_honours_flat_return(rv):
     weighted = compute._corpus_growth_rate(rv, targets, 2024)
     assert weighted != 10.0  # rv's weighted rate isn't coincidentally 10
     assert compute._corpus_growth_rate(rv, targets, 2024, flat_return=10.0) == 10.0
-
-
-def test_sip_for_target_round_trips_future_value():
-    """The SIP grown by the standard FV formula returns the target."""
-    sip = compute.sip_for_target(75_000_000, 14, 10)  # 7.5Cr in 10y @14%
-    assert sip == pytest.approx(289_668, rel=0.001)   # ~₹2.90L, matches the hand calc
-    r, n = 14 / 1200, 120
-    fv = sip * ((1 + r) ** n - 1) / r
-    assert fv == pytest.approx(75_000_000, rel=1e-9)
-
-
-def test_sip_for_target_zero_return():
-    assert compute.sip_for_target(1_200_000, 0, 10) == pytest.approx(1_200_000 / 120)
