@@ -53,25 +53,6 @@ def test_interest_falls_and_principal_rises_every_year():
     assert len(interest) == tenure
 
 
-def test_max_loan_for_emi_is_the_exact_inverse_of_emi():
-    for principal, rate, tenure in [(5_000_000, 8.5, 20), (12_000_000, 9.25, 15),
-                                    (2_500_000, 7.0, 30)]:
-        monthly = compute.emi(principal, rate, tenure)
-        assert compute.max_loan_for_emi(monthly, rate, tenure) == pytest.approx(principal, rel=1e-9)
-
-
-def test_max_loan_for_emi_zero_rate_is_flat_multiplication():
-    assert compute.max_loan_for_emi(50_000, 0, 20) == pytest.approx(50_000 * 240)
-
-
-def test_sip_for_target_future_value_hits_the_target():
-    """The SIP inverse must round-trip through the standard FV formula."""
-    target, rate, years = 10_000_000, 11.5, 10
-    sip = compute.sip_for_target(target, rate, years)
-    r, n = rate / 1200, years * 12
-    assert sip * ((1 + r) ** n - 1) / r == pytest.approx(target, rel=1e-9)
-
-
 def test_amortization_zero_rate_is_all_principal():
     principal, tenure = 1_200_000, 10
     monthly = compute.emi(principal, 0, tenure)
@@ -133,34 +114,6 @@ def test_very_low_rent_makes_renting_waste_less_within_horizon():
     assert last["rent_wasted_cum"] < last["buy_wasted_cum"]
 
 
-def test_net_columns_are_the_assets_directly():
-    """Both sides spend the same housing budget, so assets compare directly —
-    subtracting waste again would double-count (the renter's portfolio already
-    paid the rent out of that budget; Codex review 2026-07-20)."""
-    df = compute.rent_vs_buy(**DEFAULTS)
-    row = df.iloc[5]
-    assert row["buy_net"] == pytest.approx(row["buy_equity"])
-    assert row["rent_net"] == pytest.approx(row["renter_portfolio"])
-
-
-def test_crossover_year_found_when_rent_eventually_costlier():
-    params = {**DEFAULTS, "rent_monthly": 60_000, "rent_inflation_pct": 8}
-    df = compute.rent_vs_buy(**params)
-    year = compute.rent_vs_buy_crossover_year(df)
-    assert year is not None
-    row = df[df["year"] == year].iloc[0]
-    assert row["buy_wasted_cum"] <= row["rent_wasted_cum"]
-    if year > 1:
-        prev = df[df["year"] == year - 1].iloc[0]
-        assert prev["buy_wasted_cum"] > prev["rent_wasted_cum"]
-
-
-def test_crossover_year_none_when_renting_always_wastes_less():
-    params = {**DEFAULTS, "rent_monthly": 1_000, "rent_inflation_pct": 0, "horizon_years": 5}
-    df = compute.rent_vs_buy(**params)
-    assert compute.rent_vs_buy_crossover_year(df) is None
-
-
 # Allocation-weighted return helper (used to default the calculator's invest_return).
 
 def test_expected_return_for_target_weights_by_pct():
@@ -176,116 +129,6 @@ def test_renter_contributed_is_portfolio_minus_gain():
     assert row["renter_portfolio"] == pytest.approx(row["renter_contributed"] + row["renter_gain"])
 
 
-# best_buy_year — timing the purchase.
-
-TIMING = dict(
-    price=15_000_000, down_pct=20, loan_rate_pct=8.5, tenure_years=20,
-    registration_pct=7, maintenance_pct=0.5, appreciation_pct=5,
-    rent_monthly=40_000, rent_inflation_pct=5, invest_return_pct=11.5,
-    horizon_years=15, starting_corpus=5_000_000, monthly_saving=150_000,
-)
-
-
-def test_best_buy_year_covers_the_horizon_inclusively():
-    """A 15-year horizon must offer buying now through waiting all fifteen —
-    16 options, not 15 (the label says years of waiting)."""
-    df = compute.best_buy_year(**TIMING)
-    assert list(df["wait_years"]) == list(range(TIMING["horizon_years"] + 1))
-
-
-def test_waiting_grows_the_corpus_and_shrinks_the_loan():
-    """The whole reason waiting can win: savings compound into a bigger down
-    payment, so the loan falls even though the house costs more."""
-    df = compute.best_buy_year(**TIMING)
-    assert df["price_then"].is_monotonic_increasing
-    assert df["corpus"].is_monotonic_increasing
-    assert df["loan"].is_monotonic_decreasing
-    assert df.iloc[-1]["loan"] == 0.0  # eventually bought outright
-
-
-def test_savings_create_an_interior_optimum():
-    """With real monthly saving the cheapest year is neither the first nor the
-    last — waiting pays until appreciation and rent outrun the corpus."""
-    df = compute.best_buy_year(**TIMING)
-    best = int(df[df["feasible"]]["total_wasted"].idxmin())
-    assert 0 < best < TIMING["horizon_years"]
-
-
-def test_without_savings_buying_now_wins():
-    """No monthly saving means waiting buys nothing but rent and a pricier
-    house, so the optimum collapses to year 0."""
-    # The corpus must clear registration + the minimum down payment today, or
-    # year 0 is simply unaffordable and the earliest feasible year wins by default.
-    df = compute.best_buy_year(**{**TIMING, "monthly_saving": 0, "starting_corpus": 6_000_000})
-    assert bool(df.iloc[0]["feasible"])
-    assert int(df[df["feasible"]]["total_wasted"].idxmin()) == 0
-
-
-def test_interest_is_charged_over_the_full_tenure_not_the_horizon():
-    """Guards the bias that made waiting look free: buying late must still be
-    charged for every rupee of its loan."""
-    df = compute.best_buy_year(**{**TIMING, "starting_corpus": 0, "monthly_saving": 0})
-    late = df.iloc[-1]
-    monthly = compute.emi(late["loan"], TIMING["loan_rate_pct"], TIMING["tenure_years"])
-    full_interest = monthly * TIMING["tenure_years"] * 12 - late["loan"]
-    assert late["interest_paid"] == pytest.approx(full_interest, rel=1e-6)
-
-
-def test_a_small_corpus_marks_early_years_infeasible():
-    df = compute.best_buy_year(**{**TIMING, "starting_corpus": 500_000, "monthly_saving": 50_000})
-    assert not bool(df.iloc[0]["feasible"])
-    assert bool(df.iloc[-1]["feasible"])
-
-
-def test_emi_budget_gates_feasibility_not_just_cash():
-    """Codex 2026-07-21: cash alone approved years whose EMI the household
-    could never service. A tiny budget must make even cash-rich years unusable."""
-    # Cash-rich enough to clear registration + the down payment, but still
-    # borrowing — a corpus that buys outright would owe no EMI at all.
-    rich = {**TIMING, "starting_corpus": 6_000_000, "monthly_saving": 0}
-    assert compute.best_buy_year(**rich, emi_budget=500_000)["feasible"].any()
-    tight = compute.best_buy_year(**rich, emi_budget=1_000)
-    early = tight[tight["wait_years"] < 5]
-    assert early["cash_ok"].any()          # the cash is there
-    assert not early["emi_ok"].any()       # but the EMI never fits
-    assert not early["feasible"].any()     # so the year is not affordable
-
-
-def test_zero_emi_budget_skips_the_serviceability_test():
-    """0 means 'no budget known' — fall back to the cash test rather than
-    silently marking every year unaffordable."""
-    df = compute.best_buy_year(**TIMING, emi_budget=0)
-    assert (df["feasible"] == df["cash_ok"]).all()
-
-
-def test_inflation_discounts_future_costs():
-    """Same nominal scenario, discounted: waste must come out lower, and more
-    so for later purchases whose costs sit further out."""
-    nominal = compute.best_buy_year(**TIMING, inflation_pct=0)
-    real = compute.best_buy_year(**TIMING, inflation_pct=6)
-    assert (real["total_wasted"] < nominal["total_wasted"]).all()
-    shrink = 1 - real["total_wasted"] / nominal["total_wasted"]
-    assert shrink.iloc[-1] > shrink.iloc[0]
-
-
-def test_maintenance_grows_with_inflation():
-    flat = compute.best_buy_year(**TIMING, inflation_pct=0).iloc[0]["maintenance_paid"]
-    base = TIMING["price"] * TIMING["maintenance_pct"] / 100
-    assert flat == pytest.approx(base * TIMING["tenure_years"])
-
-
-def test_starting_corpus_changes_the_recommendation():
-    """Codex 2026-07-21: the toggle test only checked a caption string. Prove
-    the model itself moves when the corpus is excluded."""
-    with_corpus = compute.best_buy_year(**TIMING)
-    without = compute.best_buy_year(**{**TIMING, "starting_corpus": 0})
-    assert (without["corpus"] < with_corpus["corpus"]).all()
-    assert (without["loan"] >= with_corpus["loan"]).all()
-    best_with = int(with_corpus[with_corpus["feasible"]]["total_wasted"].idxmin())
-    best_without = int(without[without["feasible"]]["total_wasted"].idxmin())
-    assert best_without > best_with  # no head start means waiting longer
-
-
 def test_invest_discipline_haircuts_the_renters_growth():
     """Rv 2026-07-21: a renter rarely invests the whole EMI-vs-rent gap.
     Investing less of the difference must yield a smaller portfolio gain, while
@@ -294,8 +137,8 @@ def test_invest_discipline_haircuts_the_renters_growth():
     lean = compute.rent_vs_buy(**DEFAULTS, invest_discipline_pct=80)
     assert lean.iloc[-1]["renter_gain"] < full.iloc[-1]["renter_gain"]
     assert lean.iloc[-1]["rent_wasted_cum"] == pytest.approx(full.iloc[-1]["rent_wasted_cum"])
-    # The idle line (rent + forgone growth) drops with less-disciplined investing.
-    assert lean.iloc[-1]["rent_wasted_no_invest_cum"] < full.iloc[-1]["rent_wasted_no_invest_cum"]
+    # So the renter's net gain (the chart's bar) drops with less-disciplined investing.
+    assert lean.iloc[-1]["rent_wasted_net"] > full.iloc[-1]["rent_wasted_net"]
 
 
 def test_invest_discipline_default_is_the_full_amount():

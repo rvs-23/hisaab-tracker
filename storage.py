@@ -24,6 +24,8 @@ import pandas as pd
 import yaml
 
 from audit import log_change
+from config import INCOME_COMPONENTS
+from models import Config, Profile
 
 
 class AuditLogError(RuntimeError):
@@ -33,8 +35,6 @@ class AuditLogError(RuntimeError):
     on disk yet unaudited, rather than the audit failure passing unnoticed.
     """
 
-from config import INCOME_COMPONENTS
-from models import Config, Profile
 
 REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 

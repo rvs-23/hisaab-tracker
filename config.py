@@ -24,7 +24,6 @@ STRIP_TEXT = GRAPHITE
 SAND = "#dfe4e8"  # neutral income bar
 NEEDS = "#b9c0c7"  # the "needs" slice of the budget split
 CHART_TEXT = "#6b7280"  # muted grey for in-chart labels (YoY growth etc.)
-COST_LINE = "#9aa0a6"  # the net-worth chart's cost-basis line
 MARKER = "#64748b"  # slate chart markers (job-change triangle)
 FONT = "Inter"
 
@@ -70,12 +69,6 @@ EXPECTED_RETURNS = {
     "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
-# An EMI is really funded out of wants + investment: needs are committed
-# spending (an EMI can't come out of groceries), so a house is paid for by
-# giving up discretionary spend and investing less. This is the share of that
-# envelope a home loan may claim — the default the affordability slider opens at.
-EMI_SHARE_OF_WANTS_INVESTMENT_PCT = 70
-
 # A buyer is forced to "save" via the EMI; a renter with a smaller outgoing
 # rarely invests the whole difference — some leaks into lifestyle. This is the
 # share of that monthly gap the renter actually invests, in the rent-vs-buy

@@ -8,13 +8,13 @@ from config import EMERGENCY_FUND_MONTHS
 from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
     html_table, inr_axis, inr_short, load_all, metric_tile, page_header,
-    pretty_category, section, seed_slice_sig, slice_sig, stale_since_open, style_fig,
+    pretty_category, save_failed, saved, section, seed_slice_sig, slice_sig,
+    stale_since_open, style_fig,
 )
 
 d = load_all()
 active = page_header("Actuals", d.profiles)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
-scope = [active.key]
 st.caption("What actually went in, against the plan, per category; negative shortfall = under-invested.")
 
 if d.income[d.income["profile"] == active.key].empty:
@@ -97,10 +97,9 @@ with st.expander("Update emergency fund"):
             merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
             storage.validate_adjustments(merged, d.profiles)
             storage.save_adjustments(d.root, merged)
-            st.success("Saved.")
-            st.rerun()
+            saved()
         except Exception as exc:
-            st.error(f"Not saved: {exc}")
+            save_failed(exc)
 st.write("")
 
 ordered = pva.sort_values("expected", ascending=False)
@@ -150,9 +149,8 @@ with edit_card(f"Record what you actually invested in {year}"):
             storage.validate_contributions(combined, d.config, d.profiles)
             storage.save_contributions(d.root, combined)
             st.session_state.pop(seed_key, None)
-            st.success("Saved.")
-            st.rerun()
+            saved()
         except Exception as exc:
-            st.error(f"Not saved: {exc}")
+            save_failed(exc)
 
 st.caption(f"The emergency-fund goal above is derived from your budget ({EMERGENCY_FUND_MONTHS} months of the needs bucket); what you actually hold is entered in the expander above.")

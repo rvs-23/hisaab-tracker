@@ -1,140 +1,130 @@
 # Personal Finances Tracker
 
-A local Streamlit app for two people that replaces a finance-tracking Excel.
-It answers one question — *did we invest what the plan said this year?* — so it
-tracks **contributions vs goal**. Income drives a derived budget, a target
-allocation, and a planned-vs-actual comparison. Balances are never entered;
-where a portfolio value appears it is *estimated* from those contributions and
-the expected returns, and labelled as such.
+A local Streamlit app for two people that replaced a finance-tracking Excel.
+It answers one question: **did we invest what the plan said this year?** So it
+tracks **contributions vs goal**. You enter income; the budget, the goal, and
+the plan-vs-actual comparison are derived from it. Balances are never entered.
+Where a portfolio value appears, it is an *estimate* from contributions and an
+expected return, and is labelled that way.
 
 New here? **[docs/how-it-works.md](docs/how-it-works.md)** is the 5-minute,
 no-jargon guide.
 
 ## Run it
 
-`app.py` is the entry point (pages via `st.navigation`):
-
 ```sh
 uv sync
 cp .env.example .env          # set DATA_DIR to your data folder
-uv run streamlit run app.py   # http://localhost:8501
+uv run streamlit run app.py   # http://localhost:8501/?profile=rv
+uv run pytest                 # tests
 ```
 
-Python ≥ 3.14. Tests: `uv run pytest`.
+Python ≥ 3.14. `app.py` is the entry point; pages are wired with `st.navigation`.
 
 ## Data
 
-**Everything is entered by hand** — no bank, broker, or statement import. Data
-lives in a plain CSV/YAML folder outside the repo (`DATA_DIR` in `.env`, never
-committed), re-read from disk on every refresh. The minimum is `config.yaml`
-(`categories`) plus one `profiles/<key>.yaml` per person (`name, birth_year,
-forward_increment_pct, default_target`; the filename stem is the profile key);
-the history CSVs appear as you save. Scaffold a fresh folder with
-`uv run python scripts/init_data_dir.py <path>`. Zerodha users can skip
-re-typing equity/MF contributions by hand with
-`uv run python scripts/import_tradebook.py <tradebook.csv> --profile <key> --year <year>`
-— it collapses a year's tradebook into one net (buys − sells) contribution
-row, riding the same validation and audit log as every other save.
+Plain CSV/YAML in a folder **outside the repo** (`DATA_DIR` in `.env`, never
+committed), re-read from disk on every render. No database, no caching.
 
-Every save **validates first** (numeric, non-negative — except income's
-*other*, which may be negative — known categories/profiles, no duplicates, %s
-sum to 100) and refuses bad input with a message. CSVs are replaced atomically (temp file + `os.replace`), so an
-interrupted write can't leave a half-written file. Every accepted save appends
-one JSON line to **`changes.jsonl`** — an append-only audit log of exactly
-which rows were added and removed.
+| File | What it holds | Written by |
+|---|---|---|
+| `config.yaml` | `categories`, optional `expected_return_pct` | hand |
+| `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target` | hand |
+| `income.csv` | monthly `salary / bonus / other`, `job_change` flag | Income page |
+| `contributions.csv` | what was actually invested, per year and category | Actuals page, importer |
+| `targets.csv` | per-year target-allocation overrides | Budget page |
+| `adjustments.csv` | `opening_corpus`, `emergency_fund` per person | Dashboard, Actuals |
+| `changes.jsonl` | append-only audit log of every save | every save |
 
-Each page shows **one person at a time** via `?profile=<key>` (`rv` or
-`cheeni`); set it once and it sticks across pages. Year pickers are locked to
-**2022 → now**.
+The minimum to start is `config.yaml` + one profile; scaffold both with
+`uv run python scripts/init_data_dir.py <path>`. The CSVs appear on first save.
+
+**Every save** validates first and refuses bad input with a message. Checks:
+numeric, non-negative (except income's *other*, which may go negative for a
+tax payment or clawback), known categories and profiles, no duplicates, and %s
+that sum to 100. Each CSV is replaced atomically (temp file + `os.replace`).
+Each accepted save then appends the rows added and removed to `changes.jsonl`.
+If only that audit write fails, the page says *saved, but not audited*. Editors
+also check whether the data on disk changed since you opened them (say, from
+another tab). If it did, they reload instead of overwriting.
+
+**Zerodha import:** `uv run python scripts/import_tradebook.py <tradebook.csv>
+--profile <key> --year <year>` collapses one year of fills into a single net
+(buys − sells) contribution row. It uses the same validation and audit path.
+Add `--dry-run` to preview or `--replace` to overwrite an existing row.
+
+## People
+
+One person at a time, chosen by URL: `?profile=rv` or `?profile=cheeni`. It
+sticks across pages. There's no switcher and no name on screen; each person
+has their own accent colours. Year pickers run from 2022 to the current year.
 
 ## Pages
 
-**Dashboard** is read-only — it recomputes from what you enter elsewhere. Dashboard opens with four lifetime tiles, then the year-on-year
-journey (bars: income and the planned goal with its target-% of income; line:
-what you actually invested), cumulative allocation by category (stacked by the
-year each rupee went in), and the catch-up callout. A quiet
-**Adjustments** expander at the bottom holds one-off audited figures —
-currently just **opening corpus** (see below). Budget shows how income splits
-and how the investment slice grows.
+| Page | Question it answers | Writes |
+|---|---|---|
+| **Dashboard** | Where am I overall? Tiles, the year-on-year journey chart, allocation to date, catch-up, health nudges | opening corpus (Adjustments expander) |
+| **Income** | What did I earn? 12-month grid per year; a new year pre-fills last year's salary | `income.csv` |
+| **Budget** | How does income split, and where should the investment go? | `targets.csv` (allocation editor) |
+| **Actuals** | What did I really invest, against the plan? | `contributions.csv`, emergency fund held |
+| **Rent vs buy** | Is buying this house better than renting and investing? | nothing (a calculator) |
 
-The two write pages:
+## The model
 
-- **Income** → `income.csv`. Pick a year, fill 12 months of
-  `salary / bonus / other` (RSU vesting or a maturing FD goes under *other*;
-  *other* may also go negative, e.g. a tax payment or clawback); tick **Job
-  change** if you switched jobs. A new year pre-fills last year's monthly
-  salary; *Copy January down* fills the rest. Everything else derives from
-  this.
-- **Actuals** → `contributions.csv`. One row per instrument for the picked
-  year — what you actually invested, shown against the plan and the derived
-  emergency-fund target (plus the hand-entered fund you hold). Saves never
-  touch other people or other years.
-- **Budget** also owns `targets.csv`: the target-allocation table sits under
-  the monthly split (how each monthly goal is consumed per instrument), with
-  its editor in an expander (Save enables only at 100%). A saved year carries
-  forward until replaced.
+- **Budget** is derived, never stored. The first *earning* year splits income
+  by the base split (needs / wants / investment). Each later year carries last
+  year's rupees forward and splits only the **raise**, by that person's
+  increment split, which tilts toward investing. A year with an income drop
+  scales every bucket down proportionally. A zero-income year gets no row.
+  Projects to the current year + 3 at `forward_increment_pct`. The splits live
+  in `config.py` (`DEFAULT_BASE_SPLIT`, `PROFILE_INCREMENT_SPLITS`), and the
+  Budget page prints the active person's.
+- **Goal** for a year = its investment amount × target % per category. A
+  saved allocation carries forward until a newer year replaces it.
+- **Catch-up** = the lump sum that, invested today, erases every *past* year's
+  shortfall (grown at the expected return). The current year's gap is "left to
+  go", not catch-up. Overshooting is fine.
+- **Estimated value** = contributions compounded at the expected return, plus
+  the emergency fund (the amount held, or the derived target until one is
+  entered), plus any opening corpus. It's a projection, not a valuation.
+- **One rate everywhere:** `expected_return_pct` in `config.yaml` is the single
+  growth rate for estimated value, corpus, and catch-up. Remove it to fall back
+  to per-category `EXPECTED_RETURNS` in `config.py`.
+- **Emergency fund target** = `EMERGENCY_FUND_MONTHS` (4) × monthly needs.
+- **Opening corpus** is money invested before tracking began. It's assumed
+  invested at the start of your first tracked year and counts toward invested
+  and estimated value. It never touches the budget, goal, or catch-up.
+- **Health nudges** appear only when something needs a look: no income this
+  year, investing under half the elapsed-year pace, no emergency fund recorded,
+  or this year's mix ≥ 15 points off target.
+- **Rent vs buy** compares **net gain** over the loan tenure: the asset each
+  side builds, minus money that buys nothing lasting.
+  - *Buying* = the home's appreciation − (registration + loan interest +
+    maintenance). The down payment and principal are equity, not cost.
+  - *Renting* = growth on the invested difference − rent. The renter invests
+    the unspent down payment and registration, plus
+    `RENTER_INVEST_DISCIPLINE_PCT` (60%) of each year's (EMI + maintenance −
+    rent) gap.
+  - Nothing is saved. The investment-return input defaults to 11%; its tooltip
+    shows the household rate for comparison.
 
-**Rent vs buy** is a calculator, not a save — stateless, nothing written to
-disk. Inputs sit in four bordered groups (the house / the loan / renting /
-investing) under a locked start-year, a horizon, and an inflation rate. Three
-sections follow:
+## Code layout
 
-- **Money wasted** — cash that buys nothing lasting: registration + loan
-  interest + maintenance for buying, the rent itself for renting, and a third
-  line for a renter who leaves the difference idle and forfeits the growth.
-  Principal and a renter's own savings are never waste. Cumulative or per-year,
-  with a year-by-year table showing the EMI's interest/principal split.
-- **What you can afford** — the EMI sized from your budget's *wants +
-  investment* (needs are committed spending), at a configurable share
-  (`EMI_SHARE_OF_WANTS_INVESTMENT_PCT`, default 70%), back-solved to a loan and
-  a house price capped by whichever binds: that EMI or your cash.
-- **When to buy** — every year in the horizon priced end to end (rent while
-  waiting, then registration, the loan's *full* interest, and maintenance for
-  the tenure), discounted to today's rupees. A year counts as affordable only
-  if the cash covers registration + the down payment *and* the EMI fits the
-  budget. The starting corpus defaults to your estimated portfolio less the
-  emergency fund, and can be overridden or excluded.
+Flat modules at the root:
 
-The invest-return input defaults to the household expected return.
-
-## The numbers
-
-- **Budget** is derived, never stored: the first earning year splits income
-  per that person's **base split**; each later year splits only the
-  **increment** per their increment split, tilted toward investing (the
-  per-person percentages are constants in `config.py`). A zero-income year gets
-  no budget row; an income drop scales the split down proportionally. Projects
-  to current + 3 at `forward_increment_pct`.
-- **Goal** for a year = its investment amount × target %, per category.
-- **Potential net worth** = contributions compounded at the expected return,
-  plus the emergency fund (what you actually hold — or, until entered, the
-  derived target of `EMERGENCY_FUND_MONTHS` of the needs bucket) plus any
-  **opening corpus**. A projection, not a valuation. **One rate everywhere**:
-  set `expected_return_pct` in the data folder's `config.yaml` and it becomes
-  the single growth rate for net worth, corpus, catch-up, and the Rent-vs-buy
-  default; remove it to fall back to per-category `EXPECTED_RETURNS`.
-- **Opening corpus** (optional, set in Dashboard → Adjustments) is money
-  invested before tracking began. It's assumed invested at the start of your
-  first tracked year and grown at your allocation-weighted expected return; it
-  counts toward "Invested till date" and net worth, but never touches the
-  budget, goals, catch-up, or plan-vs-actual.
-- **Catch-up** = the lump sum, invested today, that erases every *past* year's
-  shortfall (grown at expected returns; the current year's gap is "left to go",
-  not catch-up; overshooting is fine).
-- **Health nudges** on the Dashboard quietly flag things worth a look — no
-  current-year income entered, investing badly behind pace, an unrecorded
-  emergency fund, or an actual mix that's drifted from target — and say
-  nothing at all when everything's healthy.
-
-## Layout
-
-Flat: `app.py` (entry) · `config.py` (palette + model constants) · `models.py`
-(pydantic YAML schemas) · `storage.py` (CSV/YAML I/O + validation) · `audit.py`
-(save log) · `compute.py` (pure financial model) · `ui.py` (Streamlit helpers)
-· `views/` (the five pages) · `scripts/` (data-dir scaffold + the Zerodha
-tradebook importer) · `tests/` (golden + headless render tests).
+| Module | Role |
+|---|---|
+| `config.py` | palette, model constants, labels (the one place for numbers) |
+| `models.py` | pydantic schemas for the YAML files |
+| `storage.py` | CSV/YAML I/O, validation, atomic saves |
+| `audit.py` | the `changes.jsonl` log |
+| `compute.py` | the financial model, pure functions |
+| `ui.py` | Streamlit helpers: formatting, tiles, theme, save messages |
+| `views/` | the five pages |
+| `scripts/` | data-folder scaffold, Zerodha importer |
+| `tests/` | ₹-exact model tests + headless page renders (`AppTest`) |
 
 ## Non-goals
 
-Live prices/FX, broker APIs, market-value tracking, auth, multi-device sync,
-mobile, cloud. Local only — no server, no database.
+Live prices, broker APIs, market-value tracking, auth, sync, mobile, cloud.
+Local only.

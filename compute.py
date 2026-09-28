@@ -600,7 +600,7 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
                registration_pct: float, maintenance_pct: float, appreciation_pct: float,
                rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
                horizon_years: int, invest_discipline_pct: float = 100.0) -> pd.DataFrame:
-    """Year-by-year money-wasted comparison between buying and renting.
+    """Year-by-year comparison of buying vs renting, as waste and net gain.
 
     One row per year 1..``horizon_years``. Buying wastes registration/stamp
     duty (once), loan interest (never principal — that's equity), and
@@ -624,9 +624,6 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         buy_wasted_cum: registration + cumulative interest paid + cumulative
             maintenance, to date.
         rent_wasted_cum: cumulative rent paid, to date.
-        rent_wasted_no_invest_cum: cumulative rent plus the investment growth
-            a renter forgoes by leaving the difference as idle cash — the
-            opportunity cost is real waste, so it belongs on the same axis.
         interest_paid / principal_paid: that single year's EMI split, from the
             monthly amortization schedule (interest is heaviest in year 1 and
             falls as the balance amortizes; principal mirrors it).
@@ -641,18 +638,14 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         buy_wasted_net / rent_wasted_net: the apples-to-apples pair — each
             side's waste minus the asset gain that side ends up holding
             (the buyer's appreciation; the renter's investment growth). Can go
-            negative when the asset gained more than the waste.
+            negative when the asset gained more than the waste; the page plots
+            its negation as "net gain".
         buy_equity: down payment + principal repaid so far + property
             appreciation on the full price (interest/maintenance/registration
             build no equity, so they're excluded here).
         renter_portfolio: down payment + registration money never spent,
             invested from year 0, plus every year's (EMI + maintenance −
             rent) difference invested from the year it occurs.
-        buy_net / rent_net: each side's ASSETS — buy_equity and
-            renter_portfolio verbatim. Both sides spend the same housing
-            budget by construction, so assets compare directly; subtracting
-            waste again would double-count (the renter's portfolio already
-            paid the rent out of that budget).
 
     Args:
         price: Property price.
@@ -666,6 +659,9 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
         rent_inflation_pct: Annual rent inflation, in percent.
         invest_return_pct: Annual return assumed on money the renter invests.
         horizon_years: How many years to project.
+        invest_discipline_pct: Share of each year's spare (EMI + maintenance −
+            rent) the renter actually invests; a negative year is never
+            discounted. 100 is the renter who invests every spare rupee.
 
     Returns:
         A DataFrame with one row per year, columns as above.
@@ -720,7 +716,6 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
             "year": year,
             "buy_wasted_cum": buy_wasted_cum,
             "rent_wasted_cum": rent_wasted_cum,
-            "rent_wasted_no_invest_cum": rent_wasted_cum + renter_gain,
             "interest_paid": interest_this_year,
             "principal_paid": principal_this_year,
             "maintenance_paid": maintenance_annual,
@@ -733,211 +728,5 @@ def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_year
             "renter_gain": renter_gain,
             "buy_wasted_net": buy_wasted_cum - appreciation_gain,
             "rent_wasted_net": rent_wasted_cum - renter_gain,
-            "buy_net": buy_equity,
-            "rent_net": renter_portfolio,
         })
     return pd.DataFrame(rows)
-
-
-def max_loan_for_emi(monthly_emi_budget: float, annual_rate_pct: float,
-                     tenure_years: int) -> float:
-    """The largest loan a monthly EMI budget can service (inverse of ``emi``).
-
-    Args:
-        monthly_emi_budget: The EMI one can afford per month.
-        annual_rate_pct: Annual loan rate, in percent.
-        tenure_years: Loan tenure in years.
-    """
-    months = tenure_years * 12
-    r = annual_rate_pct / 100 / 12
-    if r == 0:
-        return monthly_emi_budget * months
-    return monthly_emi_budget * ((1 + r) ** months - 1) / (r * (1 + r) ** months)
-
-
-def sip_for_target(target_amount: float, annual_return_pct: float, years: float) -> float:
-    """The monthly SIP that grows to ``target_amount`` in ``years``.
-
-    End-of-month contributions compounded monthly — the inverse of the standard
-    SIP future-value ``FV = P·((1+r)ⁿ−1)/r``. Handles a 0% return (straight
-    division). Use it for "how much a month to reach the down payment by then".
-
-    Args:
-        target_amount: The corpus to reach.
-        annual_return_pct: Assumed annual return, in percent.
-        years: Years to save.
-    """
-    n = max(1, round(years * 12))
-    r = annual_return_pct / 100 / 12
-    if r == 0:
-        return target_amount / n
-    return target_amount * r / ((1 + r) ** n - 1)
-
-
-def best_buy_year(price: float, down_pct: float, loan_rate_pct: float, tenure_years: int,
-                  registration_pct: float, maintenance_pct: float, appreciation_pct: float,
-                  rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
-                  horizon_years: int, starting_corpus: float = 0.0,
-                  monthly_saving: float = 0.0, inflation_pct: float = 0.0,
-                  emi_budget: float = 0.0, corpus_deploy_pct: float = 100.0) -> pd.DataFrame:
-    """Total money wasted by the horizon, for every possible year of buying.
-
-    Renting is not a permanent state: at some point the house gets bought, and
-    *when* changes the total. Buying now means interest on a big loan from day
-    one and no rent; waiting means paying rent and a pricier house, but the down
-    payment keeps compounding meanwhile.
-
-    The tension is real in both directions. Waiting costs rent and buys a
-    pricier house, but the corpus keeps compounding *and* keeps being added to,
-    so the down payment grows and the loan — the expensive part — shrinks. An
-    interior optimum exists whenever savings outrun property appreciation.
-
-    Every option is charged for the *whole* loan, not just the part that lands
-    inside the horizon. Counting only the horizon's interest would make waiting
-    look free — buy in the final year and almost none of the loan falls inside
-    the window, though every rupee of it still gets paid. Ownership therefore
-    lasts ``tenure_years`` in each scenario, just starting later, and the
-    horizon only bounds how long waiting is allowed.
-
-    For a purchase after ``t`` years of renting:
-        - rent for years 1..t, inflating at ``rent_inflation_pct``;
-        - the house costs ``price`` grown at ``appreciation_pct`` for t years,
-          registration scaled to that price and paid in cash;
-        - the down payment is whatever the corpus can put in after registration
-          (never less than ``down_pct``, never more than the whole price), so
-          waiting converts compounding into a smaller loan;
-        - the loan's full interest over ``tenure_years``;
-        - maintenance for those same ``tenure_years`` of ownership.
-
-    The corpus's growth is not subtracted anywhere — it already shows up as a
-    smaller loan, and counting it twice would make waiting look free again.
-    A year is ``feasible`` only if the corpus covers registration plus the
-    minimum down payment (``cash_ok``) *and* the resulting EMI fits
-    ``emi_budget`` for that year (``emi_ok``). Cash alone would approve a loan
-    the household cannot service.
-
-    Amounts are reported in today's rupees when ``inflation_pct`` is set: each
-    flow is discounted from the year it is paid, so rent in year 3 and interest
-    in year 25 are not added at face value.
-
-    Assumes a ready-to-move-in property: rent stops the day the house is
-    bought, with no construction gap and no pre-EMI period.
-
-    ``t`` runs 0..``horizon_years`` inclusive, so a 15-year horizon offers
-    buying now through waiting the full fifteen.
-
-    Args:
-        price: Property price today.
-        down_pct: Down payment as % of the price at purchase.
-        loan_rate_pct: Annual home-loan interest rate, in percent.
-        tenure_years: Loan tenure in years.
-        registration_pct: One-time registration + stamp duty, as % of price.
-        maintenance_pct: Annual maintenance/property tax, as % of price.
-        appreciation_pct: Assumed annual property appreciation, in percent.
-        rent_monthly: Starting monthly rent.
-        rent_inflation_pct: Annual rent inflation, in percent.
-        invest_return_pct: Annual return on the corpus while it stays invested.
-        horizon_years: How many years of waiting to evaluate.
-        starting_corpus: Investable savings available today.
-        monthly_saving: Added to the corpus every month while waiting.
-        inflation_pct: General inflation. Grows maintenance year on year and
-            discounts every flow back to today's rupees, so costs decades apart
-            compare honestly. 0 leaves the model in nominal terms.
-        emi_budget: What the household can pay as EMI today; grown at
-            ``inflation_pct`` for later years. 0 skips the serviceability test.
-        corpus_deploy_pct: The most of the corpus, in percent, that goes into
-            the house (down payment + registration). Below 100 keeps the rest
-            invested rather than draining the portfolio for a bigger down
-            payment, which — realistically — pushes the cheapest year later.
-
-    Returns:
-        One row per buy year (``wait_years`` 0..horizon-1), with the price then,
-        the corpus, the down payment it funds, the loan, each waste component,
-        ``feasible``, and ``total_wasted``. The best choice is the feasible row
-        with the smallest ``total_wasted``.
-    """
-    r_month = invest_return_pct / 100 / 12
-    discount = 1 + inflation_pct / 100
-
-    def pv(amount: float, year: float) -> float:
-        """``amount``, paid ``year`` years from today, in today's rupees."""
-        return amount / discount ** year if inflation_pct else amount
-
-    rows = []
-    for wait in range(max(1, horizon_years) + 1):
-        price_then = price * (1 + appreciation_pct / 100) ** wait
-        registration_cost = price_then * registration_pct / 100
-        # Corpus: today's savings compounded, plus the monthly additions made
-        # while waiting (standard SIP future value; flat sum at a 0% return).
-        months = wait * 12
-        corpus = starting_corpus * (1 + invest_return_pct / 100) ** wait
-        if monthly_saving:
-            corpus += (monthly_saving * (((1 + r_month) ** months - 1) / r_month)
-                       if r_month else monthly_saving * months)
-
-        min_down = price_then * down_pct / 100
-        # Only part of the corpus is ever put into a house — nobody drains their
-        # whole portfolio for a bigger down payment. ``corpus_deploy_pct`` caps
-        # what's available; registration is paid from that same deployable pot.
-        deployable = corpus * corpus_deploy_pct / 100
-        available = deployable - registration_cost  # registration is paid in cash
-        down_payment = min(max(available, min_down), price_then)
-        loan_principal = max(0.0, price_then - down_payment)
-        monthly_emi = emi(loan_principal, loan_rate_pct, tenure_years)
-        interest_by_year, _ = _amortization_by_year(
-            loan_principal, loan_rate_pct, tenure_years, monthly_emi
-        )
-        # Affordable means both: the cash is there for registration plus the
-        # minimum down payment, AND the EMI fits the household budget of that
-        # year. Cash alone would green-light a loan nobody can service.
-        cash_ok = available >= min_down
-        budget_then = emi_budget * discount ** wait if emi_budget else 0.0
-        emi_ok = monthly_emi <= budget_then if emi_budget else True
-        feasible = bool(cash_ok and emi_ok)
-
-        # Every flow is discounted from the year it is actually paid: rent while
-        # waiting, registration at purchase, then interest and maintenance
-        # across the tenure. Without this, a rupee in 2060 counts the same as
-        # one today and waiting always looks cheaper than it is.
-        rent_paid = sum(
-            pv(rent_monthly * (1 + rent_inflation_pct / 100) ** y * 12, y)
-            for y in range(wait)
-        )
-        interest_paid = sum(
-            pv(amount, wait + j + 1) for j, amount in enumerate(interest_by_year)
-        )
-        maintenance_base = price_then * maintenance_pct / 100
-        maintenance_paid = sum(
-            pv(maintenance_base * discount ** j, wait + j + 1)
-            for j in range(tenure_years)
-        )
-        registration_pv = pv(registration_cost, wait)
-
-        rows.append({
-            "wait_years": wait,
-            "price_then": price_then,
-            "corpus": corpus,
-            "down_payment": down_payment,
-            "loan": loan_principal,
-            "monthly_emi": monthly_emi,
-            "emi_budget": budget_then,
-            "cash_ok": cash_ok,
-            "emi_ok": emi_ok,
-            "feasible": feasible,
-            "rent_paid": rent_paid,
-            "registration_cost": registration_cost,
-            "registration_pv": registration_pv,
-            "interest_paid": interest_paid,
-            "maintenance_paid": maintenance_paid,
-            "total_wasted": (rent_paid + registration_pv + interest_paid
-                             + maintenance_paid),
-        })
-    return pd.DataFrame(rows)
-
-
-def rent_vs_buy_crossover_year(df: pd.DataFrame) -> int | None:
-    """The first year where buying's cumulative waste drops to or below
-    renting's — the point buying becomes the less wasteful choice — or
-    ``None`` if that never happens within the projected horizon."""
-    crossed = df[df["buy_wasted_cum"] <= df["rent_wasted_cum"]]
-    return int(crossed.iloc[0]["year"]) if not crossed.empty else None

@@ -8,8 +8,9 @@ import compute
 import storage
 from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
-    CHART_TEXT, MARKER, accent_primary, accent_secondary, edit_card, inr_axis,
-    inr_short, load_all, page_header, resync, section, style_fig,
+    CHART_TEXT, MARKER, accent_primary, accent_secondary, edit_card, flash,
+    inr_axis, inr_short, load_all, page_header, resync, save_failed, saved,
+    section, style_fig,
 )
 
 d = load_all()
@@ -28,7 +29,7 @@ if not visible.empty:
     f = go.Figure()
     f.add_bar(x=yr, y=totals, name="Income", marker_color=PRIMARY)
     # YoY income growth above each bar, so the raise is visible at a glance.
-    growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in totals.pct_change() * 100]
+    growth = ["" if pd.isna(v) else f"{v:+.0f}%" for v in totals.pct_change() * 100]
     f.add_trace(go.Scatter(
         x=yr, y=totals, mode="text", text=growth, textposition="top center",
         textfont=dict(size=11, color=CHART_TEXT), showlegend=False, hoverinfo="skip",
@@ -153,15 +154,15 @@ with edit_card(f"Enter {year}"):
         if ss.get(skey) is not None and ss[skey] != current:
             # Disk moved under this grid (another tab, or an import) — reload
             # rather than overwrite the newer data with our stale grid.
-            st.warning(f"{year}'s income changed on disk since you opened this. Reloaded — "
-                       "re-enter your change so nothing is overwritten.")
+            flash("warning", f"{year}'s income changed on disk since you opened this. "
+                             "Reloaded — re-enter your change so nothing is overwritten.")
             ss.pop(gkey, None)
             ss.pop(skey, None)
             st.rerun()
         elif rows_sig(new) == current:
             # Nothing to write. Most often the last-typed cell never committed:
             # Streamlit's editor only captures a cell once it loses focus.
-            st.toast("Nothing saved — your last edit hasn't committed.", icon="⚠️")
+            st.toast("Nothing saved — your last edit hasn't committed.", icon=":material/warning:")
             st.warning("**No changes to save.** If you just typed a value, press **Enter** "
                        "(or click another cell) to commit it — the number turns from an "
                        "editing box into plain text — then Save. Nothing was written.")
@@ -173,10 +174,9 @@ with edit_card(f"Enter {year}"):
                 storage.save_income(d.root, merged)
                 ss.pop(gkey, None)
                 ss.pop(skey, None)
-                st.success(f"Saved — {inr_short(total)} across {filled} month{'s' if filled != 1 else ''} of {year}.")
-                st.rerun()
+                saved(f"Saved — {inr_short(total)} across {filled} month{'s' if filled != 1 else ''} of {year}.")
             except Exception as exc:
-                st.error(f"Not saved: {exc}")
+                save_failed(exc)
     b3.markdown(
         f"<div style='padding-top:.4rem;color:var(--muted)'>{filled} of 12 months entered &nbsp;·&nbsp; "
         f"<b style='color:var(--text)'>{inr_short(total)}</b> for {year} ({delta})</div>",

@@ -9,7 +9,7 @@ import storage
 from ui import (
     CHART_TEXT, FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary,
     accent_secondary, chart_title, inr_axis, inr_short, load_all, metric_tile,
-    page_header, pretty_category, section, style_fig, tint,
+    page_header, pretty_category, save_failed, saved, section, style_fig, tint,
 )
 
 d = load_all()
@@ -36,6 +36,8 @@ year_range = (
 )
 
 flat_return = d.config.expected_return_pct  # "we only use one" — config.yaml override
+growth_basis = (f"a flat {flat_return:g}% a year (expected_return_pct in config.yaml)"
+                if flat_return is not None else "conservative per-category returns")
 catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year,
                                    flat_return=flat_return)
 earned = float(trend["total_income"].sum())
@@ -60,8 +62,7 @@ metric_tile(c[1], "Invested till date", inr_short(invested), year_range, big=Tru
 metric_tile(c[2], "Est. value today", inr_short(nw_potential), f"as of {today_year}",
             color=PRIMARY, big=True,
             help=f"What your contributions across {year_range} could be worth today, "
-                 "compounded at conservative per-category returns, plus your emergency "
-                 "fund."
+                 f"compounded at {growth_basis}, plus your emergency fund."
                  + (f" Includes {inr_short(opening)} invested before tracking, grown from "
                     "its assumed vintage." if opening > 0 else ""))
 # The plan tile headlines the TOTAL to invest to be fully on track: this
@@ -101,7 +102,7 @@ else:
         goal.append(g)
     actual_invested = [float(contrib.loc[contrib["year"] == y, "amount"].sum()) for y in yr]
     income_bars = trend["total_income"].tolist()
-    growth = ["" if pd.isna(v) else f"+{v:.0f}%" for v in trend["total_income"].pct_change() * 100]
+    growth = ["" if pd.isna(v) else f"{v:+.0f}%" for v in trend["total_income"].pct_change() * 100]
 
     # The target % of income (the plan's investment share) rides each goal bar
     # as a small outside label — outside, so tiny bars can't clip it.
@@ -199,8 +200,9 @@ with st.expander("Adjustments"):
         "One-off figures that don't fit the year-by-year history. Opening corpus is "
         "money you'd already invested before you started tracking here — it's added "
         "to your totals and audited like any other save, assumed invested at the "
-        "start of your first tracked year and grown at your allocation-weighted "
-        "expected return."
+        "start of your first tracked year and grown at "
+        + (growth_basis if flat_return is not None
+           else "your allocation-weighted expected return") + "."
     )
     new_opening = st.number_input(
         "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,
@@ -220,7 +222,6 @@ with st.expander("Adjustments"):
             merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
             storage.validate_adjustments(merged, d.profiles)
             storage.save_adjustments(d.root, merged)
-            st.success("Saved.")
-            st.rerun()
+            saved()
         except Exception as exc:
-            st.error(f"Not saved: {exc}")
+            save_failed(exc)
