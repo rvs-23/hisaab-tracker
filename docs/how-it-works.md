@@ -19,11 +19,11 @@ Income  →  Budget  →  Allocation  →  Actuals
 - **Income** is the only money fact you enter. Everything else is computed
   from it or compared against it.
 - **Budget** splits that income into needs / wants / investment. Your first
-  earning year splits into needs/wants/investment per your own base split;
-  after that, only each year's *raise* is split, tilted toward investing — so
-  as you earn more, a bigger share of income goes to investing. (Each person's
-  exact percentages live in `config.py`; the Budget page shows yours.)
-  You never type a budget; changing income changes it.
+  earning year uses the base split. After that, only each year's *raise* is
+  split, and that split leans toward investing, so the more you earn, the
+  bigger the share you invest. The Budget page shows your exact percentages
+  (they live in `config.py`). You never type a budget; changing income
+  changes it.
 - **Allocation** is where you say how the investment slice spreads across
   instruments (mutual funds 45%, gold 25%, …). Percentages must sum to 100.
   A year's allocation carries forward until you set a newer one. It lives on
@@ -41,8 +41,8 @@ bookmarked:
 - `http://localhost:8501/?profile=cheeni`
 
 There is no switch button and no name on the page — you can tell whose page
-you're on by the **accent colours** (rv: platinum grays; cheeni: rose +
-raspberry, a pink family). Once set, the choice sticks as you move between
+you're on by the **accent colours** (rv: platinum grays; cheeni: pink +
+raspberry). Once set, the choice sticks as you move between
 pages.
 
 ## Reading the Dashboard
@@ -69,7 +69,7 @@ Top to bottom:
    corpus**: money you'd already invested before you started tracking here
    (say, ₹20L before 2024). Set it once; it's audited like every other save.
    It's assumed invested at the start of your first tracked year and grown at
-   your own allocation-weighted expected return, and it counts toward
+   the household expected return, and it counts toward
    "Invested till date" and the net-worth estimate — but it deliberately
    doesn't touch the budget, the goal, catch-up, or plan-vs-actual, since
    those are about what you've tracked, not what came before.
@@ -79,33 +79,32 @@ and the **secondary accent means "what was planned"**.
 
 ## Rent vs buy
 
-A calculator on its own page — nothing you enter here is saved. Inputs sit
-in four groups: the house, the loan, renting (just its cost), and investing
-(what a renter does with the money buying would have consumed), plus a
-horizon and an inflation rate.
+A calculator on its own page. Nothing you enter here is saved. Fill four
+boxes: the house, the loan, renting (just its cost), and investing (what a
+renter does with the money buying would have used). The comparison runs for
+the length of the loan.
 
-**Money wasted** is the first chart: registration, loan *interest* (never
-principal) and maintenance for buying; the rent itself for renting; and a
-dashed third line for a renter who leaves the spare money idle and gives up
-the growth — the gap between those two is what the investing is worth. Switch
-between the running total and each year on its own; year 1 towers because it
-carries registration and the heaviest interest. The table below it shows how
-each EMI splits between interest and principal, year by year.
+It compares **net gain**: what each choice leaves you owning, minus the money
+spent on things that don't last.
 
-**What you can afford** sizes the EMI from your budget's *wants + investment*
-— needs are committed spending, so a house is paid for by giving up
-discretionary spend and investing less. It's deliberately conservative: your
-rent sits inside needs, so buying frees up money this doesn't credit you with.
+- **Buying:** the home's rise in value, minus registration, loan *interest*,
+  and maintenance. The down payment and the principal you repay aren't costs.
+  They become the house.
+- **Renting:** the growth on what the renter invests, minus the rent. The
+  renter invests the down payment they never spent, plus part of each month's
+  difference between an EMI and the rent. The default is 60%, since few people
+  invest every spare rupee.
 
-**When to buy** prices every year in the horizon the same way — rent until you
-buy, then registration, every rupee of the loan's interest, and maintenance
-for the whole tenure, all discounted to today's money. Waiting costs rent and
-a pricier house but grows your corpus into a bigger down payment and a smaller
-loan, so the cheapest year is usually neither the first nor the last. Bars are
-greyed unless *both* tests pass: enough cash for registration and the down
-payment, and an EMI your budget can service.
+Taller bar wins. Switch between the running total and each year on its own.
+Year 1 dips because it carries registration and the heaviest interest. Under
+the chart:
 
-None of it counts what you end up owning — it compares waste, not wealth.
+- one sentence saying who comes out ahead and why;
+- a note on what the renter's savings could buy later;
+- a year-by-year table: interest vs principal, equity, rent, portfolio.
+
+The verdict swings on three guesses: appreciation, investment return, and rent
+inflation. Treat it as a way to see which assumption matters, not as an answer.
 
 ## What to do, and when
 
