@@ -126,7 +126,7 @@ active_mix["per_month"] = active_mix["per_year"] / 12
 html_table(
     active_mix,
     {"category": "Instrument", "pct": "Target %", "per_month": "₹ / month", "per_year": "₹ / year"},
-    formats={"category": pretty_category, "pct": lambda v: f"{v:.0f}%",
+    formats={"category": pretty_category, "pct": lambda v: f"{v:g}%",
              "per_year": inr_short, "per_month": inr_short},
 )
 
