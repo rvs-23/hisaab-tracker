@@ -64,7 +64,23 @@ def year_goal_for(year: int) -> float:
     return sum(sum(compute.expected_contributions(p, d.income, d.targets, year).values())
                for p in people)
 
-section("Lifetime")
+# How much of what was earned got invested, over the tracked years only: the
+# opening corpus predates these earnings and growth isn't saving, so neither
+# counts. A low figure means most income was spent.
+tracked = float(contrib["amount"].sum())
+kept = 100 * tracked / earned if earned else 0.0
+head, corner = st.columns([3, 2])
+with head:
+    section("Lifetime")
+with corner:
+    st.markdown(
+        f"<div style='text-align:right;margin:.9rem 0 .2rem;font-size:{FS_BODY};color:var(--muted)'>"
+        f"Invested <b style='color:{PRIMARY}'>{kept:.0f}%</b> of what you earned "
+        f"({inr_short(tracked)} of {inr_short(earned)}, {year_range})</div>",
+        unsafe_allow_html=True,
+        help="Tracked investments divided by income over the same years. The opening "
+             "corpus and investment growth are left out: neither came from these earnings.",
+    )
 c = st.columns(4)
 metric_tile(c[0], "Earned till date", inr_short(earned), year_range, big=True,
             help=f"Total income across the years you've entered ({year_range}).")
