@@ -702,3 +702,10 @@ def test_liquid_pace_annualises_this_years_liquid_contributions(rv):
     today = dt.date(2026, 7, 2)
     assert compute.liquid_pace([rv], contrib, today) == pytest.approx(
         50_000 / compute.elapsed_year_fraction(today))
+
+
+def test_house_fund_todays_money_deflates_by_inflation():
+    df = compute.house_fund(corpus_today=1_000_000, pace=0, pace_growth_pct=0, rate_pct=10,
+                            years_ahead=2, today=dt.date(2026, 7, 2), inflation_pct=6)
+    assert df.loc[0, "todays_money"] == pytest.approx(1_000_000)
+    assert df.loc[2, "todays_money"] == pytest.approx(1_210_000 / 1.06 ** 2)

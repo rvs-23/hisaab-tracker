@@ -112,10 +112,11 @@ anyone) last saved data, from `changes.jsonl`.
   or this year's mix ≥ 15 points off target.
 - **House fund** = the *liquid* corpus today (contributions in
   `LIQUID_CATEGORIES` grown at the return, plus the opening corpus unless
-  unticked; EPF/PPF/NPS and the emergency fund are left out), grown each year,
-  plus a yearly pace that grows too. The pace defaults to this year's liquid
-  contributions scaled up to a full year, so it reads low if Investments are
-  behind. Return, pace, pace growth and horizon are live inputs; nothing is
+  unticked; EPF, PPF, NPS, AIF and the emergency fund are left out), grown each
+  year, plus a monthly investment that grows yearly. The monthly amount
+  defaults to this year's liquid contributions scaled to a full year, ÷ 12, so
+  it reads low if Investments are behind. Each year is also shown in today's
+  money at `HOUSE_FUND_INFLATION_PCT` (6%). All inputs are live; nothing is
   saved. Registration isn't subtracted.
 
 ## Code layout

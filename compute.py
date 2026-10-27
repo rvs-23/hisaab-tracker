@@ -588,7 +588,8 @@ def liquid_pace(profiles: list[Profile], contributions: pd.DataFrame,
 
 
 def house_fund(corpus_today: float, pace: float, pace_growth_pct: float, rate_pct: float,
-               years_ahead: int, today: dt.date | None = None) -> pd.DataFrame:
+               years_ahead: int, today: dt.date | None = None,
+               inflation_pct: float = 0.0) -> pd.DataFrame:
     """Down payment available at the end of each year, from now on.
 
     The current year gets the rest of its pace (the elapsed share is assumed
@@ -598,7 +599,9 @@ def house_fund(corpus_today: float, pace: float, pace_growth_pct: float, rate_pc
 
     Returns:
         One row per year: ``year``, ``available`` (the whole pot),
-        ``from_today`` (today's corpus grown) and ``new_savings`` (the rest).
+        ``from_today`` (today's corpus grown), ``new_savings`` (the rest) and
+        ``todays_money`` (``available`` deflated by ``inflation_pct`` a year
+        back to the current year, i.e. what it buys at today's prices).
     """
     today = today or dt.date.today()
     growth = 1 + rate_pct / 100
@@ -611,4 +614,5 @@ def house_fund(corpus_today: float, pace: float, pace_growth_pct: float, rate_pc
         rows.append({"year": today.year + i, "from_today": existing, "new_savings": saved})
     df = pd.DataFrame(rows)
     df["available"] = df["from_today"] + df["new_savings"]
-    return df[["year", "available", "from_today", "new_savings"]]
+    df["todays_money"] = df["available"] / (1 + inflation_pct / 100) ** (df["year"] - today.year)
+    return df[["year", "available", "from_today", "new_savings", "todays_money"]]

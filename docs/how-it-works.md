@@ -86,18 +86,20 @@ investing like this, how much could we put down on a house at the end of each
 year?**
 
 Only money you can sell counts: stocks, mutual funds, US market, gold and FDs.
-EPF, PPF and NPS are locked until retirement and the emergency fund stays put, so
-both are left out. The opening corpus counts unless you untick it.
+EPF, PPF and NPS are locked until retirement, AIFs have lock-ins, and the
+emergency fund stays put, so all of those are left out. The opening corpus counts unless you untick it.
 
 Each bar is the whole pot at the end of that year, in two parts: what you
 already have, grown, and what you'll save from now on, grown. Change the
 inputs and the chart redraws. Nothing is saved.
 
 - **Return:** growth on everything (defaults to the household rate).
-- **Invest per year:** defaults to this year's recorded liquid investments,
-  scaled up to a full year. If Investments are behind, it reads low, so put in
-  your real number.
-- **Pace grows:** how much more you invest each year as income rises.
+- **Invest per month:** defaults to this year's recorded liquid investments,
+  scaled up to a full year and divided by 12. If Investments are behind, it
+  reads low, so put in your real number.
+- **Monthly amount grows:** how much more you invest each year as income rises.
+- **Inflation** (default 6%): the dashed line and the "in today's money"
+  figures show what each year's pot would buy at today's prices.
 - **Years ahead:** how far out to look.
 
 Registration and stamp duty aren't taken out; keep them aside from the number.
