@@ -20,7 +20,7 @@ from ui import (
 CURRENT_YEAR = dt.date.today().year
 
 d = load_all()
-active = page_header("Budget", d.profiles)
+active = page_header("Budget", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 base_split = PROFILE_BASE_SPLITS.get(active.key, DEFAULT_BASE_SPLIT)
 increment_split = PROFILE_INCREMENT_SPLITS.get(active.key, DEFAULT_INCREMENT_SPLIT)

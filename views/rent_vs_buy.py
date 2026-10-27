@@ -26,7 +26,7 @@ from ui import (
 )
 
 d = load_all()
-profile = page_header("Rent vs buy", d.profiles)
+profile = page_header("Rent vs buy", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()
 today_year = dt.date.today().year
 k = profile.key  # per-person widget key suffix, so switching profile keeps inputs separate

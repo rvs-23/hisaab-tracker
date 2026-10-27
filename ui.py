@@ -6,6 +6,7 @@ views use so a view imports everything it needs from one place.
 
 from __future__ import annotations
 
+import datetime as dt
 import math
 from contextlib import contextmanager
 
@@ -13,6 +14,7 @@ import pandas as pd
 import streamlit as st
 
 import storage
+from audit import last_entry
 from config import (  # re-exported for views
     CARD_BG, CARD_BORDER, CATEGORY_LABELS, CHART_TEXT, DEFAULT_ACCENTS,
     GRID, INK, MARKER, MUTED, NEEDS, ON_TRACK_PCT, PROFILE_ACCENTS, SAND,
@@ -488,7 +490,26 @@ def edit_card(title: str):
         yield
 
 
-def page_header(title: str, profiles):
+# Where each data file is edited, for the "last entry" line.
+FILE_PAGES = {"income.csv": "Income", "contributions.csv": "Actuals",
+              "targets.csv": "Budget", "adjustments.csv": "Adjustments"}
+
+
+def last_entry_text(root, profile_key: str, today=None) -> str:
+    """Says when this person last saved data, e.g. ``Last entry 27 Oct 2026 (Actuals), 3 days ago``.
+
+    Empty when nothing has been logged for them yet.
+    """
+    found = last_entry(root, profile_key)
+    if found is None:
+        return ""
+    ts, filename = found
+    days = ((today or dt.date.today()) - ts.date()).days
+    ago = "today" if days <= 0 else "yesterday" if days == 1 else f"{days} days ago"
+    return f"Last entry {ts:%-d %b %Y} ({FILE_PAGES.get(filename, filename)}), {ago}"
+
+
+def page_header(title: str, profiles, root=None):
     """Renders the page title and resolves the active person from the URL.
 
     Routing is per person via the ``?profile=<key>`` query param: one active
@@ -499,6 +520,10 @@ def page_header(title: str, profiles):
     first name (Brownie). No name is shown; the person is told apart by the
     page's **accent colour scheme** (a small bar in that accent sits under the
     title).
+
+    Args:
+        root: Data folder; when given, a muted line under the title says when
+            this person last saved data (from the audit log).
 
     Returns:
         The active Profile.
@@ -526,6 +551,9 @@ def page_header(title: str, profiles):
         f"background:{accent_primary()}'></span></div>",
         unsafe_allow_html=True,
     )
+    note = last_entry_text(root, active) if root is not None else ""
+    st.markdown(f"<div style='color:var(--muted);font-size:{FS_LABEL};margin:-.5rem 0 .6rem'>"
+                f"{note}</div>", unsafe_allow_html=True)
     # Always claim the slot, filled or not, so a flash never shifts the page's
     # element positions between runs.
     slot = st.empty()

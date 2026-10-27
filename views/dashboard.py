@@ -13,7 +13,7 @@ from ui import (
 )
 
 d = load_all()
-profile = page_header("Dashboard", d.profiles)
+profile = page_header("Dashboard", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 today_year = dt.date.today().year
 

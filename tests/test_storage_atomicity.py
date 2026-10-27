@@ -89,3 +89,27 @@ def test_stale_since_open_false_when_unchanged(monkeypatch):
     ss = {"seed": ("x",)}
     monkeypatch.setattr(ui.st, "session_state", ss)
     assert ui.stale_since_open("seed", ("x",), "test") is False
+
+
+def test_last_entry_is_per_person_and_counts_adjustments(tmp_path):
+    """Adjustment saves have no year, so ``touched`` is empty; the person
+    still has to be found from the logged rows."""
+    import datetime as dt
+    import json
+
+    import audit
+    import ui
+
+    log = [
+        {"ts": "2026-10-01T10:00:00+05:30", "file": "income.csv", "touched": [["rv", 2026]],
+         "added": [], "removed": []},
+        {"ts": "2026-10-20T10:00:00+05:30", "file": "adjustments.csv", "touched": [],
+         "added": [{"profile": "cheeni", "field": "emergency_fund", "value": 1}], "removed": []},
+    ]
+    (tmp_path / "changes.jsonl").write_text("\n".join(json.dumps(r) for r in log) + "\n")
+    assert audit.last_entry(tmp_path, "rv")[1] == "income.csv"
+    assert audit.last_entry(tmp_path, "cheeni")[1] == "adjustments.csv"
+    assert audit.last_entry(tmp_path, "nobody") is None
+    assert ui.last_entry_text(tmp_path, "cheeni", today=dt.date(2026, 10, 23)) == (
+        "Last entry 20 Oct 2026 (Adjustments), 3 days ago")
+    assert ui.last_entry_text(tmp_path / "missing", "rv") == ""

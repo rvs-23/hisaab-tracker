@@ -85,3 +85,30 @@ def log_change(root: Path, filename: str, before: pd.DataFrame, after: pd.DataFr
         return None
     except Exception as exc:  # noqa: BLE001 - the write already succeeded
         return f"{type(exc).__name__}: {exc}"
+
+
+def last_entry(root: Path, profile_key: str) -> tuple[datetime, str] | None:
+    """Returns when ``profile_key``'s data was last saved, and to which file.
+
+    Scans the log newest-first. A record counts for a person if it touched
+    their rows: its ``touched`` pairs, or the profile on any logged row
+    (adjustment saves carry no year, so they never appear in ``touched``).
+
+    Returns:
+        ``(timestamp, filename)``, or ``None`` with no log or no matching record.
+    """
+    path = root / CHANGES_LOG
+    if not path.exists():
+        return None
+    for line in reversed(path.read_text().splitlines()):
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        people = {t[0] for t in rec.get("touched", [])}
+        for side in ("added", "removed"):
+            if isinstance(rec.get(side), list):
+                people |= {r.get("profile") for r in rec[side]}
+        if profile_key in people:
+            return datetime.fromisoformat(rec["ts"]), rec["file"]
+    return None

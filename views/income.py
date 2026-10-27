@@ -14,7 +14,7 @@ from ui import (
 )
 
 d = load_all()
-active = page_header("Income", d.profiles)
+active = page_header("Income", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
