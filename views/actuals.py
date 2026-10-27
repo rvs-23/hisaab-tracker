@@ -13,7 +13,7 @@ from ui import (
 )
 
 d = load_all()
-active = page_header("Actuals", d.profiles)
+active = page_header("Actuals", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 st.caption("What actually went in, against the plan, per category; negative shortfall = under-invested.")
 

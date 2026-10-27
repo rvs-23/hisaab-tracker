@@ -107,6 +107,7 @@ def validate_targets(df: pd.DataFrame, config: Config, profiles: list[Profile]) 
     if df.empty:
         return
     _check_profiles(df, profiles, "targets.csv")
+    _check_required(df, TARGETS_COLUMNS, "targets.csv")
     bad_cat = set(df["category"].dropna()) - set(config.categories)
     if bad_cat:
         raise ValueError(f"targets.csv uses categories not in config.yaml: {sorted(bad_cat)}")
@@ -153,8 +154,7 @@ def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
     if df.empty:
         return
     _check_numeric(df, ["year", "month", *INCOME_COMPONENTS], "income.csv")
-    if df["year"].isna().any() or df["salary"].isna().any():
-        raise ValueError("income.csv has rows with a missing year or salary")
+    _check_required(df, ["profile", "year", "month", *INCOME_COMPONENTS], "income.csv")
     if not df["month"].between(1, 12).all():
         raise ValueError("income.csv has rows with month outside 1–12")
     # `other` is the catch-all (RSU vesting, a maturing FD — or a tax payment
@@ -175,8 +175,7 @@ def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Prof
     if df.empty:
         return
     _check_numeric(df, ["year", "amount"], "contributions.csv")
-    if df["year"].isna().any() or df["amount"].isna().any():
-        raise ValueError("contributions.csv has rows with a missing year or amount")
+    _check_required(df, ["year", "profile", "category", "amount"], "contributions.csv")
     bad = set(df["category"].dropna()) - set(config.categories)
     if bad:
         raise ValueError(f"contributions.csv uses categories not in config.yaml: {sorted(bad)}")
@@ -258,6 +257,18 @@ def _check_profiles(df: pd.DataFrame, profiles: list[Profile], filename: str) ->
     bad = set(df["profile"].dropna()) - {p.key for p in profiles}
     if bad:
         raise ValueError(f"{filename} has unknown profiles: {sorted(bad)}")
+
+
+def _check_required(df: pd.DataFrame, columns: list[str], filename: str) -> None:
+    """Rejects rows with a blank cell in any of ``columns``.
+
+    An editor row added with only some cells filled (say, an amount but no
+    category) would otherwise save, and a blank category then drops out of
+    every per-category view while still counting in the totals.
+    """
+    blank = [c for c in columns if df[c].isna().any()]
+    if blank:
+        raise ValueError(f"{filename} has rows with a missing {', '.join(blank)}")
 
 
 def _check_numeric(df: pd.DataFrame, columns: list[str], filename: str) -> None:
