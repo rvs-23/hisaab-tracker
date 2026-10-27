@@ -503,6 +503,26 @@ def test_contributions_reject_non_numeric_amount(rv, config):
         storage.validate_contributions(df, config, [rv])
 
 
+def test_contributions_reject_missing_category(rv, config):
+    """An editor row with an amount but no category must not save: it would
+    vanish from plan-vs-actual yet still count in the totals."""
+    df = pd.DataFrame([{"year": 2024, "profile": "rv", "category": None, "amount": 500, "notes": None}])
+    with pytest.raises(ValueError, match="missing category"):
+        storage.validate_contributions(df, config, [rv])
+
+
+def test_income_rejects_blank_component(rv):
+    base = {"profile": "rv", "year": 2024, "month": 1, "salary": 100, "bonus": 0, "other": 0, "job_change": 0}
+    with pytest.raises(ValueError, match="missing bonus"):
+        storage.validate_income(pd.DataFrame([{**base, "bonus": None}]), [rv])
+
+
+def test_targets_reject_missing_category(rv, config):
+    df = pd.DataFrame([{"profile": "rv", "year": 2024, "category": None, "pct": 100}])
+    with pytest.raises(ValueError, match="missing category"):
+        storage.validate_targets(df, config, [rv])
+
+
 def test_targets_reject_duplicate_category(rv, config):
     df = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 50},
                        {"profile": "rv", "year": 2024, "category": "mfs", "pct": 50}])

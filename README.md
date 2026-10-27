@@ -53,6 +53,11 @@ another tab). If it did, they reload instead of overwriting.
 (buys − sells) contribution row. It uses the same validation and audit path.
 Add `--dry-run` to preview or `--replace` to overwrite an existing row.
 
+**Zerodha summary:** `uv run python scripts/zerodha_summary.py <tradebook.csv>...`
+is read-only. It takes any mix of equity and MF exports (overlaps are
+de-duplicated) and prints buys, sells and net per year, `--by month` or
+`--by symbol`, optionally within `--year` or `--from`/`--to`.
+
 ## People
 
 One person at a time, chosen by URL: `?profile=rv` or `?profile=cheeni`. It
@@ -121,7 +126,7 @@ Flat modules at the root:
 | `compute.py` | the financial model, pure functions |
 | `ui.py` | Streamlit helpers: formatting, tiles, theme, save messages |
 | `views/` | the five pages |
-| `scripts/` | data-folder scaffold, Zerodha importer |
+| `scripts/` | data-folder scaffold, Zerodha importer and summary |
 | `tests/` | ₹-exact model tests + headless page renders (`AppTest`) |
 
 ## Non-goals
