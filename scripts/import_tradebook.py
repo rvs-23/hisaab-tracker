@@ -16,8 +16,9 @@ Usage::
     uv run python scripts/import_tradebook.py <csv-path> --profile rv --year 2024 --dry-run
 
 The category is auto-detected from the tradebook's ``segment`` column (``EQ``
-→ ``indian_stocks``, ``MF`` → ``mfs``), except that gold and silver funds go to
-``gold_metals`` as their own row. Pass ``--category`` to put everything in one
+→ ``indian_stocks``, ``MF`` → ``mfs``), except that gold and silver funds and ETFs
+go to ``gold_metals`` as their own row (it replaces any gold row for that
+year, so add physical gold back by hand). Pass ``--category`` to put everything in one
 category (it must be one of ``config.yaml``'s categories). Each row's notes
 list what's in it, fund by fund. NET = gross buys − gross sells,
 rounded to the rupee, for rows whose ``trade_date`` falls in ``--year`` only —
@@ -48,8 +49,12 @@ REQUIRED_COLUMNS = ["symbol", "isin", "trade_date", "exchange", "segment", "seri
 
 # Zerodha's tradebook segment → this tracker's asset-class category.
 SEGMENT_CATEGORY = {"EQ": "indian_stocks", "MF": "mfs"}
-# Mutual funds that hold gold or silver are tracked as gold, not as MFs.
-GOLD_FUND = re.compile(r"\b(GOLD|SILVER)\b", re.IGNORECASE)
+# Gold and silver are tracked as gold, whether bought as a mutual fund
+# ("NIPPON INDIA GOLD SAVINGS FUND") or as an exchange-traded fund on the stock
+# segment (GOLDBEES, GOLDCASE, SILVERIETF, GOLD1). The ETF pattern needs an ETF
+# suffix so a company like GOLDIAM stays a stock.
+GOLD_FUND = re.compile(r"\b(?:GOLD|SILVER)\b", re.IGNORECASE)
+GOLD_ETF = re.compile(r"^[A-Z]*(?:GOLD|SILVER)(?:BEES|CASE|IETF|ETF|1)$")
 
 
 def read_tradebook(csv_path: Path) -> pd.DataFrame:
@@ -118,13 +123,15 @@ def split_by_category(in_year: pd.DataFrame, override: str | None,
     """Groups a year's fills by the category each one is recorded under.
 
     With ``override`` everything goes to that one category. Otherwise gold and
-    silver mutual funds go to ``gold_metals`` and the rest is auto-detected by
-    ``detect_category``.
+    silver funds and ETFs go to ``gold_metals`` and the rest is auto-detected
+    by ``detect_category``.
     """
     if override is not None:
         return {detect_category(in_year, override, known_categories): in_year}
     segment = in_year["segment"].astype(str).str.strip().str.upper()
-    gold = (segment == "MF") & in_year["symbol"].astype(str).str.contains(GOLD_FUND)
+    symbol = in_year["symbol"].astype(str).str.strip()
+    gold = (((segment == "MF") & symbol.str.contains(GOLD_FUND))
+            | ((segment == "EQ") & symbol.str.upper().str.match(GOLD_ETF)))
     parts = {}
     if gold.any():
         parts["gold_metals"] = in_year[gold]

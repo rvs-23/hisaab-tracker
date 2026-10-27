@@ -193,3 +193,16 @@ def test_gold_funds_get_their_own_row_with_holdings_in_notes(tmp_path, data_root
     assert df.loc["gold_metals", "amount"] == 200
     assert "Uti Nifty 50 Index Fund 1,000" in df.loc["mfs", "notes"]
     assert "Nippon India Gold Savings Fund 200" in df.loc["gold_metals", "notes"]
+
+
+def test_gold_etfs_on_the_stock_segment_go_to_gold(tmp_path):
+    csv = write_tradebook(
+        tmp_path,
+        "GOLDCASE,INE1,2026-03-01,NSE,EQ,EQ,buy,10,20\n"
+        "SILVERIETF,INE2,2026-03-01,NSE,EQ,EQ,buy,1,50\n"
+        "GOLDIAM,INE3,2026-03-01,NSE,EQ,EQ,buy,1,300\n",
+    )
+    df = imp.read_tradebook(csv)
+    parts = imp.split_by_category(df, None, ["indian_stocks", "mfs", "gold_metals"])
+    assert sorted(parts["gold_metals"]["symbol"]) == ["GOLDCASE", "SILVERIETF"]
+    assert list(parts["indian_stocks"]["symbol"]) == ["GOLDIAM"]  # a jeweller, not an ETF
