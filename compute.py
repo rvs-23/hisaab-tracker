@@ -383,6 +383,18 @@ def elapsed_year_fraction(today: dt.date | None = None) -> float:
     return today.timetuple().tm_yday / days_in_year
 
 
+def months_left(today: dt.date | None = None) -> int:
+    """Months still open this year, counting the current one (October → 3)."""
+    return 13 - (today or dt.date.today()).month
+
+
+def month_span(today: dt.date | None = None) -> str:
+    """The months still open this year as text: ``Oct–Dec``, or ``Dec``."""
+    today = today or dt.date.today()
+    start = dt.date(today.year, today.month, 1).strftime("%b")
+    return "Dec" if today.month == 12 else f"{start}–Dec"
+
+
 def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
                     contributions: pd.DataFrame, today_year: int,
                     flat_return: float | None = None) -> float:

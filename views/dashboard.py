@@ -85,7 +85,7 @@ year_goal = year_goal_for(today_year)
 invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
 to_go = max(0.0, year_goal - invested_ty)
 plan_sub = (
-    ("no past shortfall" if catch_up == 0 else f"past shortfall: {inr_short(catch_up)}")
+    ("no past shortfall" if catch_up == 0 else f"past years' shortfall: {inr_short(catch_up)}")
     + "<br>"
     + (f"{today_year} left: {inr_short(to_go)}" if to_go > 0 else f"{today_year} goal met")
 )
@@ -182,23 +182,30 @@ else:
     f.update_yaxes(showgrid=False)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-# Catch-up callout last: the one number to act on, once you've seen the journey.
-if catch_up > 0:
+# The one number to act on, last, once you've seen the journey: everything
+# still needed to be on plan by December, this year's remainder plus the past
+# years' shortfall, and what that is per remaining month.
+needed = to_go + catch_up
+if needed > 0:
+    n = compute.months_left()
+    parts = [f"{inr_short(to_go)} left of {today_year}'s goal"] if to_go > 0 else []
+    if catch_up > 0:
+        parts.append(f"{inr_short(catch_up)} past years' shortfall (grown at expected returns)")
     st.markdown(
         f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
         f"padding:14px 18px;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
         f"<span style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
-        f"Catch up in {today_year}</span>"
-        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(catch_up)}</span>"
-        f"<span style='font-size:{FS_BODY};color:var(--muted)'>invest this much extra today and you're level with "
-        f"every past year you fell short (grown at expected returns). This year's own goal is on top of it.</span></div>",
+        f"To be on plan by Dec {today_year}</span>"
+        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(needed)}</span>"
+        f"<span style='font-size:{FS_BODY};color:var(--muted)'>{' + '.join(parts)}. That's about "
+        f"<b>{inr_short(needed / n)} a month</b> for {compute.month_span()}.</span></div>",
         unsafe_allow_html=True,
     )
 else:
     st.markdown(
         f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
         f"padding:12px 18px;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
-        f"You're level with the plan, so there's no catch-up in {today_year}. Anything extra overshoots the goal.</div>",
+        f"You're on plan for {today_year} and every past year. Anything extra overshoots the goal.</div>",
         unsafe_allow_html=True,
     )
 

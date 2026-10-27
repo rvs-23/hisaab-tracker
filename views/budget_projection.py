@@ -100,14 +100,17 @@ if not row.empty:
         ].sum())
         catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year,
                                            flat_return=d.config.expected_return_pct)
-        months_left = 13 - dt.date.today().month
-        adj_monthly = (catch_up + max(0.0, year_goal - invested_ty)) / months_left
-        inv_sub += f"<br>adjusted: {inr_short(adj_monthly)}/mo to be on track"
+        left = max(0.0, year_goal - invested_ty)
+        n = compute.months_left()
+        adj_monthly = (left + catch_up) / n
+        inv_sub += f"<br>to finish {year}: {inr_short(adj_monthly)}/mo, {compute.month_span()}"
+        inv_help = (f"The plan's monthly investment. 'To finish {year}' = {inr_short(left)} left of "
+                    f"{year}'s goal + {inr_short(catch_up)} past years' shortfall, spread over the "
+                    f"{n} month{'s' if n != 1 else ''} left. Following it puts you fully on track by December.")
+    else:
+        inv_help = "The plan's monthly investment for this year."
     metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", inv_sub,
-                color=SECONDARY, big=True,
-                help="The plan's monthly investment. 'Adjusted' spreads the past "
-                     "shortfall plus what's left of this year's goal over the months "
-                     "remaining, so following it makes you fully on track by December.")
+                color=SECONDARY, big=True, help=inv_help)
 
 # Target allocation lives here (moved from Actuals, 2026-07-20): right under
 # the monthly split, so how each monthly goal is consumed per instrument reads

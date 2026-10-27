@@ -709,3 +709,10 @@ def test_house_fund_todays_money_deflates_by_inflation():
                             years_ahead=2, today=dt.date(2026, 7, 2), inflation_pct=6)
     assert df.loc[0, "todays_money"] == pytest.approx(1_000_000)
     assert df.loc[2, "todays_money"] == pytest.approx(1_210_000 / 1.06 ** 2)
+
+
+def test_months_left_counts_the_current_month():
+    assert compute.months_left(dt.date(2026, 10, 27)) == 3
+    assert compute.month_span(dt.date(2026, 10, 27)) == "Oct–Dec"
+    assert compute.months_left(dt.date(2026, 12, 1)) == 1
+    assert compute.month_span(dt.date(2026, 12, 1)) == "Dec"
