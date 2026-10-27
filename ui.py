@@ -109,7 +109,7 @@ def _nice_step(rough_step: float) -> float:
 
 
 def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
-             min_value: float = 0.0, min_step: float | None = None) -> None:
+             min_value: float = 0.0, min_step: float | None = None, minor: int = 0) -> None:
     """Sets compact lakh/crore ₹ tick labels on a Plotly axis.
 
     Plotly's ``tickformat="~s"`` renders ₹ amounts as "2M" — the wrong idiom for
@@ -130,6 +130,8 @@ def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
             gridlines closer than 1Cr). The step still grows past it as the data
             demands, so a large scenario doesn't end up with thirty lines.
             Ignored when ``step`` is given.
+        minor: Unlabelled gridlines between labelled ones, as subdivisions of
+            each step (4 puts a faint line every quarter step). 0 for none.
     """
     max_value = max(float(max_value), 1.0)
     min_value = min(float(min_value), 0.0)
@@ -144,6 +146,9 @@ def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
     # hoverformat stops Plotly's default SI hover ("2.5M"); full rupees with
     # separators is the best d3 can do (no lakh grouping in its locale).
     kwargs = dict(tickvals=tickvals, ticktext=ticktext, hoverformat=",.0f")
+    if minor:
+        kwargs["minor"] = dict(tick0=lo, dtick=step / minor, showgrid=True,
+                               gridcolor=STRIP_BORDER, griddash="dot")
     if axis == "y":
         fig.update_yaxes(**kwargs)
     else:

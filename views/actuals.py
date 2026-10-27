@@ -116,7 +116,7 @@ f.add_bar(y=labels, x=asc["actual"], name="Actual", orientation="h", marker_colo
 f.update_traces(cliponaxis=False)
 f.update_layout(barmode="group")
 # Headroom so the outside labels on the longest bar stay inside the plot.
-inr_axis(f, 1.15 * max(asc["expected"].max(), asc["actual"].max()), axis="x")
+inr_axis(f, 1.15 * max(asc["expected"].max(), asc["actual"].max()), axis="x", minor=4)
 style_fig(f)
 f.update_xaxes(showgrid=True, gridcolor=GRID)
 f.update_yaxes(showgrid=False)
