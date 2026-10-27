@@ -27,7 +27,7 @@ import pandas as pd
 
 from config import (
     BASELINE_YEAR, CATEGORY_LABELS, DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT,
-    EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS, LIQUID_CATEGORIES,
+    EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
     NETWORTH_PROJECTION_YEARS, PROFILE_BASE_SPLITS, PROFILE_INCREMENT_SPLITS,
     PROJECTION_YEARS_AHEAD,
 )
@@ -558,34 +558,33 @@ def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
     return findings
 
 
-def liquid_corpus_today(profiles: list[Profile], income: pd.DataFrame,
-                        contributions: pd.DataFrame, adjustments: pd.DataFrame,
-                        today_year: int, rate_pct: float,
-                        include_opening: bool = True) -> float:
-    """What the given people could sell today toward a down payment.
+def corpus_at(profiles: list[Profile], income: pd.DataFrame, contributions: pd.DataFrame,
+              adjustments: pd.DataFrame, year: int, rate_pct: float,
+              exclude: list[str] | None = None) -> float:
+    """The given people's corpus at the end of ``year``, at ``rate_pct``.
 
-    Every liquid contribution (``LIQUID_CATEGORIES``) is grown at ``rate_pct``
-    from its year to ``today_year``. With ``include_opening``, each person's
-    opening corpus is added, grown from their first tracked year; its mix isn't
-    recorded, so it is assumed liquid.
+    Every contribution recorded up to ``year`` (except ``exclude``
+    categories), grown from its year to ``year``, plus each person's opening
+    corpus grown from their first tracked year. A projection from
+    contributions, not a market value.
     """
     keys = [p.key for p in profiles]
-    mine = contributions[contributions["profile"].isin(keys)
-                         & contributions["category"].isin(LIQUID_CATEGORIES)]
-    total = sum(float(r.amount) * (1 + rate_pct / 100) ** max(0, today_year - int(r.year))
+    mine = contributions[contributions["profile"].isin(keys) & (contributions["year"] <= year)
+                         & ~contributions["category"].isin(exclude or [])]
+    total = sum(float(r.amount) * (1 + rate_pct / 100) ** (year - int(r.year))
                 for r in mine.itertuples())
-    if include_opening:
-        for p in profiles:
-            opening = opening_corpus(adjustments, p.key)
-            vintage = corpus_vintage_year(income, contributions, p.key)
-            if opening and vintage is not None:
-                total += opening * (1 + rate_pct / 100) ** max(0, today_year - vintage)
+    for p in profiles:
+        opening = opening_corpus(adjustments, p.key)
+        vintage = corpus_vintage_year(income, contributions, p.key)
+        if opening and vintage is not None and year >= vintage:
+            total += opening * (1 + rate_pct / 100) ** (year - vintage)
     return total
 
 
-def liquid_pace(profiles: list[Profile], contributions: pd.DataFrame,
-                today: dt.date | None = None) -> float:
-    """This year's liquid contributions so far, scaled up to a full year.
+def monthly_pace(profiles: list[Profile], contributions: pd.DataFrame,
+                 today: dt.date | None = None, exclude: list[str] | None = None) -> float:
+    """The combined monthly investment this year: recorded so far, scaled to a
+    full year, divided by 12.
 
     Contributions carry no date, so this assumes Investments are up to date: a
     year recorded only through July reads low in October.
@@ -594,15 +593,65 @@ def liquid_pace(profiles: list[Profile], contributions: pd.DataFrame,
     keys = [p.key for p in profiles]
     recorded = contributions.loc[
         contributions["profile"].isin(keys) & (contributions["year"] == today.year)
-        & contributions["category"].isin(LIQUID_CATEGORIES), "amount"
+        & ~contributions["category"].isin(exclude or []), "amount"
     ].sum()
-    return float(recorded) / elapsed_year_fraction(today)
+    return float(recorded) / elapsed_year_fraction(today) / 12
+
+
+def corpus_by_year(profiles: list[Profile], income: pd.DataFrame, contributions: pd.DataFrame,
+                   adjustments: pd.DataFrame, first_year: int, last_year: int, monthly: float,
+                   pace_growth_pct: float, rate_pct: float, inflation_pct: float,
+                   today: dt.date | None = None, exclude: list[str] | None = None) -> pd.DataFrame:
+    """The corpus at the end of each year from ``first_year`` to ``last_year``.
+
+    Past years are what was actually built (``corpus_at``). From the current
+    year on, it's today's corpus grown at ``rate_pct`` plus investing
+    ``monthly`` (×12 a year, the rest of this year first), growing
+    ``pace_growth_pct`` a year. ``todays_money`` deflates each year's total by
+    ``inflation_pct`` a year back to the current year.
+
+    Returns:
+        One row per year: ``year``, ``total``, ``invested_by_now`` (the corpus
+        already built, grown), ``new_savings`` (from now on, grown),
+        ``todays_money`` and ``is_projected``.
+    """
+    today = today or dt.date.today()
+    rows = []
+    for year in range(first_year, min(last_year, today.year - 1) + 1):
+        built = corpus_at(profiles, income, contributions, adjustments, year, rate_pct, exclude)
+        rows.append({"year": year, "invested_by_now": built, "new_savings": 0.0, "is_projected": False})
+    if last_year >= today.year:
+        now = corpus_at(profiles, income, contributions, adjustments, today.year, rate_pct, exclude)
+        ahead = house_fund(now, 12 * monthly, pace_growth_pct, rate_pct, last_year - today.year, today)
+        for r in ahead.itertuples():
+            rows.append({"year": r.year, "invested_by_now": r.from_today, "new_savings": r.new_savings,
+                         "is_projected": r.year > today.year})
+    df = pd.DataFrame(rows)
+    df["total"] = df["invested_by_now"] + df["new_savings"]
+    df["todays_money"] = df["total"] / (1 + inflation_pct / 100) ** (df["year"] - today.year)
+    return df[["year", "total", "invested_by_now", "new_savings", "todays_money", "is_projected"]]
+
+
+def monthly_needed(corpus_now: float, target: float, year: int, pace_growth_pct: float,
+                   rate_pct: float, today: dt.date | None = None) -> float:
+    """The monthly investment, starting now, that reaches ``target`` by the end of ``year``.
+
+    The pot is linear in the pace (``house_fund``), so the answer is the
+    target minus today's corpus grown, divided by what one rupee a month
+    (growing ``pace_growth_pct`` a year) adds up to. Zero if today's corpus
+    alone gets there.
+    """
+    today = today or dt.date.today()
+    n = year - today.year
+    base = house_fund(corpus_now, 0, pace_growth_pct, rate_pct, n, today).iloc[-1]["available"]
+    per_rupee = house_fund(0, 12, pace_growth_pct, rate_pct, n, today).iloc[-1]["available"]
+    return max(0.0, (target - base) / per_rupee) if per_rupee else 0.0
 
 
 def house_fund(corpus_today: float, pace: float, pace_growth_pct: float, rate_pct: float,
                years_ahead: int, today: dt.date | None = None,
                inflation_pct: float = 0.0) -> pd.DataFrame:
-    """Down payment available at the end of each year, from now on.
+    """The pot at the end of each year from now on: ``corpus_today`` plus a growing pace.
 
     The current year gets the rest of its pace (the elapsed share is assumed
     already in ``corpus_today``). Each later year grows the pot at

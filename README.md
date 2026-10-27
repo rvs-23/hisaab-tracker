@@ -79,7 +79,7 @@ anyone) last saved data, from `changes.jsonl`.
 | **Income** | What did I earn? 12-month grid per year; a new year pre-fills last year's salary | `income.csv` |
 | **Budget** | How does income split, and where should the investment go? | `targets.csv` (allocation editor) |
 | **Investments** | Record what went in; how does it compare with the plan? | `contributions.csv`, emergency fund held |
-| **House fund** (household) | If we keep investing at this pace, how much could we put down on a house at the end of each year? | nothing (live inputs) |
+| **House fund** (household) | At this pace, what's our corpus each year (2024–2034)? What must we invest monthly for a down payment of ₹X Cr in Y years? | nothing (live inputs) |
 
 ## The model
 
@@ -110,14 +110,15 @@ anyone) last saved data, from `changes.jsonl`.
 - **Health nudges** appear only when something needs a look: no income this
   year, investing under half the elapsed-year pace, no emergency fund recorded,
   or this year's mix ≥ 15 points off target.
-- **House fund** = the *liquid* corpus today (contributions in
-  `LIQUID_CATEGORIES` grown at the return, plus the opening corpus unless
-  unticked; EPF, PPF, NPS, AIF and the emergency fund are left out), grown each
-  year, plus a monthly investment that grows yearly. The monthly amount
-  defaults to this year's liquid contributions scaled to a full year, ÷ 12, so
-  it reads low if Investments are behind. Each year is also shown in today's
-  money at `HOUSE_FUND_INFLATION_PCT` (6%). All inputs are live; nothing is
-  saved. Registration isn't subtracted.
+- **House fund** shows the corpus at the end of each year, 2024–2034
+  (`HOUSE_FUND_YEARS`). Past years are what was built: contributions grown at
+  the return, plus the opening corpus. From this year on: that corpus grown,
+  plus a combined monthly investment that grows yearly. EPF, PPF and NPS
+  (`HOUSE_FUND_EXCLUDED`) are left out. Each year is also shown in today's
+  money at the inflation input. A reverse calculation at the bottom takes a
+  down payment (today's prices, inflated to the buying year) and a number of
+  years, and gives the monthly investment needed. All inputs are live; nothing
+  is saved.
 
 ## Code layout
 

@@ -679,29 +679,45 @@ def test_house_fund_compounds_corpus_and_growing_pace():
     assert (df["available"] == df["from_today"] + df["new_savings"]).all()
 
 
-def test_liquid_corpus_excludes_locked_money_and_can_drop_opening(rv):
+def test_corpus_at_counts_everything_up_to_the_year(rv):
     income = pd.DataFrame([{"profile": "rv", "year": 2024, "month": 1, "salary": 100,
                             "bonus": 0, "other": 0, "job_change": 0}])
     contrib = pd.DataFrame([
         {"year": 2024, "profile": "rv", "category": "mfs", "amount": 100_000, "notes": None},
-        {"year": 2024, "profile": "rv", "category": "ppf", "amount": 999_999, "notes": None},
+        {"year": 2024, "profile": "rv", "category": "ppf", "amount": 50_000, "notes": None},
+        {"year": 2026, "profile": "rv", "category": "mfs", "amount": 70_000, "notes": None},
     ])
     adj = pd.DataFrame([{"profile": "rv", "field": "opening_corpus", "value": 50_000}])
-    without = compute.liquid_corpus_today([rv], income, contrib, adj, 2026, 10, include_opening=False)
-    assert without == pytest.approx(100_000 * 1.21)  # PPF/NPS left out
-    with_opening = compute.liquid_corpus_today([rv], income, contrib, adj, 2026, 10)
-    assert with_opening == pytest.approx(150_000 * 1.21)  # corpus vintage = 2024
+    # 2025: the 2026 row isn't in yet; opening corpus from its 2024 vintage.
+    assert compute.corpus_at([rv], income, contrib, adj, 2025, 10) == pytest.approx(200_000 * 1.1)
+    assert compute.corpus_at([rv], income, contrib, adj, 2026, 10) == pytest.approx(200_000 * 1.21 + 70_000)
 
 
-def test_liquid_pace_annualises_this_years_liquid_contributions(rv):
+def test_monthly_pace_is_this_years_recorded_amount_per_month(rv):
     contrib = pd.DataFrame([
         {"year": 2026, "profile": "rv", "category": "mfs", "amount": 50_000, "notes": None},
         {"year": 2026, "profile": "rv", "category": "ppf", "amount": 70_000, "notes": None},
         {"year": 2025, "profile": "rv", "category": "mfs", "amount": 80_000, "notes": None},
     ])
     today = dt.date(2026, 7, 2)
-    assert compute.liquid_pace([rv], contrib, today) == pytest.approx(
-        50_000 / compute.elapsed_year_fraction(today))
+    assert compute.monthly_pace([rv], contrib, today) == pytest.approx(
+        120_000 / compute.elapsed_year_fraction(today) / 12)
+
+
+def test_corpus_by_year_joins_actual_past_to_the_projection(rv):
+    income = pd.DataFrame([{"profile": "rv", "year": 2024, "month": 1, "salary": 100,
+                            "bonus": 0, "other": 0, "job_change": 0}])
+    contrib = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "mfs", "amount": 100_000, "notes": None}])
+    adj = pd.DataFrame(columns=storage.ADJUSTMENTS_COLUMNS)
+    today = dt.date(2026, 7, 2)
+    df = compute.corpus_by_year([rv], income, contrib, adj, 2024, 2027, monthly=10_000,
+                                pace_growth_pct=0, rate_pct=10, inflation_pct=5, today=today).set_index("year")
+    assert list(df.index) == [2024, 2025, 2026, 2027]
+    assert df.loc[2025, "total"] == pytest.approx(110_000)
+    assert not df.loc[2025, "is_projected"] and df.loc[2027, "is_projected"]
+    rest = 120_000 * (1 - compute.elapsed_year_fraction(today))
+    assert df.loc[2026, "total"] == pytest.approx(121_000 + rest)
+    assert df.loc[2027, "todays_money"] == pytest.approx(df.loc[2027, "total"] / 1.05)
 
 
 def test_house_fund_todays_money_deflates_by_inflation():
@@ -716,3 +732,21 @@ def test_months_left_counts_the_current_month():
     assert compute.month_span(dt.date(2026, 10, 27)) == "Oct–Dec"
     assert compute.months_left(dt.date(2026, 12, 1)) == 1
     assert compute.month_span(dt.date(2026, 12, 1)) == "Dec"
+
+
+def test_monthly_needed_hits_the_target_exactly():
+    today = dt.date(2026, 7, 2)
+    need = compute.monthly_needed(1_000_000, 5_000_000, 2030, 5, 10, today)
+    got = compute.house_fund(1_000_000, 12 * need, 5, 10, 4, today).iloc[-1]["available"]
+    assert got == pytest.approx(5_000_000)
+    assert compute.monthly_needed(10_000_000, 5_000_000, 2030, 5, 10, today) == 0.0
+
+
+def test_corpus_at_can_leave_out_retirement_money(rv):
+    income = pd.DataFrame(columns=storage.INCOME_COLUMNS)
+    contrib = pd.DataFrame([
+        {"year": 2026, "profile": "rv", "category": "mfs", "amount": 100, "notes": None},
+        {"year": 2026, "profile": "rv", "category": "ppf", "amount": 50, "notes": None},
+    ])
+    adj = pd.DataFrame(columns=storage.ADJUSTMENTS_COLUMNS)
+    assert compute.corpus_at([rv], income, contrib, adj, 2026, 10, exclude=["ppf"]) == 100

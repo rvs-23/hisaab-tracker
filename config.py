@@ -46,10 +46,13 @@ PROFILE_ACCENTS = {
 # from all the people, so it never appears in any CSV's profile column.
 HOUSEHOLD_KEY = "household"
 
-# Categories you can sell to fund a down payment. EPF, PPF and NPS are locked
-# until retirement, AIFs have lock-ins, and the emergency fund stays put.
-LIQUID_CATEGORIES = ["us_market", "indian_stocks", "mfs", "fixed_deposit", "gold_metals"]
-HOUSE_FUND_YEARS_AHEAD = 10  # the House fund page's default horizon
+# House fund defaults. The years shown are fixed: two actual years for context,
+# then the projection.
+HOUSE_FUND_YEARS = (2024, 2034)
+HOUSE_FUND_GROWTH_PCT = 5.0  # yearly growth of the monthly investment
+# Retirement money is left out of the House fund corpus: provident funds and
+# NPS can't be drawn for a down payment.
+HOUSE_FUND_EXCLUDED = ["epf", "ppf", "nps"]
 HOUSE_FUND_INFLATION_PCT = 6.0  # default for showing future rupees in today's money
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 

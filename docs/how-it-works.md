@@ -81,28 +81,28 @@ and the **secondary accent means "what was planned"**.
 
 ## House fund
 
-Open it with `?profile=household`. It answers one question: **if we keep
-investing like this, how much could we put down on a house at the end of each
-year?**
+Open it with `?profile=household`. It answers: **if we keep investing like
+this, what will our corpus be at the end of each year, 2024 to 2034?** 2024 and
+2025 are what you actually built; the rest is the projection.
 
-Only money you can sell counts: stocks, mutual funds, US market, gold and FDs.
-EPF, PPF and NPS are locked until retirement, AIFs have lock-ins, and the
-emergency fund stays put, so all of those are left out. The opening corpus counts unless you untick it.
+It counts everything you've invested except EPF, PPF and NPS, which are
+retirement money and can't go toward a house. The opening corpus is included.
 
-Each bar is the whole pot at the end of that year, in two parts: what you
-already have, grown, and what you'll save from now on, grown. Change the
-inputs and the chart redraws. Nothing is saved.
+Four inputs, all live (nothing is saved):
 
-- **Return:** growth on everything (defaults to the household rate).
-- **Invest per month:** defaults to this year's recorded liquid investments,
-  scaled up to a full year and divided by 12. If Investments are behind, it
-  reads low, so put in your real number.
-- **Monthly amount grows:** how much more you invest each year as income rises.
-- **Inflation** (default 6%): the dashed line and the "in today's money"
-  figures show what each year's pot would buy at today's prices.
-- **Years ahead:** how far out to look.
+- **Combined monthly investment:** defaults to this year's recorded investments
+  (without EPF, PPF and NPS), scaled to a full year, divided by 12. If
+  Investments are behind, it reads low, so put in your real number.
+- **It grows:** how much more you invest each year as income rises (5%).
+- **Return:** growth on everything (the household rate).
+- **Inflation** (6%): the dashed line and the "today's money" figures show what
+  each year's corpus would buy at today's prices.
 
-Registration and stamp duty aren't taken out; keep them aside from the number.
+At the bottom, **Plan a down payment** works backwards: enter a down payment in
+today's crores and how many years away, and it shows the monthly investment
+needed, how that compares with what you invest now, and how far your current
+pace gets you. The amount is grown by inflation to the buying year, since
+house prices rise too. Registration and stamp duty aren't included.
 
 ## What to do, and when
 
