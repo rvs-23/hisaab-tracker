@@ -117,8 +117,10 @@ investment = float(budget_row.iloc[0]["investment"]) if not budget_row.empty els
 target = compute.resolve_target(active, d.targets, year)
 
 section(f"Target allocation · how the monthly goal is consumed")
-active_mix = pd.DataFrame({"category": list(target.keys()), "pct": list(target.values())})
-active_mix = active_mix.sort_values("pct", ascending=False)
+# Every instrument, in the same order as the Investments table, so the two
+# pages line up row for row (0% included).
+active_mix = pd.DataFrame({"category": d.config.categories,
+                           "pct": [target.get(c, 0.0) for c in d.config.categories]})
 active_mix["per_year"] = active_mix["pct"] / 100 * investment
 active_mix["per_month"] = active_mix["per_year"] / 12
 html_table(

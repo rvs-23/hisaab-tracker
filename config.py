@@ -103,5 +103,5 @@ CATEGORY_LABELS = {
     "ppf": "PPF",
     "nps": "NPS",
     "aif": "AIF",
-    "gold_metals": "Gold / metals",
+    "gold_metals": "Gold",
 }
