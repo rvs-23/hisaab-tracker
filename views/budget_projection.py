@@ -39,7 +39,7 @@ st.caption(
 st.markdown(
     f"<div style='border-left:3px solid {NEEDS};background:var(--strip-bg);border-radius:4px;"
     f"padding:.5rem .8rem;color:var(--muted);font-size:{FS_BODY};margin:.2rem 0 .4rem'>"
-    "These figures are <b>derived</b> — to change them, edit <b>Income</b>. The one "
+    "These figures are <b>derived</b>. To change them, edit <b>Income</b>. The one "
     "thing to set here is your <b>target allocation</b> below.</div>",
     unsafe_allow_html=True,
 )
@@ -100,14 +100,17 @@ if not row.empty:
         ].sum())
         catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year,
                                            flat_return=d.config.expected_return_pct)
-        months_left = 13 - dt.date.today().month
-        adj_monthly = (catch_up + max(0.0, year_goal - invested_ty)) / months_left
-        inv_sub += f"<br>adjusted: {inr_short(adj_monthly)}/mo to be on track"
+        left = max(0.0, year_goal - invested_ty)
+        n = compute.months_left()
+        adj_monthly = (left + catch_up) / n
+        inv_sub += f"<br>to finish {year}: {inr_short(adj_monthly)}/mo, {compute.month_span()}"
+        inv_help = (f"The plan's monthly investment. 'To finish {year}' = {inr_short(left)} left of "
+                    f"{year}'s goal + {inr_short(catch_up)} past years' shortfall, spread over the "
+                    f"{n} month{'s' if n != 1 else ''} left. Following it puts you fully on track by December.")
+    else:
+        inv_help = "The plan's monthly investment for this year."
     metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", inv_sub,
-                color=SECONDARY, big=True,
-                help="The plan's monthly investment. 'Adjusted' spreads the past "
-                     "shortfall plus what's left of this year's goal over the months "
-                     "remaining, so following it makes you fully on track by December.")
+                color=SECONDARY, big=True, help=inv_help)
 
 # Target allocation lives here (moved from Actuals, 2026-07-20): right under
 # the monthly split, so how each monthly goal is consumed per instrument reads
@@ -117,14 +120,16 @@ investment = float(budget_row.iloc[0]["investment"]) if not budget_row.empty els
 target = compute.resolve_target(active, d.targets, year)
 
 section(f"Target allocation · how the monthly goal is consumed")
-active_mix = pd.DataFrame({"category": list(target.keys()), "pct": list(target.values())})
-active_mix = active_mix.sort_values("pct", ascending=False)
+# Every instrument, in the same order as the Investments table, so the two
+# pages line up row for row (0% included).
+active_mix = pd.DataFrame({"category": d.config.categories,
+                           "pct": [target.get(c, 0.0) for c in d.config.categories]})
 active_mix["per_year"] = active_mix["pct"] / 100 * investment
 active_mix["per_month"] = active_mix["per_year"] / 12
 html_table(
     active_mix,
     {"category": "Instrument", "pct": "Target %", "per_month": "₹ / month", "per_year": "₹ / year"},
-    formats={"category": pretty_category, "pct": lambda v: f"{v:.0f}%",
+    formats={"category": pretty_category, "pct": lambda v: f"{v:g}%",
              "per_year": inr_short, "per_month": inr_short},
 )
 

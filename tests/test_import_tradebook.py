@@ -17,7 +17,7 @@ TRADEBOOK_HEADER = "symbol,isin,trade_date,exchange,segment,series,trade_type,qu
 @pytest.fixture
 def data_root(tmp_path):
     (tmp_path / "config.yaml").write_text(
-        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, gold_metals]\n"
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
     profiles.mkdir()
@@ -177,3 +177,32 @@ def test_unknown_profile_refused(tmp_path, data_root):
     csv = write_tradebook(tmp_path, "INFY,INE1,2024-03-01,NSE,EQ,EQ,buy,10,1500\n")
     code = imp.run(csv, "not_a_person", 2024, None, replace=False, dry_run=False, root=data_root)
     assert code == 1
+
+
+def test_gold_funds_get_their_own_row_with_holdings_in_notes(tmp_path, data_root):
+    (data_root / "config.yaml").write_text(
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]\n")
+    csv = write_tradebook(
+        tmp_path,
+        "UTI NIFTY 50 INDEX FUND-DIRECT GROWTH PLAN-GROWTH,INF1,2026-06-01,BSE,MF,,buy,10,100\n"
+        "NIPPON INDIA GOLD SAVINGS FUND DIRECT PLAN GROWTH,INF2,2026-06-01,BSE,MF,,buy,5,40\n",
+    )
+    assert imp.run(csv, "rv", 2026, None, replace=False, dry_run=False, root=data_root) == 0
+    df = pd.read_csv(data_root / "contributions.csv").set_index("category")
+    assert df.loc["mfs", "amount"] == 1000
+    assert df.loc["gold_metals", "amount"] == 200
+    assert "Uti Nifty 50 Index Fund 1,000" in df.loc["mfs", "notes"]
+    assert "Nippon India Gold Savings Fund 200" in df.loc["gold_metals", "notes"]
+
+
+def test_gold_etfs_on_the_stock_segment_go_to_gold(tmp_path):
+    csv = write_tradebook(
+        tmp_path,
+        "GOLDCASE,INE1,2026-03-01,NSE,EQ,EQ,buy,10,20\n"
+        "SILVERIETF,INE2,2026-03-01,NSE,EQ,EQ,buy,1,50\n"
+        "GOLDIAM,INE3,2026-03-01,NSE,EQ,EQ,buy,1,300\n",
+    )
+    df = imp.read_tradebook(csv)
+    parts = imp.split_by_category(df, None, ["indian_stocks", "mfs", "gold_metals"])
+    assert sorted(parts["gold_metals"]["symbol"]) == ["GOLDCASE", "SILVERIETF"]
+    assert list(parts["indian_stocks"]["symbol"]) == ["GOLDIAM"]  # a jeweller, not an ETF

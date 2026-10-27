@@ -14,6 +14,8 @@ GRAPHITE = "#334155"  # rv primary — dark gunmetal (the "platinum" scheme)
 STEEL = "#64748B"  # rv secondary — lighter steel, so planned recedes
 PINK = "#EC4899"  # cheeni primary — light bright pink (chart + large-text AA; small text is borderline ~3.5:1)
 RASPBERRY = "#9D174D"  # cheeni secondary — deep raspberry, same pink family (not violet)
+TEAL = "#0F766E"  # household primary — deep teal (≈5.5:1 on white)
+DEEP_TEAL = "#134E4A"  # household secondary — darker teal, same family
 MUTED = "#697077"  # ≈5:1 on white — the old #7c828c failed WCAG AA at small sizes
 CARD_BG = "#ffffff"
 CARD_BORDER = "#e7eaee"
@@ -33,10 +35,25 @@ FONT = "Inter"
 # on white; the shared grays stay the neutral base.
 #   rv     → platinum monochrome (graphite + steel)
 #   cheeni → pink family (light pink + deep raspberry)
+#   household → teal family (both people combined, ?profile=household)
 PROFILE_ACCENTS = {
     "rv": (GRAPHITE, STEEL),
     "cheeni": (PINK, RASPBERRY),
+    "household": (TEAL, DEEP_TEAL),
 }
+
+# The combined view of everyone. Not a profiles/*.yaml file: it is derived
+# from all the people, so it never appears in any CSV's profile column.
+HOUSEHOLD_KEY = "household"
+
+# House fund defaults. The years shown are fixed: two actual years for context,
+# then the projection.
+HOUSE_FUND_YEARS = (2024, 2034)
+HOUSE_FUND_GROWTH_PCT = 5.0  # yearly growth of the monthly investment
+# Retirement money is left out of the House fund corpus: provident funds and
+# NPS can't be drawn for a down payment.
+HOUSE_FUND_EXCLUDED = ["epf", "ppf", "nps"]
+HOUSE_FUND_INFLATION_PCT = 6.0  # default for showing future rupees in today's money
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
 # Budget model. The anchor year (first earning year) splits income 50/30/20
@@ -65,20 +82,16 @@ BASELINE_YEAR = 2022
 # as held cash (no growth).
 EXPECTED_RETURNS = {
     "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
-    "ppf_nps": 10.0,  # EPF / PPF / NPS blended
+    "epf": 8.25, "ppf": 7.1, "nps": 10.0,  # EPF and PPF at their declared rates
+    "aif": 12.0,
     "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
-# A buyer is forced to "save" via the EMI; a renter with a smaller outgoing
-# rarely invests the whole difference — some leaks into lifestyle. This is the
-# share of that monthly gap the renter actually invests, in the rent-vs-buy
-# comparison. Below 100 stops the renting side from looking unrealistically good.
-RENTER_INVEST_DISCIPLINE_PCT = 60
 
-# Emergency-fund *target* = this many months of the needs bucket (essential
-# spending only; wants pause in an emergency). The target is derived; the
-# *actual* fund held is entered by hand (see storage.ALLOWED_ADJUSTMENTS).
-EMERGENCY_FUND_MONTHS = 4
+# Emergency-fund *target* = this many months of current monthly salary
+# (2026-10-27). The *actual* fund held is entered by hand (see
+# storage.ALLOWED_ADJUSTMENTS).
+EMERGENCY_FUND_MONTHS = 3
 
 # The components that sum to a year's total income. "other" catches anything
 # beyond salary and bonus (RSU vesting, an FD/RD maturing, and so on).
@@ -90,6 +103,9 @@ CATEGORY_LABELS = {
     "indian_stocks": "Indian stocks",
     "mfs": "Mutual funds",
     "fixed_deposit": "Fixed deposit",
-    "ppf_nps": "EPF / PPF / NPS",
-    "gold_metals": "Gold / metals",
+    "epf": "EPF",
+    "ppf": "PPF",
+    "nps": "NPS",
+    "aif": "AIF",
+    "gold_metals": "Gold",
 }

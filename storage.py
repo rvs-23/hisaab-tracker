@@ -10,8 +10,8 @@ tidy CSVs, keyed by (year, profile) where a year applies:
   adjustments.csv    one-off per-person adjustments, e.g. opening_corpus —
                      money invested before tracking began (optional)
 
-The budget (needs/wants/investment) and the emergency-fund target (4 months of
-needs) are *derived* from income, not stored. Every save is recorded in the audit log
+The budget (needs/wants/investment) and the emergency-fund target (3 months of
+salary) are *derived* from income, not stored. Every save is recorded in the audit log
 (see audit.py).
 """
 
@@ -44,7 +44,12 @@ REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 # `salary` and `bonus` must be non-negative; `other` is the catch-all (RSU
 # vesting, a maturing FD — or a tax payment/clawback) and may go negative.
 INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
-CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
+# `notes` is what the row holds, shown in the app; `last_change` says what the
+# most recent update was ("+60k SIP in Oct"); `details` is never shown: it keeps
+# the questions asked about the row and the answers given, as the record of why
+# the number is what it is. Older files without the last two still load.
+CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes", "last_change", "details"]
+OPTIONAL_CONTRIB_COLUMNS = ["last_change", "details"]
 TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
 
 # Adjustments are one-off per-person values, not a year-by-year history — a
@@ -165,12 +170,16 @@ def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
 
 def load_contributions(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
     df = _read_optional(root / "contributions.csv", CONTRIB_COLUMNS)
+    for col in OPTIONAL_CONTRIB_COLUMNS:
+        if col not in df.columns:
+            df[col] = None
     validate_contributions(df, config, profiles)
     return df
 
 
 def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Profile]) -> None:
-    _check_columns(df, CONTRIB_COLUMNS, "contributions.csv")
+    _check_columns(df, [c for c in CONTRIB_COLUMNS if c not in OPTIONAL_CONTRIB_COLUMNS],
+                   "contributions.csv")
     _check_profiles(df, profiles, "contributions.csv")
     if df.empty:
         return

@@ -112,3 +112,34 @@ def last_entry(root: Path, profile_key: str) -> tuple[datetime, str] | None:
         if profile_key in people:
             return datetime.fromisoformat(rec["ts"]), rec["file"]
     return None
+
+
+def row_last_changed(root: Path, filename: str, key_columns: list[str]) -> dict[tuple, datetime]:
+    """When each row of ``filename`` last got a new amount, keyed by ``key_columns``.
+
+    An edit logs the new row as added, so the latest record that added a key
+    is its last change. A record that removed the same key with the same
+    ``amount`` only touched its text, so it doesn't count. Rows saved before
+    the audit log existed, or in a save too large to log row by row, are absent.
+    """
+    path = root / CHANGES_LOG
+    if not path.exists():
+        return {}
+    stamps: dict[tuple, datetime] = {}
+    for line in path.read_text().splitlines():
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if rec.get("file") != filename or not isinstance(rec.get("added"), list):
+            continue
+        ts = datetime.fromisoformat(rec["ts"])
+        removed = rec.get("removed") if isinstance(rec.get("removed"), list) else []
+        before = {tuple(r.get(k) for k in key_columns): r.get("amount") for r in removed}
+        for row in rec["added"]:
+            if all(k in row for k in key_columns):
+                key = tuple(row[k] for k in key_columns)
+                if key in before and before[key] == row.get("amount"):
+                    continue
+                stamps[key] = ts
+    return stamps

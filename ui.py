@@ -15,9 +15,10 @@ import streamlit as st
 
 import storage
 from audit import last_entry
+from models import Profile
 from config import (  # re-exported for views
     CARD_BG, CARD_BORDER, CATEGORY_LABELS, CHART_TEXT, DEFAULT_ACCENTS,
-    GRID, INK, MARKER, MUTED, NEEDS, ON_TRACK_PCT, PROFILE_ACCENTS, SAND,
+    GRID, HOUSEHOLD_KEY, INK, MARKER, MUTED, NEEDS, ON_TRACK_PCT, PROFILE_ACCENTS, SAND,
     STRIP_BORDER, STRIP_BG, STRIP_TEXT,
 )
 
@@ -108,7 +109,7 @@ def _nice_step(rough_step: float) -> float:
 
 
 def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
-             min_value: float = 0.0, min_step: float | None = None) -> None:
+             min_value: float = 0.0, min_step: float | None = None, minor: int = 0) -> None:
     """Sets compact lakh/crore ₹ tick labels on a Plotly axis.
 
     Plotly's ``tickformat="~s"`` renders ₹ amounts as "2M" — the wrong idiom for
@@ -129,6 +130,8 @@ def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
             gridlines closer than 1Cr). The step still grows past it as the data
             demands, so a large scenario doesn't end up with thirty lines.
             Ignored when ``step`` is given.
+        minor: Unlabelled gridlines between labelled ones, as subdivisions of
+            each step (4 puts a faint line every quarter step). 0 for none.
     """
     max_value = max(float(max_value), 1.0)
     min_value = min(float(min_value), 0.0)
@@ -143,6 +146,9 @@ def inr_axis(fig, max_value: float, axis: str = "y", step: float | None = None,
     # hoverformat stops Plotly's default SI hover ("2.5M"); full rupees with
     # separators is the best d3 can do (no lakh grouping in its locale).
     kwargs = dict(tickvals=tickvals, ticktext=ticktext, hoverformat=",.0f")
+    if minor:
+        kwargs["minor"] = dict(tick0=lo, dtick=step / minor, showgrid=True,
+                               gridcolor=STRIP_BORDER, griddash="dot")
     if axis == "y":
         fig.update_yaxes(**kwargs)
     else:
@@ -430,7 +436,7 @@ def stale_since_open(seed_key: str, current_sig: tuple, label: str) -> bool:
     """
     seeded = st.session_state.get(seed_key)
     if seeded is not None and seeded != current_sig:
-        flash("warning", f"{label} changed on disk since you opened this — reloaded with "
+        flash("warning", f"{label} changed on disk since you opened this. Reloaded with "
                          "the newer data, so please redo your edit.")
         st.session_state.pop(seed_key, None)
         st.rerun()
@@ -491,25 +497,52 @@ def edit_card(title: str):
 
 
 # Where each data file is edited, for the "last entry" line.
-FILE_PAGES = {"income.csv": "Income", "contributions.csv": "Actuals",
+FILE_PAGES = {"income.csv": "Income", "contributions.csv": "Investments",
               "targets.csv": "Budget", "adjustments.csv": "Adjustments"}
 
 
-def last_entry_text(root, profile_key: str, today=None) -> str:
-    """Says when this person last saved data, e.g. ``Last entry 27 Oct 2026 (Actuals), 3 days ago``.
+def last_entry_text(root, profile_keys: list[str], today=None) -> str:
+    """Says when any of these people last saved data, e.g.
+    ``Last entry 27 Oct 2026 (Investments), 3 days ago``.
 
     Empty when nothing has been logged for them yet.
     """
-    found = last_entry(root, profile_key)
-    if found is None:
+    found = [e for e in (last_entry(root, k) for k in profile_keys) if e is not None]
+    if not found:
         return ""
-    ts, filename = found
+    ts, filename = max(found)
     days = ((today or dt.date.today()) - ts.date()).days
     ago = "today" if days <= 0 else "yesterday" if days == 1 else f"{days} days ago"
     return f"Last entry {ts:%-d %b %Y} ({FILE_PAGES.get(filename, filename)}), {ago}"
 
 
-def page_header(title: str, profiles, root=None):
+def household_profile(profiles: list[Profile]) -> Profile:
+    """The combined view of everyone, shaped like a Profile so pages can take it.
+
+    Built with ``model_construct`` because it has no allocation of its own;
+    pages check ``is_household`` and aggregate the real people instead.
+    """
+    return Profile.model_construct(
+        key=HOUSEHOLD_KEY, name="Household",
+        birth_year=min(p.birth_year for p in profiles),
+        forward_increment_pct=sum(p.forward_increment_pct for p in profiles) / len(profiles),
+        default_target={},
+    )
+
+
+def is_household(profile: Profile) -> bool:
+    return profile.key == HOUSEHOLD_KEY
+
+
+def active_profile_key() -> str | None:
+    """The profile the URL (or this session) asks for, before any page validates it.
+
+    ``app.py`` uses it to pick the nav; ``page_header`` does the real resolving.
+    """
+    return st.query_params.get("profile") or st.session_state.get("active_profile")
+
+
+def page_header(title: str, profiles, root=None, allow_household: bool = False):
     """Renders the page title and resolves the active person from the URL.
 
     Routing is per person via the ``?profile=<key>`` query param: one active
@@ -524,14 +557,24 @@ def page_header(title: str, profiles, root=None):
     Args:
         root: Data folder; when given, a muted line under the title says when
             this person last saved data (from the audit log).
+        allow_household: Whether this page has a combined view. Pages that
+            edit one person's rows don't; asked for ``household``, they fall
+            back to the default person.
 
     Returns:
         The active Profile.
     """
     inject_theme()
-    keys = [p.key for p in profiles]
+    keys = [p.key for p in profiles] + ([HOUSEHOLD_KEY] if allow_household else [])
     default = min(profiles, key=lambda p: p.name).key
 
+    if st.query_params.get("profile") == HOUSEHOLD_KEY and not allow_household:
+        # A per-person page opened as the household (say, the URL's profile was
+        # edited here): its overview is the household Dashboard.
+        try:
+            st.switch_page("views/dashboard.py")
+        except st.errors.StreamlitAPIException:
+            pass  # rendered on its own, outside the app's navigation (tests)
     if st.query_params.get("profile") in keys:
         active = st.query_params["profile"]
     else:
@@ -543,7 +586,12 @@ def page_header(title: str, profiles, root=None):
     _set_accents(active)
     inject_accent(accent_primary())  # native widgets follow the active person too
 
-    profile = next(p for p in profiles if p.key == active)
+    if active == HOUSEHOLD_KEY:
+        profile = household_profile(profiles)
+        people = [p.key for p in profiles]
+    else:
+        profile = next(p for p in profiles if p.key == active)
+        people = [active]
     st.title(title)
     st.markdown(
         f"<div style='margin:-.6rem 0 .9rem'>"
@@ -551,7 +599,7 @@ def page_header(title: str, profiles, root=None):
         f"background:{accent_primary()}'></span></div>",
         unsafe_allow_html=True,
     )
-    note = last_entry_text(root, active) if root is not None else ""
+    note = last_entry_text(root, people) if root is not None else ""
     st.markdown(f"<div style='color:var(--muted);font-size:{FS_LABEL};margin:-.5rem 0 .6rem'>"
                 f"{note}</div>", unsafe_allow_html=True)
     # Always claim the slot, filled or not, so a flash never shifts the page's

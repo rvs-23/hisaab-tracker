@@ -31,9 +31,9 @@ committed), re-read from disk on every render. No database, no caching.
 | `config.yaml` | `categories`, optional `expected_return_pct` | hand |
 | `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target` | hand |
 | `income.csv` | monthly `salary / bonus / other`, `job_change` flag | Income page |
-| `contributions.csv` | what was actually invested, per year and category | Actuals page, importer |
+| `contributions.csv` | what was invested, per year and category, with `notes` (shown as Details) and `last_change` | Investments page, importer |
 | `targets.csv` | per-year target-allocation overrides | Budget page |
-| `adjustments.csv` | `opening_corpus`, `emergency_fund` per person | Dashboard, Actuals |
+| `adjustments.csv` | `opening_corpus`, `emergency_fund` per person | Dashboard, Investments |
 | `changes.jsonl` | append-only audit log of every save | every save |
 
 The minimum to start is `config.yaml` + one profile; scaffold both with
@@ -64,6 +64,13 @@ One person at a time, chosen by URL: `?profile=rv` or `?profile=cheeni`. It
 sticks across pages. There's no switcher and no name on screen; each person
 has their own accent colours. Year pickers run from 2022 to the current year.
 
+`?profile=household` (teal) is both people combined. It isn't a profile file;
+it sums the real people. It only reads, so its nav is just Dashboard and
+House fund: income, budget and investments are edited per person.
+
+Every page shows, under its title, when that person (or, for the household,
+anyone) last saved data, from `changes.jsonl`.
+
 ## Pages
 
 | Page | Question it answers | Writes |
@@ -71,8 +78,8 @@ has their own accent colours. Year pickers run from 2022 to the current year.
 | **Dashboard** | Where am I overall? Tiles, the year-on-year journey chart, allocation to date, catch-up, health nudges | opening corpus (Adjustments expander) |
 | **Income** | What did I earn? 12-month grid per year; a new year pre-fills last year's salary | `income.csv` |
 | **Budget** | How does income split, and where should the investment go? | `targets.csv` (allocation editor) |
-| **Actuals** | What did I really invest, against the plan? | `contributions.csv`, emergency fund held |
-| **Rent vs buy** | Is buying this house better than renting and investing? | nothing (a calculator) |
+| **Investments** | Record what went in; how does it compare with the plan? | `contributions.csv`, emergency fund held |
+| **House fund** (household) | At this pace, what's our corpus each year (2024–2034)? What must we invest monthly for a down payment of ₹X Cr in Y years? | nothing (live inputs) |
 
 ## The model
 
@@ -95,23 +102,23 @@ has their own accent colours. Year pickers run from 2022 to the current year.
 - **One rate everywhere:** `expected_return_pct` in `config.yaml` is the single
   growth rate for estimated value, corpus, and catch-up. Remove it to fall back
   to per-category `EXPECTED_RETURNS` in `config.py`.
-- **Emergency fund target** = `EMERGENCY_FUND_MONTHS` (4) × monthly needs.
+- **Emergency fund target** = `EMERGENCY_FUND_MONTHS` (3) × current monthly
+  salary (the latest month entered up to today; bonus and other left out).
 - **Opening corpus** is money invested before tracking began. It's assumed
   invested at the start of your first tracked year and counts toward invested
   and estimated value. It never touches the budget, goal, or catch-up.
 - **Health nudges** appear only when something needs a look: no income this
   year, investing under half the elapsed-year pace, no emergency fund recorded,
   or this year's mix ≥ 15 points off target.
-- **Rent vs buy** compares **net gain** over the loan tenure: the asset each
-  side builds, minus money that buys nothing lasting.
-  - *Buying* = the home's appreciation − (registration + loan interest +
-    maintenance). The down payment and principal are equity, not cost.
-  - *Renting* = growth on the invested difference − rent. The renter invests
-    the unspent down payment and registration, plus
-    `RENTER_INVEST_DISCIPLINE_PCT` (60%) of each year's (EMI + maintenance −
-    rent) gap.
-  - Nothing is saved. The investment-return input defaults to 11%; its tooltip
-    shows the household rate for comparison.
+- **House fund** shows the corpus at the end of each year, 2024–2034
+  (`HOUSE_FUND_YEARS`). Past years are what was built: contributions grown at
+  the return, plus the opening corpus. From this year on: that corpus grown,
+  plus a combined monthly investment that grows yearly. EPF, PPF and NPS
+  (`HOUSE_FUND_EXCLUDED`) are left out. Each year is also shown in today's
+  money at the inflation input. A reverse calculation at the bottom takes a
+  down payment (today's prices, inflated to the buying year) and a number of
+  years, and gives the monthly investment needed. All inputs are live; nothing
+  is saved.
 
 ## Code layout
 
