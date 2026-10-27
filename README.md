@@ -64,6 +64,13 @@ One person at a time, chosen by URL: `?profile=rv` or `?profile=cheeni`. It
 sticks across pages. There's no switcher and no name on screen; each person
 has their own accent colours. Year pickers run from 2022 to the current year.
 
+`?profile=household` (teal) is both people combined. It isn't a profile file;
+it sums the real people. It only reads, so its nav is just Dashboard and
+House fund: income, budget and actuals are edited per person.
+
+Every page shows, under its title, when that person (or, for the household,
+anyone) last saved data, from `changes.jsonl`.
+
 ## Pages
 
 | Page | Question it answers | Writes |
@@ -72,7 +79,7 @@ has their own accent colours. Year pickers run from 2022 to the current year.
 | **Income** | What did I earn? 12-month grid per year; a new year pre-fills last year's salary | `income.csv` |
 | **Budget** | How does income split, and where should the investment go? | `targets.csv` (allocation editor) |
 | **Actuals** | What did I really invest, against the plan? | `contributions.csv`, emergency fund held |
-| **Rent vs buy** | Is buying this house better than renting and investing? | nothing (a calculator) |
+| **House fund** (household) | If we keep investing at this pace, how much could we put down on a house at the end of each year? | nothing (live inputs) |
 
 ## The model
 
@@ -95,23 +102,21 @@ has their own accent colours. Year pickers run from 2022 to the current year.
 - **One rate everywhere:** `expected_return_pct` in `config.yaml` is the single
   growth rate for estimated value, corpus, and catch-up. Remove it to fall back
   to per-category `EXPECTED_RETURNS` in `config.py`.
-- **Emergency fund target** = `EMERGENCY_FUND_MONTHS` (4) × monthly needs.
+- **Emergency fund target** = `EMERGENCY_FUND_MONTHS` (3) × current monthly
+  salary (the latest month entered up to today; bonus and other left out).
 - **Opening corpus** is money invested before tracking began. It's assumed
   invested at the start of your first tracked year and counts toward invested
   and estimated value. It never touches the budget, goal, or catch-up.
 - **Health nudges** appear only when something needs a look: no income this
   year, investing under half the elapsed-year pace, no emergency fund recorded,
   or this year's mix ≥ 15 points off target.
-- **Rent vs buy** compares **net gain** over the loan tenure: the asset each
-  side builds, minus money that buys nothing lasting.
-  - *Buying* = the home's appreciation − (registration + loan interest +
-    maintenance). The down payment and principal are equity, not cost.
-  - *Renting* = growth on the invested difference − rent. The renter invests
-    the unspent down payment and registration, plus
-    `RENTER_INVEST_DISCIPLINE_PCT` (60%) of each year's (EMI + maintenance −
-    rent) gap.
-  - Nothing is saved. The investment-return input defaults to 11%; its tooltip
-    shows the household rate for comparison.
+- **House fund** = the *liquid* corpus today (contributions in
+  `LIQUID_CATEGORIES` grown at the return, plus the opening corpus unless
+  unticked; EPF/PPF/NPS and the emergency fund are left out), grown each year,
+  plus a yearly pace that grows too. The pace defaults to this year's liquid
+  contributions scaled up to a full year, so it reads low if Actuals are
+  behind. Return, pace, pace growth and horizon are live inputs; nothing is
+  saved. Registration isn't subtracted.
 
 ## Code layout
 

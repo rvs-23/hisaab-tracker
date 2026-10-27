@@ -110,6 +110,8 @@ def test_last_entry_is_per_person_and_counts_adjustments(tmp_path):
     assert audit.last_entry(tmp_path, "rv")[1] == "income.csv"
     assert audit.last_entry(tmp_path, "cheeni")[1] == "adjustments.csv"
     assert audit.last_entry(tmp_path, "nobody") is None
-    assert ui.last_entry_text(tmp_path, "cheeni", today=dt.date(2026, 10, 23)) == (
+    assert ui.last_entry_text(tmp_path, ["cheeni"], today=dt.date(2026, 10, 23)) == (
         "Last entry 20 Oct 2026 (Adjustments), 3 days ago")
-    assert ui.last_entry_text(tmp_path / "missing", "rv") == ""
+    assert ui.last_entry_text(tmp_path, ["rv", "cheeni"], today=dt.date(2026, 10, 23)).startswith(
+        "Last entry 20 Oct")  # household: the newest of anyone's
+    assert ui.last_entry_text(tmp_path / "missing", ["rv"]) == ""

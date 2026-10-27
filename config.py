@@ -14,6 +14,8 @@ GRAPHITE = "#334155"  # rv primary — dark gunmetal (the "platinum" scheme)
 STEEL = "#64748B"  # rv secondary — lighter steel, so planned recedes
 PINK = "#EC4899"  # cheeni primary — light bright pink (chart + large-text AA; small text is borderline ~3.5:1)
 RASPBERRY = "#9D174D"  # cheeni secondary — deep raspberry, same pink family (not violet)
+TEAL = "#0F766E"  # household primary — deep teal (≈5.5:1 on white)
+DEEP_TEAL = "#134E4A"  # household secondary — darker teal, same family
 MUTED = "#697077"  # ≈5:1 on white — the old #7c828c failed WCAG AA at small sizes
 CARD_BG = "#ffffff"
 CARD_BORDER = "#e7eaee"
@@ -33,10 +35,21 @@ FONT = "Inter"
 # on white; the shared grays stay the neutral base.
 #   rv     → platinum monochrome (graphite + steel)
 #   cheeni → pink family (light pink + deep raspberry)
+#   household → teal family (both people combined, ?profile=household)
 PROFILE_ACCENTS = {
     "rv": (GRAPHITE, STEEL),
     "cheeni": (PINK, RASPBERRY),
+    "household": (TEAL, DEEP_TEAL),
 }
+
+# The combined view of everyone. Not a profiles/*.yaml file: it is derived
+# from all the people, so it never appears in any CSV's profile column.
+HOUSEHOLD_KEY = "household"
+
+# Categories you can sell to fund a down payment. EPF/PPF/NPS is locked until
+# retirement and the emergency fund stays put, so neither counts.
+LIQUID_CATEGORIES = ["us_market", "indian_stocks", "mfs", "fixed_deposit", "gold_metals"]
+HOUSE_FUND_YEARS_AHEAD = 10  # the House fund page's default horizon
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
 # Budget model. The anchor year (first earning year) splits income 50/30/20
@@ -69,16 +82,11 @@ EXPECTED_RETURNS = {
     "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
-# A buyer is forced to "save" via the EMI; a renter with a smaller outgoing
-# rarely invests the whole difference — some leaks into lifestyle. This is the
-# share of that monthly gap the renter actually invests, in the rent-vs-buy
-# comparison. Below 100 stops the renting side from looking unrealistically good.
-RENTER_INVEST_DISCIPLINE_PCT = 60
 
-# Emergency-fund *target* = this many months of the needs bucket (essential
-# spending only; wants pause in an emergency). The target is derived; the
-# *actual* fund held is entered by hand (see storage.ALLOWED_ADJUSTMENTS).
-EMERGENCY_FUND_MONTHS = 4
+# Emergency-fund *target* = this many months of current monthly salary
+# (2026-10-27). The *actual* fund held is entered by hand (see
+# storage.ALLOWED_ADJUSTMENTS).
+EMERGENCY_FUND_MONTHS = 3
 
 # The components that sum to a year's total income. "other" catches anything
 # beyond salary and bonus (RSU vesting, an FD/RD maturing, and so on).

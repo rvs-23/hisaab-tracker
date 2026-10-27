@@ -14,7 +14,7 @@ PAGES = [
     "views/income.py",
     "views/budget_projection.py",
     "views/actuals.py",
-    "views/rent_vs_buy.py",
+    "views/house_fund.py",
 ]
 
 TARGET = (
@@ -78,26 +78,46 @@ def test_page_renders_without_errors(page, profile, fake_data_dir):
     assert not at.error, [e.value for e in at.error]
 
 
+@pytest.mark.parametrize("page", ["views/dashboard.py", "views/house_fund.py"])
+def test_household_pages_render(page, fake_data_dir):
+    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20)
+    at.query_params["profile"] = "household"
+    at.run()
+    assert not at.exception, at.exception
+    assert not at.error, [e.value for e in at.error]
+
+
+def test_household_dashboard_sums_both_people(fake_data_dir):
+    """The fixture's contributions are all rv's, so household 'Invested' must
+    equal rv's (cheeni adds nothing), not fall back to one default person."""
+    (fake_data_dir / "contributions.csv").write_text(
+        "year,profile,category,amount,notes\n2024,rv,mfs,100000,\n2024,cheeni,mfs,50000,\n")
+
+    def invested(profile):
+        at = AppTest.from_file(str(REPO_ROOT / "views/dashboard.py"), default_timeout=20)
+        at.query_params["profile"] = profile
+        at.run()
+        tile = next(m.value for m in at.markdown if "Invested till date" in m.value)
+        return tile.split("class='val'")[1].split(">")[1].split("<")[0]
+
+    assert invested("rv") == "₹1.0L"
+    assert invested("household") == "₹1.5L"
+
+
+def test_household_falls_back_on_per_person_pages(fake_data_dir):
+    at = AppTest.from_file(str(REPO_ROOT / "views/income.py"), default_timeout=20)
+    at.query_params["profile"] = "household"
+    at.run()
+    assert not at.exception, at.exception
+    assert at.query_params["profile"] != ["household"]
+
+
 @pytest.mark.parametrize("page", PAGES)
 def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
     """README promises config.yaml + profiles/ is enough to start — no CSVs."""
     at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20).run()
     assert not at.exception, at.exception
     assert not at.error, [e.value for e in at.error]
-
-
-# Rent vs buy is now a single net-cost chart (no budget/timing sections) — it
-# reads none of the person's own data, so it renders the same for both profiles.
-
-def test_rent_vs_buy_states_the_net_cost_verdict(fake_data_dir):
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    assert not at.exception, at.exception
-    captions = " ".join(c.value for c in at.caption)
-    assert "comes out ahead by" in captions    # the verdict
-    assert "net gain" in captions.lower()       # framed as net gain
-    assert "the two asset piles" in captions    # the equity-vs-gain table caption
 
 
 def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
@@ -113,30 +133,6 @@ def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     assert not at.exception, at.exception
     assert "No changes to save" in " ".join(m.value for m in at.warning)
     assert "Saved" not in " ".join(s.value for s in at.success)
-
-
-def test_rent_vs_buy_per_year_view_switches_the_chart(fake_data_dir):
-    """The Cumulative/Per year toggle must recompute without error."""
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    at.radio(key="rvb_view_rv").set_value("Per year").run()
-    assert not at.exception, at.exception
-
-
-
-def test_rent_vs_buy_explains_a_buying_win_as_a_buying_win(fake_data_dir):
-    """The 'it wins because' clause once always credited investing — even when
-    buying won. Strong appreciation vs a weak return must read as buying's win."""
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    at.number_input(key="rvb_appr_rv").set_value(12.0)
-    at.number_input(key="rvb_return_rv").set_value(4.0).run()
-    assert not at.exception, at.exception
-    captions = " ".join(c.value for c in at.caption)
-    assert "buying comes out ahead" in captions
-    assert "investing outpaces" not in captions
 
 
 def test_flash_shows_on_the_next_run_then_clears(fake_data_dir):

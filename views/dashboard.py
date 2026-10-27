@@ -8,18 +8,25 @@ import compute
 import storage
 from ui import (
     CHART_TEXT, FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary,
-    accent_secondary, chart_title, inr_axis, inr_short, load_all, metric_tile,
+    accent_secondary, chart_title, inr_axis, inr_short, is_household, load_all, metric_tile,
     page_header, pretty_category, save_failed, saved, section, style_fig, tint,
 )
 
 d = load_all()
-profile = page_header("Dashboard", d.profiles, d.root)
+profile = page_header("Dashboard", d.profiles, d.root, allow_household=True)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 today_year = dt.date.today().year
+# The household view sums every figure over both people; a person's view is
+# the same code over a list of one.
+household = is_household(profile)
+people = d.profiles if household else [profile]
+keys = [p.key for p in people]
 
-contrib = d.contributions[d.contributions["profile"] == profile.key]
-bs = compute.budget_series(profile, d.income)
-trend = bs[~bs["is_projected"]]
+contrib = d.contributions[d.contributions["profile"].isin(keys)]
+bs = pd.concat([compute.budget_series(p, d.income) for p in people], ignore_index=True)
+trend = (bs[~bs["is_projected"].astype(bool)]
+         .groupby("year", as_index=False)[["total_income", "investment"]].sum()
+         if not bs.empty else bs)
 if trend.empty and contrib.empty:
     st.info("Nothing here yet. Start on the Income page.")
     st.stop()
@@ -38,17 +45,24 @@ year_range = (
 flat_return = d.config.expected_return_pct  # "we only use one" — config.yaml override
 growth_basis = (f"a flat {flat_return:g}% a year (expected_return_pct in config.yaml)"
                 if flat_return is not None else "conservative per-category returns")
-catch_up = compute.catch_up_amount(profile, d.income, d.targets, d.contributions, today_year,
-                                   flat_return=flat_return)
+catch_up = sum(compute.catch_up_amount(p, d.income, d.targets, d.contributions, today_year,
+                                       flat_return=flat_return) for p in people)
 earned = float(trend["total_income"].sum())
-opening = compute.opening_corpus(d.adjustments, profile.key)
+opening = sum(compute.opening_corpus(d.adjustments, p.key) for p in people)
+invested = float(contrib["amount"].sum()) + opening
 # The actual emergency fund (entered on Actuals) beats the derived target in
 # net worth; None falls back to the target until one is recorded.
-ef_held = compute.emergency_fund_actual(d.adjustments, profile.key) or None
-invested = float(contrib["amount"].sum()) + opening
-nw_actual, nw_potential = compute.net_worth_to_date(
-    profile, d.income, d.contributions, d.targets, today_year, opening=opening,
-    emergency_fund=ef_held, flat_return=flat_return)
+nw_potential = sum(compute.net_worth_to_date(
+    p, d.income, d.contributions, d.targets, today_year,
+    opening=compute.opening_corpus(d.adjustments, p.key),
+    emergency_fund=compute.emergency_fund_actual(d.adjustments, p.key) or None,
+    flat_return=flat_return)[1] for p in people)
+
+
+def year_goal_for(year: int) -> float:
+    """The planned investment for a year, summed over the people shown."""
+    return sum(sum(compute.expected_contributions(p, d.income, d.targets, year).values())
+               for p in people)
 
 section("Lifetime")
 c = st.columns(4)
@@ -67,7 +81,7 @@ metric_tile(c[2], "Est. value today", inr_short(nw_potential), f"as of {today_ye
                     "its assumed vintage." if opening > 0 else ""))
 # The plan tile headlines the TOTAL to invest to be fully on track: this
 # year's goal plus the catch-up from past years. The sub-lines split it.
-year_goal = sum(compute.expected_contributions(profile, d.income, d.targets, today_year).values())
+year_goal = year_goal_for(today_year)
 invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
 to_go = max(0.0, year_goal - invested_ty)
 plan_sub = (
@@ -96,7 +110,7 @@ else:
     fraction = compute.elapsed_year_fraction()
     goal = []
     for y in yr:
-        g = sum(compute.expected_contributions(profile, d.income, d.targets, int(y)).values())
+        g = year_goal_for(int(y))
         if int(y) == today_year:
             g *= fraction
         goal.append(g)
@@ -180,12 +194,14 @@ else:
     st.markdown(
         f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
         f"padding:12px 18px;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
-        f"You're level with the plan — no catch-up needed in {today_year}. Anything extra overshoots the goal.</div>",
+        f"You're level with the plan, so there's no catch-up in {today_year}. Anything extra overshoots the goal.</div>",
         unsafe_allow_html=True,
     )
 
 # Health nudges: quiet, plain-language findings — nothing renders when healthy.
-findings = compute.health_checks(
+# Per person only: with no names on screen, a combined list couldn't say whose
+# nudge is whose.
+findings = [] if household else compute.health_checks(
     profile, d.income, d.targets, d.contributions, d.adjustments, fmt=inr_short
 )
 if findings:
@@ -195,10 +211,12 @@ if findings:
 
 # Adjustments live in a quiet expander at the very bottom — the dashboard stays
 # summary-first, and this is a one-off setting, not something read every visit.
+if household:
+    st.stop()  # the opening corpus is set per person
 with st.expander("Adjustments"):
     st.caption(
         "One-off figures that don't fit the year-by-year history. Opening corpus is "
-        "money you'd already invested before you started tracking here — it's added "
+        "money you'd already invested before you started tracking here. It's added "
         "to your totals and audited like any other save, assumed invested at the "
         "start of your first tracked year and grown at "
         + (growth_basis if flat_return is not None

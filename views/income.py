@@ -137,11 +137,11 @@ with edit_card(f"Enter {year}"):
     pending = rows_sig(preview) != rows_sig(disk_rows(year))
     if pending:
         st.markdown(f"<div style='color:{PRIMARY};font-weight:600;font-size:.82rem'>"
-                    "● Unsaved changes — press Enter to commit the cell, then Save.</div>",
+                    "● Unsaved changes. Press Enter to commit the cell, then Save.</div>",
                     unsafe_allow_html=True)
     else:
         st.markdown("<div style='color:var(--muted);font-size:.82rem'>"
-                    "✓ In sync with saved data — nothing to save.</div>",
+                    "✓ In sync with saved data. Nothing to save.</div>",
                     unsafe_allow_html=True)
 
     b2, b3 = st.columns([1, 3])
@@ -155,17 +155,17 @@ with edit_card(f"Enter {year}"):
             # Disk moved under this grid (another tab, or an import) — reload
             # rather than overwrite the newer data with our stale grid.
             flash("warning", f"{year}'s income changed on disk since you opened this. "
-                             "Reloaded — re-enter your change so nothing is overwritten.")
+                             "Reloaded. Re-enter your change so nothing is overwritten.")
             ss.pop(gkey, None)
             ss.pop(skey, None)
             st.rerun()
         elif rows_sig(new) == current:
             # Nothing to write. Most often the last-typed cell never committed:
             # Streamlit's editor only captures a cell once it loses focus.
-            st.toast("Nothing saved — your last edit hasn't committed.", icon=":material/warning:")
+            st.toast("Nothing saved: your last edit hasn't committed.", icon=":material/warning:")
             st.warning("**No changes to save.** If you just typed a value, press **Enter** "
-                       "(or click another cell) to commit it — the number turns from an "
-                       "editing box into plain text — then Save. Nothing was written.")
+                       "(or click another cell) to commit it. The number turns from an "
+                       "editing box into plain text. Then Save. Nothing was written.")
         else:
             others = d.income[~((d.income["profile"] == active.key) & (d.income["year"] == year))]
             merged = pd.concat([others, new], ignore_index=True)
@@ -174,7 +174,7 @@ with edit_card(f"Enter {year}"):
                 storage.save_income(d.root, merged)
                 ss.pop(gkey, None)
                 ss.pop(skey, None)
-                saved(f"Saved — {inr_short(total)} across {filled} month{'s' if filled != 1 else ''} of {year}.")
+                saved(f"Saved: {inr_short(total)} across {filled} month{'s' if filled != 1 else ''} of {year}.")
             except Exception as exc:
                 save_failed(exc)
     b3.markdown(

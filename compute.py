@@ -27,7 +27,7 @@ import pandas as pd
 
 from config import (
     BASELINE_YEAR, CATEGORY_LABELS, DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT,
-    EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
+    EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS, LIQUID_CATEGORIES,
     NETWORTH_PROJECTION_YEARS, PROFILE_BASE_SPLITS, PROFILE_INCREMENT_SPLITS,
     PROJECTION_YEARS_AHEAD,
 )
@@ -266,22 +266,26 @@ def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
     return list(range(BASELINE_YEAR, top + 1))
 
 
-def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None) -> float:
-    """The emergency-fund *target*: ``EMERGENCY_FUND_MONTHS`` months of the
-    needs bucket (essential spending only — wants pause in an emergency).
-    Derived from income like the rest of the budget; the *actual* fund held is
-    a hand-entered adjustment (see ``emergency_fund_actual``). Defaults to the
-    latest non-projected year."""
-    bs = budget_series(profile, income)
-    if bs.empty:
+def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None,
+                          today: dt.date | None = None) -> float:
+    """The emergency-fund *target*: ``EMERGENCY_FUND_MONTHS`` months of current salary.
+
+    "Current" is the latest month with a salary, up to ``year`` (default: now).
+    In the current year, months after today don't count, so a salary pre-filled
+    for December doesn't move today's target. Bonus and *other* are left out.
+    The *actual* fund held is hand-entered (see ``emergency_fund_actual``).
+    Zero when no salary has been entered.
+    """
+    today = today or dt.date.today()
+    year = today.year if year is None else year
+    rows = income[(income["profile"] == profile.key) & (income["salary"] > 0)
+                  & (income["year"] <= year)]
+    if year == today.year:
+        rows = rows[(rows["year"] < year) | (rows["month"] <= today.month)]
+    if rows.empty:
         return 0.0
-    pool = bs[~bs["is_projected"]]
-    if pool.empty:
-        pool = bs
-    row = pool[pool["year"] == year] if year is not None else pool.iloc[[-1]]
-    if row.empty:
-        row = pool.iloc[[-1]]
-    return float(row.iloc[0]["monthly_needs"]) * EMERGENCY_FUND_MONTHS
+    latest = rows.sort_values(["year", "month"]).iloc[-1]
+    return float(latest["salary"]) * EMERGENCY_FUND_MONTHS
 
 
 def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,
@@ -299,8 +303,7 @@ def expected_return_for_target(target: dict[str, float], flat_return: float | No
 
     E.g. 45% mfs @ 11.5% + 25% gold @ 7.5% + ... Used for the opening
     corpus's assumed growth (``_corpus_growth_rate``) and exposed publicly so
-    other callers (e.g. the rent-vs-buy calculator's default invest return)
-    can reuse the same weighting instead of hard-coding a number.
+    other callers can reuse the same weighting instead of hard-coding a number.
     """
     if flat_return is not None:
         return flat_return
@@ -543,190 +546,69 @@ def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
     return findings
 
 
-# Rent-vs-buy: money wasted, not net worth. The core philosophy — buying
-# wastes registration/stamp duty (one-time), loan INTEREST (never principal,
-# which is equity), and maintenance/property tax; renting wastes the rent
-# itself, inflating every year. A renter's invested savings are not waste.
+def liquid_corpus_today(profiles: list[Profile], income: pd.DataFrame,
+                        contributions: pd.DataFrame, adjustments: pd.DataFrame,
+                        today_year: int, rate_pct: float,
+                        include_opening: bool = True) -> float:
+    """What the given people could sell today toward a down payment.
 
-def emi(principal: float, annual_rate_pct: float, tenure_years: int) -> float:
-    """The standard equated-monthly-instalment formula.
+    Every liquid contribution (``LIQUID_CATEGORIES``) is grown at ``rate_pct``
+    from its year to ``today_year``. With ``include_opening``, each person's
+    opening corpus is added, grown from their first tracked year; its mix isn't
+    recorded, so it is assumed liquid.
+    """
+    keys = [p.key for p in profiles]
+    mine = contributions[contributions["profile"].isin(keys)
+                         & contributions["category"].isin(LIQUID_CATEGORIES)]
+    total = sum(float(r.amount) * (1 + rate_pct / 100) ** max(0, today_year - int(r.year))
+                for r in mine.itertuples())
+    if include_opening:
+        for p in profiles:
+            opening = opening_corpus(adjustments, p.key)
+            vintage = corpus_vintage_year(income, contributions, p.key)
+            if opening and vintage is not None:
+                total += opening * (1 + rate_pct / 100) ** max(0, today_year - vintage)
+    return total
 
-    Args:
-        principal: Loan amount.
-        annual_rate_pct: Annual interest rate, in percent (e.g. ``8.5``).
-        tenure_years: Loan tenure in years.
+
+def liquid_pace(profiles: list[Profile], contributions: pd.DataFrame,
+                today: dt.date | None = None) -> float:
+    """This year's liquid contributions so far, scaled up to a full year.
+
+    Contributions carry no date, so this assumes Actuals are up to date: a
+    year recorded only through July reads low in October.
+    """
+    today = today or dt.date.today()
+    keys = [p.key for p in profiles]
+    recorded = contributions.loc[
+        contributions["profile"].isin(keys) & (contributions["year"] == today.year)
+        & contributions["category"].isin(LIQUID_CATEGORIES), "amount"
+    ].sum()
+    return float(recorded) / elapsed_year_fraction(today)
+
+
+def house_fund(corpus_today: float, pace: float, pace_growth_pct: float, rate_pct: float,
+               years_ahead: int, today: dt.date | None = None) -> pd.DataFrame:
+    """Down payment available at the end of each year, from now on.
+
+    The current year gets the rest of its pace (the elapsed share is assumed
+    already in ``corpus_today``). Each later year grows the pot at
+    ``rate_pct`` and adds that year's pace, which itself grows at
+    ``pace_growth_pct``. Yearly compounding, contributions landing at year end.
 
     Returns:
-        The constant monthly instalment. At 0% interest the standard formula
-        divides by zero, so that case is simply ``principal / months``.
+        One row per year: ``year``, ``available`` (the whole pot),
+        ``from_today`` (today's corpus grown) and ``new_savings`` (the rest).
     """
-    months = tenure_years * 12
-    if months <= 0:
-        return 0.0
-    if annual_rate_pct == 0:
-        return principal / months
-    r = annual_rate_pct / 1200
-    factor = (1 + r) ** months
-    return principal * r * factor / (factor - 1)
-
-
-def _amortization_by_year(principal: float, annual_rate_pct: float, tenure_years: int,
-                          monthly_emi: float) -> tuple[list[float], list[float]]:
-    """Splits a loan's EMIs into interest and principal, summed per year.
-
-    A month-by-month schedule (the only way to split interest from
-    principal correctly) collapsed to one interest total and one principal
-    total per year of the tenure — indices ``0..tenure_years-1``.
-    """
-    r = annual_rate_pct / 1200
-    balance = principal
-    interest_by_year: list[float] = []
-    principal_by_year: list[float] = []
-    interest_acc = principal_acc = 0.0
-    for m in range(1, tenure_years * 12 + 1):
-        interest_payment = balance * r
-        principal_payment = min(monthly_emi - interest_payment, balance)
-        balance = max(0.0, balance - principal_payment)
-        interest_acc += interest_payment
-        principal_acc += principal_payment
-        if m % 12 == 0:
-            interest_by_year.append(interest_acc)
-            principal_by_year.append(principal_acc)
-            interest_acc = principal_acc = 0.0
-    return interest_by_year, principal_by_year
-
-
-def rent_vs_buy(price: float, down_pct: float, loan_rate_pct: float, tenure_years: int,
-               registration_pct: float, maintenance_pct: float, appreciation_pct: float,
-               rent_monthly: float, rent_inflation_pct: float, invest_return_pct: float,
-               horizon_years: int, invest_discipline_pct: float = 100.0) -> pd.DataFrame:
-    """Year-by-year comparison of buying vs renting, as waste and net gain.
-
-    One row per year 1..``horizon_years``. Buying wastes registration/stamp
-    duty (once), loan interest (never principal — that's equity), and
-    maintenance/property tax (``maintenance_pct`` of ``price``, flat every
-    year — an approximation, since a real property-tax bill usually tracks
-    assessed value). Renting wastes the rent itself, inflating at
-    ``rent_inflation_pct`` every year.
-
-    The renter is assumed to have the same monthly housing budget a buyer
-    would (EMI + maintenance): whatever of that budget isn't spent on rent —
-    plus the down payment and registration money never spent at all — is
-    invested at ``invest_return_pct``. Once the rent (inflating) overtakes
-    EMI + maintenance (fixed once the loan is repaid, since maintenance
-    persists), that monthly "difference" goes negative and draws down what
-    would otherwise be invested, per the same logic. Monthly amounts are
-    aggregated to one lump per year and compounded yearly (an approximation:
-    real contributions land monthly, so this slightly understates each
-    year's compounding versus true monthly compounding).
-
-    Columns:
-        buy_wasted_cum: registration + cumulative interest paid + cumulative
-            maintenance, to date.
-        rent_wasted_cum: cumulative rent paid, to date.
-        interest_paid / principal_paid: that single year's EMI split, from the
-            monthly amortization schedule (interest is heaviest in year 1 and
-            falls as the balance amortizes; principal mirrors it).
-        maintenance_paid / rent_paid: that single year's maintenance and rent.
-        loan_balance: principal still outstanding at the end of the year.
-        appreciation_gain: house value so far minus the price paid.
-        renter_contributed: what the renter has put aside to date (down
-            payment + registration never spent, plus the yearly differences)
-            at face value — a renter who never invests holds exactly this.
-        renter_gain: growth on the renter's invested savings (portfolio minus
-            renter_contributed).
-        buy_wasted_net / rent_wasted_net: the apples-to-apples pair — each
-            side's waste minus the asset gain that side ends up holding
-            (the buyer's appreciation; the renter's investment growth). Can go
-            negative when the asset gained more than the waste; the page plots
-            its negation as "net gain".
-        buy_equity: down payment + principal repaid so far + property
-            appreciation on the full price (interest/maintenance/registration
-            build no equity, so they're excluded here).
-        renter_portfolio: down payment + registration money never spent,
-            invested from year 0, plus every year's (EMI + maintenance −
-            rent) difference invested from the year it occurs.
-
-    Args:
-        price: Property price.
-        down_pct: Down payment as % of price; the rest is financed.
-        loan_rate_pct: Annual home-loan interest rate, in percent.
-        tenure_years: Loan tenure in years.
-        registration_pct: One-time registration + stamp duty, as % of price.
-        maintenance_pct: Annual maintenance/property tax, as % of price.
-        appreciation_pct: Assumed annual property appreciation, in percent.
-        rent_monthly: Starting monthly rent.
-        rent_inflation_pct: Annual rent inflation, in percent.
-        invest_return_pct: Annual return assumed on money the renter invests.
-        horizon_years: How many years to project.
-        invest_discipline_pct: Share of each year's spare (EMI + maintenance −
-            rent) the renter actually invests; a negative year is never
-            discounted. 100 is the renter who invests every spare rupee.
-
-    Returns:
-        A DataFrame with one row per year, columns as above.
-    """
-    down_payment = price * down_pct / 100
-    loan_principal = price - down_payment
-    registration_cost = price * registration_pct / 100
-    monthly_emi = emi(loan_principal, loan_rate_pct, tenure_years)
-    interest_by_year, principal_by_year = _amortization_by_year(
-        loan_principal, loan_rate_pct, tenure_years, monthly_emi
-    )
-    maintenance_annual = price * maintenance_pct / 100
-    non_invested_base = down_payment + registration_cost
-
-    rows = []
-    cum_interest = cum_principal = cum_maintenance = cum_rent = 0.0
-    yearly_diff: dict[int, float] = {}  # year -> that year's (EMI+maint-rent) lump
-
-    for year in range(1, horizon_years + 1):
-        idx = year - 1
-        interest_this_year = interest_by_year[idx] if idx < len(interest_by_year) else 0.0
-        principal_this_year = principal_by_year[idx] if idx < len(principal_by_year) else 0.0
-        cum_interest += interest_this_year
-        cum_principal += principal_this_year
-        cum_maintenance += maintenance_annual
-
-        rent_this_year = rent_monthly * (1 + rent_inflation_pct / 100) ** (year - 1) * 12
-        cum_rent += rent_this_year
-        emi_this_year = monthly_emi * 12 if year <= tenure_years else 0.0
-        yearly_diff[year] = (emi_this_year + maintenance_annual) - rent_this_year
-
-        buy_wasted_cum = registration_cost + cum_interest + cum_maintenance
-        rent_wasted_cum = cum_rent
-        appreciation_gain = price * (1 + appreciation_pct / 100) ** year - price
-        buy_equity = down_payment + cum_principal + appreciation_gain
-
-        # The renter invests only ``invest_discipline_pct`` of each year's spare
-        # difference — a buyer's EMI is forced saving, a renter tends to spend
-        # some of the gap. A year where rent already exceeds EMI+maintenance
-        # (a negative diff) is a genuine outflow and isn't discounted.
-        def invested(diff: float) -> float:
-            return diff * invest_discipline_pct / 100 if diff > 0 else diff
-
-        renter_portfolio = non_invested_base * (1 + invest_return_pct / 100) ** year
-        for k, diff in yearly_diff.items():
-            renter_portfolio += invested(diff) * (1 + invest_return_pct / 100) ** (year - k)
-
-        renter_contributed = non_invested_base + sum(invested(v) for v in yearly_diff.values())
-        renter_gain = renter_portfolio - renter_contributed
-
-        rows.append({
-            "year": year,
-            "buy_wasted_cum": buy_wasted_cum,
-            "rent_wasted_cum": rent_wasted_cum,
-            "interest_paid": interest_this_year,
-            "principal_paid": principal_this_year,
-            "maintenance_paid": maintenance_annual,
-            "rent_paid": rent_this_year,
-            "loan_balance": max(0.0, loan_principal - cum_principal),
-            "buy_equity": buy_equity,
-            "renter_portfolio": renter_portfolio,
-            "appreciation_gain": appreciation_gain,
-            "renter_contributed": renter_contributed,
-            "renter_gain": renter_gain,
-            "buy_wasted_net": buy_wasted_cum - appreciation_gain,
-            "rent_wasted_net": rent_wasted_cum - renter_gain,
-        })
-    return pd.DataFrame(rows)
+    today = today or dt.date.today()
+    growth = 1 + rate_pct / 100
+    existing = corpus_today
+    saved = pace * (1 - elapsed_year_fraction(today))
+    rows = [{"year": today.year, "from_today": existing, "new_savings": saved}]
+    for i in range(1, years_ahead + 1):
+        existing *= growth
+        saved = saved * growth + pace * (1 + pace_growth_pct / 100) ** i
+        rows.append({"year": today.year + i, "from_today": existing, "new_savings": saved})
+    df = pd.DataFrame(rows)
+    df["available"] = df["from_today"] + df["new_savings"]
+    return df[["year", "available", "from_today", "new_savings"]]

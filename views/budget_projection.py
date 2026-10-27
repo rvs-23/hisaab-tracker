@@ -39,7 +39,7 @@ st.caption(
 st.markdown(
     f"<div style='border-left:3px solid {NEEDS};background:var(--strip-bg);border-radius:4px;"
     f"padding:.5rem .8rem;color:var(--muted);font-size:{FS_BODY};margin:.2rem 0 .4rem'>"
-    "These figures are <b>derived</b> — to change them, edit <b>Income</b>. The one "
+    "These figures are <b>derived</b>. To change them, edit <b>Income</b>. The one "
     "thing to set here is your <b>target allocation</b> below.</div>",
     unsafe_allow_html=True,
 )

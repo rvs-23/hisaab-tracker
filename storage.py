@@ -10,8 +10,8 @@ tidy CSVs, keyed by (year, profile) where a year applies:
   adjustments.csv    one-off per-person adjustments, e.g. opening_corpus —
                      money invested before tracking began (optional)
 
-The budget (needs/wants/investment) and the emergency-fund target (4 months of
-needs) are *derived* from income, not stored. Every save is recorded in the audit log
+The budget (needs/wants/investment) and the emergency-fund target (3 months of
+salary) are *derived* from income, not stored. Every save is recorded in the audit log
 (see audit.py).
 """
 

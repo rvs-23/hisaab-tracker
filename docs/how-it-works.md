@@ -1,15 +1,15 @@
-# How this tracker works — a 5-minute guide
+# How this tracker works: a 5-minute guide
 
 For anyone using the app for the first time (hi, Cheeni 👋). No finance or code
 background needed. The technical details live in the [README](../README.md).
 
 ## The one idea
 
-The app answers a single question: **did we invest what the plan said this
-year?** It does not track what your investments are *worth* — no live prices,
-no market values. Just: the plan said put in ₹X, you put in ₹Y.
+The app answers one question: **did we invest what the plan said this year?**
+It doesn't track what your investments are *worth*: no live prices, no market
+values. The plan said put in ₹X, you put in ₹Y.
 
-Everything flows from one number — your income:
+Everything starts from your income:
 
 ```
 Income  →  Budget  →  Allocation  →  Actuals
@@ -24,13 +24,12 @@ Income  →  Budget  →  Allocation  →  Actuals
   bigger the share you invest. The Budget page shows your exact percentages
   (they live in `config.py`). You never type a budget; changing income
   changes it.
-- **Allocation** is where you say how the investment slice spreads across
-  instruments (mutual funds 45%, gold 25%, …). Percentages must sum to 100.
-  A year's allocation carries forward until you set a newer one. It lives on
-  the **Budget** page, right under the monthly split — so you can see how each
-  monthly goal is consumed per instrument.
-- **Actuals** is where you record what you really invested, and see it against
-  the plan.
+- **Allocation** is how the investment slice spreads across instruments
+  (mutual funds 45%, gold 25%, …). Percentages must sum to 100. A year's
+  allocation carries forward until you set a newer one. It sits on the
+  **Budget** page, under the monthly split, so you can see what each
+  instrument takes out of the monthly goal.
+- **Actuals** is where you record what you really invested, next to the plan.
 
 ## Your page, your colours
 
@@ -39,102 +38,95 @@ bookmarked:
 
 - `http://localhost:8501/?profile=rv`
 - `http://localhost:8501/?profile=cheeni`
+- `http://localhost:8501/?profile=household` (both of you, read-only)
 
-There is no switch button and no name on the page — you can tell whose page
-you're on by the **accent colours** (rv: platinum grays; cheeni: pink +
-raspberry). Once set, the choice sticks as you move between
-pages.
+There's no switch button and no name on the page. The **accent colours** tell
+you whose page it is: platinum grays for rv, pink and raspberry for cheeni,
+teal for the household. The choice sticks as you move between pages.
+
+Under every page title, a small line says when data was last entered and on
+which page, so you can tell at a glance whether Actuals are up to date.
 
 ## Reading the Dashboard
 
 Top to bottom:
 
-1. **Four lifetime tiles** — earned to date, invested to date, what it could
-   be worth today at conservative growth, and the year's **total goal**: this
-   year's plan plus any shortfall carried over from past years.
-2. **The journey, year on year** — bars show total income and the planned
-   goal side by side; a line shows what you actually invested, so plan and
-   reality read against each other at once.
-3. **Allocation today** — everything you've contributed so far, split across
-   instruments, stacked by the year each rupee went in (lightest = oldest).
-4. **Catch up** — the closing action item. If past years fell short of the
-   plan, this is the lump sum that, invested today, pulls you level. Zero (a
-   calm note) means you're on plan. Investing *more* than planned is always
-   fine.
-5. **Health** — quiet, muted-caption nudges that only appear when something
-   needs attention: no income entered yet this year, investing badly behind
-   pace, an emergency fund you've never recorded, or an actual mix that's
-   drifted from target. Nothing shows at all once everything's healthy.
-6. **Adjustments** — a small expander at the very bottom for **opening
-   corpus**: money you'd already invested before you started tracking here
-   (say, ₹20L before 2024). Set it once; it's audited like every other save.
-   It's assumed invested at the start of your first tracked year and grown at
-   the household expected return, and it counts toward
-   "Invested till date" and the net-worth estimate — but it deliberately
-   doesn't touch the budget, the goal, catch-up, or plan-vs-actual, since
-   those are about what you've tracked, not what came before.
+1. **Four lifetime tiles:** earned to date, invested to date, what it could
+   be worth today at conservative growth, and the year's **total goal** (this
+   year's plan plus any shortfall carried over from past years).
+2. **The journey, year on year:** bars show total income and the planned
+   goal side by side, and a line shows what you actually invested.
+3. **Allocation today:** everything you've contributed so far, split across
+   instruments and stacked by the year each rupee went in (lightest is oldest).
+4. **Catch up:** if past years fell short of the plan, this is the lump sum
+   that, invested today, pulls you level. Zero means you're on plan. Investing
+   *more* than planned is always fine.
+5. **Health:** short nudges that appear only when something needs a look: no
+   income entered yet this year, investing badly behind pace, no emergency
+   fund recorded, or this year's mix drifting from target.
+6. **Adjustments:** a small expander at the bottom for your **opening
+   corpus**, the money you'd already invested before you started tracking
+   (say, ₹20L before 2024). Set it once. It's assumed invested at the start of
+   your first tracked year and grown at the household rate. It counts toward
+   "Invested till date" and the estimated value. It stays out of the budget,
+   the goal, catch-up and plan-vs-actual, which only cover what you've tracked.
+
+On the household page, the tiles and charts add both of you together. Health
+nudges and Adjustments stay on each person's own page.
 
 Everywhere in the app, the **primary accent means "what actually happened"**
 and the **secondary accent means "what was planned"**.
 
-## Rent vs buy
+## House fund
 
-A calculator on its own page. Nothing you enter here is saved. Fill four
-boxes: the house, the loan, renting (just its cost), and investing (what a
-renter does with the money buying would have used). The comparison runs for
-the length of the loan.
+Open it with `?profile=household`. It answers one question: **if we keep
+investing like this, how much could we put down on a house at the end of each
+year?**
 
-It compares **net gain**: what each choice leaves you owning, minus the money
-spent on things that don't last.
+Only money you can sell counts: stocks, mutual funds, US market, gold and FDs.
+EPF / PPF / NPS is locked until retirement and the emergency fund stays put, so
+both are left out. The opening corpus counts unless you untick it.
 
-- **Buying:** the home's rise in value, minus registration, loan *interest*,
-  and maintenance. The down payment and the principal you repay aren't costs.
-  They become the house.
-- **Renting:** the growth on what the renter invests, minus the rent. The
-  renter invests the down payment they never spent, plus part of each month's
-  difference between an EMI and the rent. The default is 60%, since few people
-  invest every spare rupee.
+Each bar is the whole pot at the end of that year, in two parts: what you
+already have, grown, and what you'll save from now on, grown. Change the
+inputs and the chart redraws. Nothing is saved.
 
-Taller bar wins. Switch between the running total and each year on its own.
-Year 1 dips because it carries registration and the heaviest interest. Under
-the chart:
+- **Return:** growth on everything (defaults to the household rate).
+- **Invest per year:** defaults to this year's recorded liquid investments,
+  scaled up to a full year. If Actuals are behind, it reads low, so put in
+  your real number.
+- **Pace grows:** how much more you invest each year as income rises.
+- **Years ahead:** how far out to look.
 
-- one sentence saying who comes out ahead and why;
-- a note on what the renter's savings could buy later;
-- a year-by-year table: interest vs principal, equity, rent, portfolio.
-
-The verdict swings on three guesses: appreciation, investment return, and rent
-inflation. Treat it as a way to see which assumption matters, not as an answer.
+Registration and stamp duty aren't taken out; keep them aside from the number.
 
 ## What to do, and when
 
-- **Monthly (2 minutes):** nothing required — but recording contributions on
+- **Monthly (2 minutes):** nothing is required, but recording contributions on
   **Actuals** as you invest beats reconstructing them in December.
-- **When salary lands differently** (raise, bonus, job switch): update that
-  year on **Income**. Tick "Job change this year?" if you switched jobs. A tax
-  payment or clawback goes under *other* too — it's the one field allowed to
-  go negative.
-- **Once a year:** check the target allocation on **Budget** still reflects
-  where you want money to go (it sits right under the monthly split).
-- **Zerodha for equities/MFs?** `scripts/import_tradebook.py` turns a year's
-  tradebook export into one net contribution row instead of typing it in by
-  hand — see the README for the command.
+- **When salary changes** (raise, bonus, job switch): update that year on
+  **Income**. Tick "Job change this year?" if you switched jobs. A tax payment
+  or clawback goes under *other*, the one field allowed to go negative.
+- **Once a year:** check the target allocation on **Budget** still matches
+  where you want money to go.
+- **Zerodha for equities/MFs?** `scripts/zerodha_summary.py` shows what went in
+  from any tradebook export, and `scripts/import_tradebook.py` turns a year of
+  it into one contribution row. The README has the commands.
 
 ## Things that surprise people
 
-- **The emergency-fund *target* is automatic** — a configured number of months
-  (`EMERGENCY_FUND_MONTHS`) of your essential spending (the needs bucket); earn
-  more and the target grows. What you *actually* hold is entered by hand on
-  the Actuals page and counts in your net worth.
-- **Saving is safe**: every save is checked first (sums, duplicates, negative
-  numbers — except income's *other*, which is allowed to go negative) and
-  refused with a message if something's off — and every change is also
-  appended to an audit log (`changes.jsonl`), so nothing is ever silently
-  lost.
-- **A year you earned nothing** simply has no budget — it won't distort other
+- **The emergency-fund *target* is automatic:** 3 months
+  (`EMERGENCY_FUND_MONTHS`) of your current monthly salary, so it grows with
+  your pay. What you *actually* hold is entered by hand on
+  Actuals and counts toward your estimated value.
+- **Saving is safe.** Every save is checked first (sums, duplicates, blanks,
+  negative numbers except income's *other*) and refused with a message if
+  something's off. Every change is also appended to an audit log
+  (`changes.jsonl`).
+- **A year you earned nothing** has no budget, so it doesn't distort other
   years.
-- **Catch-up means past years only** — this year's remaining goal is shown as
-  "left to go", never as catch-up. (On the journey chart, the current year's
-  goal bar is drawn pro-rated to the elapsed year so the bar stays fair.)
+- **Catch-up covers past years only.** This year's remaining goal shows as
+  "left to go". On the journey chart, the current year's goal bar covers only
+  the part of the year that has passed.
 - The ₹ figures use Indian grouping and short forms: `₹55.8L` is 55.8 lakh,
   `₹3.40Cr` is 3.40 crore.

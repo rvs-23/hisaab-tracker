@@ -18,7 +18,7 @@ PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 st.caption("What actually went in, against the plan, per category; negative shortfall = under-invested.")
 
 if d.income[d.income["profile"] == active.key].empty:
-    st.info("No data yet — add income first.")
+    st.info("No data yet. Add income first.")
     st.stop()
 years = compute.selectable_years(d.income, d.contributions, active.key)
 
@@ -51,13 +51,7 @@ f.update_xaxes(showgrid=True, gridcolor=GRID)
 f.update_yaxes(showgrid=False)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-# The tile label must say which year the derived buffer really uses: with no
-# budget row for the picked year, emergency_fund_target falls back to the
-# latest earning year.
-bs = compute.budget_series(active, d.income)
-has_budget_row = not bs[(bs["year"] == year) & (~bs["is_projected"])].empty
-ef_sub = (f"{EMERGENCY_FUND_MONTHS} months of {year} needs" if has_budget_row
-          else f"{EMERGENCY_FUND_MONTHS} months of latest year's needs")
+ef_sub = f"{EMERGENCY_FUND_MONTHS} months of your latest salary up to {year}"
 ef_actual = compute.emergency_fund_actual(d.adjustments, active.key)
 
 goal_pct = compute.pct_goal_achieved(pva)
@@ -77,9 +71,8 @@ metric_tile(cols[1], "Invested", inr_short(pva["actual"].sum()),
 metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund),
             f"held: {inr_short(ef_actual)}<br>{ef_status}",
             color=SECONDARY, big=True,
-            help=f"The target ({ef_sub}), derived from your budget. The sub-line is the "
-                 "buffer you actually hold (hand-entered below; counted in net worth as "
-                 "cash).")
+            help=f"The target ({ef_sub}). The sub-line is the buffer you actually "
+                 "hold, entered below and counted in your estimated value as cash.")
 
 with st.expander("Update emergency fund"):
     st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
@@ -153,4 +146,4 @@ with edit_card(f"Record what you actually invested in {year}"):
         except Exception as exc:
             save_failed(exc)
 
-st.caption(f"The emergency-fund goal above is derived from your budget ({EMERGENCY_FUND_MONTHS} months of the needs bucket); what you actually hold is entered in the expander above.")
+st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your salary. What you actually hold goes in the expander above.")
