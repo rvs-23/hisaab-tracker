@@ -9,8 +9,9 @@ from config import (
     HOUSE_FUND_YEARS, INK,
 )
 from ui import (
-    accent_primary, accent_secondary, chart_title, edit_card, html_table, inr_axis, inr_short,
-    is_household, load_all, metric_tile, page_header, section, style_fig,
+    FS_BODY, FS_CAPTION, FS_HERO, FS_LABEL, FS_TITLE, FS_VALUE, accent_primary, accent_secondary,
+    chart_title, html_table, inr_axis, inr_short, is_household, load_all, metric_tile, page_header,
+    section, style_fig,
 )
 
 d = load_all()
@@ -90,8 +91,14 @@ html_table(
 )
 st.caption("Yearly compounding, each year's savings landing at year end.")
 
-section("Plan a down payment")
-with edit_card("How much do we need to invest for it?"):
+# The reverse question, boxed on its own. It reuses the assumptions above, and
+# says so, rather than taking a second set that could quietly disagree.
+with st.container(border=True):
+    st.markdown(f"<div style='font-weight:700;color:{PRIMARY};font-size:{FS_TITLE}'>"
+                "Plan a down payment</div>"
+                f"<div style='color:var(--muted);font-size:{FS_CAPTION};margin:.15rem 0 .4rem'>"
+                f"Uses the assumptions above: {growth:g}% yearly growth in what you invest, "
+                f"{rate:g}% return, {inflation:g}% inflation.</div>", unsafe_allow_html=True)
     r = st.columns(2)
     target_cr = r[0].number_input("Down payment (₹ Cr, today's prices)", 0.0, 50.0, 1.0, 0.1,
                                   key="hf_target",
@@ -107,14 +114,25 @@ with edit_card("How much do we need to invest for it?"):
                                  today).iloc[-1]["available"]
     gap = target - at_pace
 
-    o = st.columns(3)
-    metric_tile(o[0], f"Needed by Dec {buy_year}", inr_short(target),
-                f"₹{target_cr:g} Cr today, plus {inflation:g}% a year", big=True)
-    metric_tile(o[1], "Invest per month", inr_short(need),
-                f"you're at {inr_short(monthly)}; "
-                + (f"{inr_short(need - monthly)} more" if need > monthly else "you're ahead"),
-                color=PRIMARY, big=True,
-                help=f"Starting now, growing {growth:g}% a year, at a {rate:g}% return.")
-    metric_tile(o[2], "At your current pace", inr_short(at_pace),
-                f"{inr_short(gap)} short" if gap > 0 else f"{inr_short(-gap)} to spare",
-                color=SECONDARY, big=True, help=corpus_help)
+    # One answer up top, the two numbers behind it underneath.
+    vs_now = (f"{inr_short(need - monthly)} more than the {inr_short(monthly)} you invest now"
+              if need > monthly else f"less than the {inr_short(monthly)} you invest now")
+    pace_line = f"{inr_short(gap)} short" if gap > 0 else f"{inr_short(-gap)} to spare"
+    fact = ("<div><div style='font-size:{l};color:var(--muted);text-transform:uppercase;"
+            "letter-spacing:.05em'>{label}</div><div style='font-size:{v};font-weight:700'>{value}</div>"
+            "<div style='font-size:{c};color:var(--muted)'>{sub}</div></div>")
+    st.markdown(
+        f"<div style='margin:.6rem 0 .2rem'>"
+        f"<div style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
+        f"Invest every month, starting now</div>"
+        f"<div style='font-size:{FS_HERO};font-weight:700;color:{PRIMARY}'>{inr_short(need)}</div>"
+        f"<div style='font-size:{FS_BODY};color:var(--muted)'>{vs_now}</div></div>"
+        f"<div style='display:flex;gap:2.5rem;flex-wrap:wrap;margin:.8rem 0 .3rem;"
+        f"padding-top:.7rem;border-top:1px solid var(--card-border)'>"
+        + fact.format(l=FS_LABEL, v=FS_VALUE, c=FS_CAPTION, label=f"Needed by Dec {buy_year}",
+                      value=inr_short(target), sub=f"₹{target_cr:g} Cr today, grown {inflation:g}% a year")
+        + fact.format(l=FS_LABEL, v=FS_VALUE, c=FS_CAPTION, label="At your current pace",
+                      value=inr_short(at_pace), sub=pace_line)
+        + "</div>",
+        unsafe_allow_html=True,
+    )
