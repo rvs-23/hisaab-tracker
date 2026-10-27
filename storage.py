@@ -44,7 +44,9 @@ REPO_ROOT = Path(__file__).resolve().parent  # this module sits at the repo root
 # `salary` and `bonus` must be non-negative; `other` is the catch-all (RSU
 # vesting, a maturing FD — or a tax payment/clawback) and may go negative.
 INCOME_COLUMNS = ["profile", "year", "month", *INCOME_COMPONENTS, "job_change"]
-CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes"]
+# `notes` holds lasting details about the row; `last_change` says what the most
+# recent update was ("+60k SIP in Oct"). Older files without it still load.
+CONTRIB_COLUMNS = ["year", "profile", "category", "amount", "notes", "last_change"]
 TARGETS_COLUMNS = ["profile", "year", "category", "pct"]
 
 # Adjustments are one-off per-person values, not a year-by-year history — a
@@ -165,12 +167,14 @@ def validate_income(df: pd.DataFrame, profiles: list[Profile]) -> None:
 
 def load_contributions(root: Path, config: Config, profiles: list[Profile]) -> pd.DataFrame:
     df = _read_optional(root / "contributions.csv", CONTRIB_COLUMNS)
+    if "last_change" not in df.columns:
+        df["last_change"] = None
     validate_contributions(df, config, profiles)
     return df
 
 
 def validate_contributions(df: pd.DataFrame, config: Config, profiles: list[Profile]) -> None:
-    _check_columns(df, CONTRIB_COLUMNS, "contributions.csv")
+    _check_columns(df, [c for c in CONTRIB_COLUMNS if c != "last_change"], "contributions.csv")
     _check_profiles(df, profiles, "contributions.csv")
     if df.empty:
         return

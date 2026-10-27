@@ -135,3 +135,20 @@ def test_row_last_changed_keeps_the_latest_save_per_row(tmp_path):
     stamps = audit.row_last_changed(tmp_path, "contributions.csv", ["profile", "year", "category"])
     assert list(stamps) == [("rv", 2026, "mfs")]
     assert stamps[("rv", 2026, "mfs")].day == 27
+
+
+def test_row_last_changed_ignores_text_only_edits(tmp_path):
+    import json
+
+    import audit
+
+    key = {"profile": "rv", "year": 2026, "category": "mfs"}
+    log = [
+        {"ts": "2026-07-01T10:00:00+05:30", "file": "contributions.csv",
+         "added": [{**key, "amount": 5, "notes": None}], "removed": []},
+        {"ts": "2026-10-27T10:00:00+05:30", "file": "contributions.csv",
+         "added": [{**key, "amount": 5, "notes": "SIP"}], "removed": [{**key, "amount": 5, "notes": None}]},
+    ]
+    (tmp_path / "changes.jsonl").write_text("\n".join(json.dumps(r) for r in log) + "\n")
+    stamps = audit.row_last_changed(tmp_path, "contributions.csv", ["profile", "year", "category"])
+    assert stamps[("rv", 2026, "mfs")].month == 7

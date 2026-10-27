@@ -86,7 +86,7 @@ investing like this, how much could we put down on a house at the end of each
 year?**
 
 Only money you can sell counts: stocks, mutual funds, US market, gold and FDs.
-EPF / PPF / NPS is locked until retirement and the emergency fund stays put, so
+EPF, PPF and NPS are locked until retirement and the emergency fund stays put, so
 both are left out. The opening corpus counts unless you untick it.
 
 Each bar is the whole pot at the end of that year, in two parts: what you

@@ -31,7 +31,7 @@ committed), re-read from disk on every render. No database, no caching.
 | `config.yaml` | `categories`, optional `expected_return_pct` | hand |
 | `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target` | hand |
 | `income.csv` | monthly `salary / bonus / other`, `job_change` flag | Income page |
-| `contributions.csv` | what was actually invested, per year and category | Investments page, importer |
+| `contributions.csv` | what was invested, per year and category, with `notes` (shown as Details) and `last_change` | Investments page, importer |
 | `targets.csv` | per-year target-allocation overrides | Budget page |
 | `adjustments.csv` | `opening_corpus`, `emergency_fund` per person | Dashboard, Investments |
 | `changes.jsonl` | append-only audit log of every save | every save |

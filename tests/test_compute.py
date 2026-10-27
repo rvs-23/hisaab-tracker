@@ -18,7 +18,7 @@ def rv():
     return Profile(
         key="rv", name="Rv", birth_year=1998, forward_increment_pct=5,
         default_target={"mfs": 45, "gold_metals": 25, "indian_stocks": 5,
-                        "us_market": 10, "ppf_nps": 5, "fixed_deposit": 10},
+                        "us_market": 10, "ppf": 5, "fixed_deposit": 10},
     )
 
 
@@ -48,7 +48,7 @@ def contributions():
             {"year": 2024, "profile": "rv", "category": "us_market", "amount": 39345.5, "notes": None},
             {"year": 2024, "profile": "rv", "category": "indian_stocks", "amount": 95078, "notes": None},
             {"year": 2024, "profile": "rv", "category": "mfs", "amount": 169766, "notes": None},
-            {"year": 2024, "profile": "rv", "category": "ppf_nps", "amount": 7600, "notes": None},
+            {"year": 2024, "profile": "rv", "category": "ppf", "amount": 7600, "notes": None},
         ]
     )
 
@@ -467,7 +467,7 @@ def test_inr_indian_grouping():
 def config():
     from models import Config
     return Config(categories=["mfs", "gold_metals", "indian_stocks", "us_market",
-                              "ppf_nps", "fixed_deposit"])
+                              "epf", "ppf", "nps", "fixed_deposit"])
 
 
 def test_load_missing_csvs_returns_empty(tmp_path, rv, config):
@@ -582,7 +582,7 @@ def test_save_contributions_preserves_other_profile(tmp_path, rv, config):
     # rv edits only their own row (the editor hides the profile column); merge back.
     edited = pd.DataFrame([{"year": 2024, "category": "mfs", "amount": 150, "notes": None}]).assign(profile="rv")
     others = existing[existing["profile"] != "rv"]
-    combined = pd.concat([others, edited], ignore_index=True)[storage.CONTRIB_COLUMNS]
+    combined = pd.concat([others, edited], ignore_index=True).reindex(columns=storage.CONTRIB_COLUMNS)
     storage.validate_contributions(combined, config, [rv, cheeni])
     storage.save_contributions(tmp_path, combined)
     reloaded = storage.load_contributions(tmp_path, config, [rv, cheeni])
@@ -684,7 +684,7 @@ def test_liquid_corpus_excludes_locked_money_and_can_drop_opening(rv):
                             "bonus": 0, "other": 0, "job_change": 0}])
     contrib = pd.DataFrame([
         {"year": 2024, "profile": "rv", "category": "mfs", "amount": 100_000, "notes": None},
-        {"year": 2024, "profile": "rv", "category": "ppf_nps", "amount": 999_999, "notes": None},
+        {"year": 2024, "profile": "rv", "category": "ppf", "amount": 999_999, "notes": None},
     ])
     adj = pd.DataFrame([{"profile": "rv", "field": "opening_corpus", "value": 50_000}])
     without = compute.liquid_corpus_today([rv], income, contrib, adj, 2026, 10, include_opening=False)
@@ -696,7 +696,7 @@ def test_liquid_corpus_excludes_locked_money_and_can_drop_opening(rv):
 def test_liquid_pace_annualises_this_years_liquid_contributions(rv):
     contrib = pd.DataFrame([
         {"year": 2026, "profile": "rv", "category": "mfs", "amount": 50_000, "notes": None},
-        {"year": 2026, "profile": "rv", "category": "ppf_nps", "amount": 70_000, "notes": None},
+        {"year": 2026, "profile": "rv", "category": "ppf", "amount": 70_000, "notes": None},
         {"year": 2025, "profile": "rv", "category": "mfs", "amount": 80_000, "notes": None},
     ])
     today = dt.date(2026, 7, 2)

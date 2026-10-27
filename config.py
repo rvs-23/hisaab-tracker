@@ -78,7 +78,7 @@ BASELINE_YEAR = 2022
 # as held cash (no growth).
 EXPECTED_RETURNS = {
     "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
-    "ppf_nps": 10.0,  # EPF / PPF / NPS blended
+    "epf": 8.25, "ppf": 7.1, "nps": 10.0,  # EPF and PPF at their declared rates
     "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
@@ -98,6 +98,8 @@ CATEGORY_LABELS = {
     "indian_stocks": "Indian stocks",
     "mfs": "Mutual funds",
     "fixed_deposit": "Fixed deposit",
-    "ppf_nps": "EPF / PPF / NPS",
+    "epf": "EPF",
+    "ppf": "PPF",
+    "nps": "NPS",
     "gold_metals": "Gold / metals",
 }

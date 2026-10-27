@@ -39,9 +39,11 @@ with edit_card(f"Record what you invested in {year}"):
                "+ under the table, or change an amount when you invest more. Then Save.")
     # Scoped like the rest of the page: this person, this year. The key carries
     # both, so pending edits can never leak across a profile or year switch.
-    sig_cols = ["category", "amount", "notes"]
+    sig_cols = ["category", "amount", "notes", "last_change"]
     seed_key = f"contrib_{active.key}_{year}_seed"
     mine = contrib_slice(d.contributions).drop(columns=["profile", "year"])
+    # An all-blank text column reads back as float; the editor needs text.
+    mine[["notes", "last_change"]] = mine[["notes", "last_change"]].astype("string")
     seed_slice_sig(seed_key, slice_sig(mine, sig_cols))  # what disk held when this grid opened
     # Read-only, from the audit log; never saved (the save keeps CONTRIB_COLUMNS only).
     stamps = row_last_changed(d.root, "contributions.csv", ["profile", "year", "category"])
@@ -53,14 +55,20 @@ with edit_card(f"Record what you invested in {year}"):
         mine.sort_values("category").reset_index(drop=True),
         num_rows="dynamic", hide_index=True, width="stretch",
         key=f"contrib_{active.key}_{year}",
+        column_order=["category", "amount", "updated", "last_change", "notes"],
         column_config={
             "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
             "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
-            "notes": "Notes",
             "updated": st.column_config.TextColumn(
                 "Last updated", disabled=True,
-                help="When this row was last saved, from the audit log. Blank for rows "
-                     "entered before the log existed."),
+                help="When this row's amount last changed, from the audit log. Blank "
+                     "for rows entered before the log existed."),
+            "last_change": st.column_config.TextColumn(
+                "What changed", help="The latest update, e.g. '+60k SIP in Oct'. "
+                                     "Overwrite it each time you change the amount."),
+            "notes": st.column_config.TextColumn(
+                "Details", help="Anything lasting about this row: accounts, sources, how "
+                                "the number was worked out."),
         },
     )
     if st.button("Save contributions", type="primary"):

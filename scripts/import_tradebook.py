@@ -134,7 +134,8 @@ def merged_contributions(contributions: pd.DataFrame, profile: str, year: int,
           & (contributions["category"] == category))
     ]
     new_row = pd.DataFrame([{"year": year, "profile": profile, "category": category,
-                             "amount": amount, "notes": notes}])
+                             "amount": amount, "notes": notes,
+                             "last_change": "Zerodha tradebook import"}])
     return pd.concat([others, new_row], ignore_index=True)[storage.CONTRIB_COLUMNS]
 
 
