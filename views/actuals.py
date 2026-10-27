@@ -103,8 +103,11 @@ if pva.empty:
     st.info("No plan for this selection/year yet.")
     st.stop()
 
-chart_title(f"Planned vs actual, by bucket · {year}")
-asc = pva.sort_values("expected")
+chart_title(f"Planned vs actual, by bucket · {year}",
+            help="Sorted by the gap: the furthest behind plan is on top.")
+# Ordered by the gap: Plotly draws the first row at the bottom, so the biggest
+# overshoot sits there and the biggest shortfall lands on top.
+asc = pva.sort_values("shortfall", ascending=False)
 f = go.Figure()
 labels = [pretty_category(x) for x in asc["category"]]
 gap = [f"{'over' if v >= 0 else 'short'} by {inr_short(abs(v))}" for v in asc["shortfall"]]
