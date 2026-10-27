@@ -190,3 +190,17 @@ def test_investments_save_keeps_hidden_details(fake_data_dir):
     saved_csv = (fake_data_dir / "contributions.csv").read_text()
     assert "last_change" in saved_csv.splitlines()[0]
     assert "Q: which funds? A: PPFAS" in saved_csv
+
+
+@pytest.mark.parametrize("page", ["views/income.py", "views/budget_projection.py",
+                                  "views/actuals.py", "views/house_fund.py"])
+@pytest.mark.parametrize("profile", ["rv", "household"])
+def test_switching_profile_on_any_page_finds_a_page(page, profile, fake_data_dir):
+    """Editing ?profile= while on any page must never hit 'Page not found':
+    every page is registered for every profile, only hidden from the nav."""
+    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=20)
+    at.query_params["profile"] = profile
+    at.run()
+    at.switch_page(page).run()
+    assert not at.exception, at.exception
+    assert not at.error, [e.value for e in at.error]

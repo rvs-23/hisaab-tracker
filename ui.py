@@ -568,6 +568,13 @@ def page_header(title: str, profiles, root=None, allow_household: bool = False):
     keys = [p.key for p in profiles] + ([HOUSEHOLD_KEY] if allow_household else [])
     default = min(profiles, key=lambda p: p.name).key
 
+    if st.query_params.get("profile") == HOUSEHOLD_KEY and not allow_household:
+        # A per-person page opened as the household (say, the URL's profile was
+        # edited here): its overview is the household Dashboard.
+        try:
+            st.switch_page("views/dashboard.py")
+        except st.errors.StreamlitAPIException:
+            pass  # rendered on its own, outside the app's navigation (tests)
     if st.query_params.get("profile") in keys:
         active = st.query_params["profile"]
     else:
