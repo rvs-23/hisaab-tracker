@@ -66,7 +66,7 @@ has their own accent colours. Year pickers run from 2022 to the current year.
 
 `?profile=household` (teal) is both people combined. It isn't a profile file;
 it sums the real people. It only reads, so its nav is just Dashboard and
-House fund: income, budget and actuals are edited per person.
+House fund: income, budget and investments are edited per person.
 
 Every page shows, under its title, when that person (or, for the household,
 anyone) last saved data, from `changes.jsonl`.

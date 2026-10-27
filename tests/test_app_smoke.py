@@ -13,7 +13,7 @@ PAGES = [
     "views/dashboard.py",
     "views/income.py",
     "views/budget_projection.py",
-    "views/actuals.py",
+    "views/investments.py",
     "views/house_fund.py",
 ]
 
@@ -140,7 +140,7 @@ def test_flash_shows_on_the_next_run_then_clears(fake_data_dir):
     right before st.rerun, which the browser wipes. page_header shows a queued
     message once. (AppTest keeps stale elements a browser clears, so the old
     bug itself can't be reproduced here — this pins the mechanism instead.)"""
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.session_state["_flash"] = ("success", "Saved.")
     at.run()
@@ -149,7 +149,7 @@ def test_flash_shows_on_the_next_run_then_clears(fake_data_dir):
 
 
 def test_save_queues_its_confirmation(fake_data_dir):
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     at.number_input(key="ef_rv").set_value(150_000)
@@ -163,7 +163,7 @@ def test_audit_failure_reads_as_saved_but_unaudited(fake_data_dir, monkeypatch):
     """The CSV is written before the audit record; if only the audit fails the
     page must not claim 'Not saved'."""
     monkeypatch.setattr(storage, "log_change", lambda *a, **k: "OSError: disk full")
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     at.number_input(key="ef_rv").set_value(150_000)
@@ -181,7 +181,7 @@ def test_investments_save_keeps_hidden_details(fake_data_dir):
     (fake_data_dir / "contributions.csv").write_text(
         "year,profile,category,amount,notes,details\n"
         "2024,rv,mfs,169766,,Q: which funds? A: PPFAS\n")
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     at.selectbox[0].set_value(2024).run()
@@ -193,7 +193,7 @@ def test_investments_save_keeps_hidden_details(fake_data_dir):
 
 
 @pytest.mark.parametrize("page", ["views/income.py", "views/budget_projection.py",
-                                  "views/actuals.py", "views/house_fund.py"])
+                                  "views/investments.py", "views/house_fund.py"])
 @pytest.mark.parametrize("profile", ["rv", "household"])
 def test_switching_profile_on_any_page_finds_a_page(page, profile, fake_data_dir):
     """Editing ?profile= while on any page must never hit 'Page not found':

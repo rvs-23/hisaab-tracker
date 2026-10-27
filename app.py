@@ -22,7 +22,7 @@ st.navigation([
     st.Page("views/income.py", title="Income", icon=":material/payments:", visibility=shown(False)),
     st.Page("views/budget_projection.py", title="Budget", icon=":material/call_split:",
             visibility=shown(False)),
-    st.Page("views/actuals.py", title="Investments", icon=":material/savings:", url_path="investments",
+    st.Page("views/investments.py", title="Investments", icon=":material/savings:",
             visibility=shown(False)),
     st.Page("views/house_fund.py", title="House fund", icon=":material/home:", visibility=shown(True)),
 ]).run()

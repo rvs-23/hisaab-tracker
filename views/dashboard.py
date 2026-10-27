@@ -98,7 +98,7 @@ metric_tile(c[3], f"{today_year} total goal", inr_short(year_goal + catch_up), p
 
 if not household:
     if st.button("Record an investment", icon=":material/add_circle:"):
-        st.switch_page("views/actuals.py")
+        st.switch_page("views/investments.py")
 
 # The journey: income and the goal as bars, actual investment riding along as
 # a line, all on one shared rupee axis (one axis only — dual axes hinder
