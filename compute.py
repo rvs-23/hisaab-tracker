@@ -522,7 +522,7 @@ def health_checks(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
             )
 
     if emergency_fund_actual(adjustments, profile.key) == 0:
-        findings.append("Emergency fund not recorded yet — enter it on Actuals to track your buffer.")
+        findings.append("Emergency fund not recorded yet. Enter it on Investments to track your buffer.")
 
     # Drift compares THIS year's flow against THIS year's target — targets are
     # contribution-flow targets, and judging old years against a newer target
@@ -575,7 +575,7 @@ def liquid_pace(profiles: list[Profile], contributions: pd.DataFrame,
                 today: dt.date | None = None) -> float:
     """This year's liquid contributions so far, scaled up to a full year.
 
-    Contributions carry no date, so this assumes Actuals are up to date: a
+    Contributions carry no date, so this assumes Investments are up to date: a
     year recorded only through July reads low in October.
     """
     today = today or dt.date.today()

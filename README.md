@@ -31,9 +31,9 @@ committed), re-read from disk on every render. No database, no caching.
 | `config.yaml` | `categories`, optional `expected_return_pct` | hand |
 | `profiles/<key>.yaml` | `name, birth_year, forward_increment_pct, default_target` | hand |
 | `income.csv` | monthly `salary / bonus / other`, `job_change` flag | Income page |
-| `contributions.csv` | what was actually invested, per year and category | Actuals page, importer |
+| `contributions.csv` | what was actually invested, per year and category | Investments page, importer |
 | `targets.csv` | per-year target-allocation overrides | Budget page |
-| `adjustments.csv` | `opening_corpus`, `emergency_fund` per person | Dashboard, Actuals |
+| `adjustments.csv` | `opening_corpus`, `emergency_fund` per person | Dashboard, Investments |
 | `changes.jsonl` | append-only audit log of every save | every save |
 
 The minimum to start is `config.yaml` + one profile; scaffold both with
@@ -78,7 +78,7 @@ anyone) last saved data, from `changes.jsonl`.
 | **Dashboard** | Where am I overall? Tiles, the year-on-year journey chart, allocation to date, catch-up, health nudges | opening corpus (Adjustments expander) |
 | **Income** | What did I earn? 12-month grid per year; a new year pre-fills last year's salary | `income.csv` |
 | **Budget** | How does income split, and where should the investment go? | `targets.csv` (allocation editor) |
-| **Actuals** | What did I really invest, against the plan? | `contributions.csv`, emergency fund held |
+| **Investments** | Record what went in; how does it compare with the plan? | `contributions.csv`, emergency fund held |
 | **House fund** (household) | If we keep investing at this pace, how much could we put down on a house at the end of each year? | nothing (live inputs) |
 
 ## The model
@@ -114,7 +114,7 @@ anyone) last saved data, from `changes.jsonl`.
   `LIQUID_CATEGORIES` grown at the return, plus the opening corpus unless
   unticked; EPF/PPF/NPS and the emergency fund are left out), grown each year,
   plus a yearly pace that grows too. The pace defaults to this year's liquid
-  contributions scaled up to a full year, so it reads low if Actuals are
+  contributions scaled up to a full year, so it reads low if Investments are
   behind. Return, pace, pace growth and horizon are live inputs; nothing is
   saved. Registration isn't subtracted.
 

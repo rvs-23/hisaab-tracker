@@ -12,7 +12,7 @@ values. The plan said put in ₹X, you put in ₹Y.
 Everything starts from your income:
 
 ```
-Income  →  Budget  →  Allocation  →  Actuals
+Income  →  Budget  →  Allocation  →  Investments
 (you type) (derived) (you set %s)   (you record)
 ```
 
@@ -29,7 +29,9 @@ Income  →  Budget  →  Allocation  →  Actuals
   allocation carries forward until you set a newer one. It sits on the
   **Budget** page, under the monthly split, so you can see what each
   instrument takes out of the monthly goal.
-- **Actuals** is where you record what you really invested, next to the plan.
+- **Investments** is where you record what you invested. Do it whenever money
+  goes in: open it, pick the year, add or update a row, Save. The plan sits
+  next to it.
 
 ## Your page, your colours
 
@@ -45,7 +47,7 @@ you whose page it is: platinum grays for rv, pink and raspberry for cheeni,
 teal for the household. The choice sticks as you move between pages.
 
 Under every page title, a small line says when data was last entered and on
-which page, so you can tell at a glance whether Actuals are up to date.
+which page, so you can tell at a glance whether Investments are up to date.
 
 ## Reading the Dashboard
 
@@ -93,7 +95,7 @@ inputs and the chart redraws. Nothing is saved.
 
 - **Return:** growth on everything (defaults to the household rate).
 - **Invest per year:** defaults to this year's recorded liquid investments,
-  scaled up to a full year. If Actuals are behind, it reads low, so put in
+  scaled up to a full year. If Investments are behind, it reads low, so put in
   your real number.
 - **Pace grows:** how much more you invest each year as income rises.
 - **Years ahead:** how far out to look.
@@ -103,7 +105,7 @@ Registration and stamp duty aren't taken out; keep them aside from the number.
 ## What to do, and when
 
 - **Monthly (2 minutes):** nothing is required, but recording contributions on
-  **Actuals** as you invest beats reconstructing them in December.
+  **Investments** as you invest beats reconstructing them in December.
 - **When salary changes** (raise, bonus, job switch): update that year on
   **Income**. Tick "Job change this year?" if you switched jobs. A tax payment
   or clawback goes under *other*, the one field allowed to go negative.
@@ -118,7 +120,7 @@ Registration and stamp duty aren't taken out; keep them aside from the number.
 - **The emergency-fund *target* is automatic:** 3 months
   (`EMERGENCY_FUND_MONTHS`) of your current monthly salary, so it grows with
   your pay. What you *actually* hold is entered by hand on
-  Actuals and counts toward your estimated value.
+  Investments and counts toward your estimated value.
 - **Saving is safe.** Every save is checked first (sums, duplicates, blanks,
   negative numbers except income's *other*) and refused with a message if
   something's off. Every change is also appended to an audit log

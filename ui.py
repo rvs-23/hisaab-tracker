@@ -492,13 +492,13 @@ def edit_card(title: str):
 
 
 # Where each data file is edited, for the "last entry" line.
-FILE_PAGES = {"income.csv": "Income", "contributions.csv": "Actuals",
+FILE_PAGES = {"income.csv": "Income", "contributions.csv": "Investments",
               "targets.csv": "Budget", "adjustments.csv": "Adjustments"}
 
 
 def last_entry_text(root, profile_keys: list[str], today=None) -> str:
     """Says when any of these people last saved data, e.g.
-    ``Last entry 27 Oct 2026 (Actuals), 3 days ago``.
+    ``Last entry 27 Oct 2026 (Investments), 3 days ago``.
 
     Empty when nothing has been logged for them yet.
     """

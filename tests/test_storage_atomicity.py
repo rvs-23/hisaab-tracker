@@ -115,3 +115,23 @@ def test_last_entry_is_per_person_and_counts_adjustments(tmp_path):
     assert ui.last_entry_text(tmp_path, ["rv", "cheeni"], today=dt.date(2026, 10, 23)).startswith(
         "Last entry 20 Oct")  # household: the newest of anyone's
     assert ui.last_entry_text(tmp_path / "missing", ["rv"]) == ""
+
+
+def test_row_last_changed_keeps_the_latest_save_per_row(tmp_path):
+    import json
+
+    import audit
+
+    log = [
+        {"ts": "2026-07-01T10:00:00+05:30", "file": "contributions.csv",
+         "added": [{"profile": "rv", "year": 2026, "category": "mfs", "amount": 1}]},
+        {"ts": "2026-10-27T10:00:00+05:30", "file": "contributions.csv",
+         "added": [{"profile": "rv", "year": 2026, "category": "mfs", "amount": 2}]},
+        {"ts": "2026-10-28T10:00:00+05:30", "file": "income.csv",
+         "added": [{"profile": "rv", "year": 2026, "category": "mfs"}]},
+        {"ts": "2026-10-29T10:00:00+05:30", "file": "contributions.csv", "added": 500},
+    ]
+    (tmp_path / "changes.jsonl").write_text("\n".join(json.dumps(r) for r in log) + "\n")
+    stamps = audit.row_last_changed(tmp_path, "contributions.csv", ["profile", "year", "category"])
+    assert list(stamps) == [("rv", 2026, "mfs")]
+    assert stamps[("rv", 2026, "mfs")].day == 27

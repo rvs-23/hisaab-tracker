@@ -50,7 +50,7 @@ catch_up = sum(compute.catch_up_amount(p, d.income, d.targets, d.contributions, 
 earned = float(trend["total_income"].sum())
 opening = sum(compute.opening_corpus(d.adjustments, p.key) for p in people)
 invested = float(contrib["amount"].sum()) + opening
-# The actual emergency fund (entered on Actuals) beats the derived target in
+# The actual emergency fund (entered on Investments) beats the derived target in
 # net worth; None falls back to the target until one is recorded.
 nw_potential = sum(compute.net_worth_to_date(
     p, d.income, d.contributions, d.targets, today_year,
@@ -95,6 +95,10 @@ metric_tile(c[3], f"{today_year} total goal", inr_short(year_goal + catch_up), p
                  f"past years grown at expected returns ({inr_short(catch_up)}). "
                  f"'{today_year} left' is the year's goal minus the {inr_short(invested_ty)} "
                  "you've already put in. Overshooting is fine.")
+
+if not household:
+    if st.button("Record an investment", icon=":material/add_circle:"):
+        st.switch_page("views/actuals.py")
 
 # The journey: income and the goal as bars, actual investment riding along as
 # a line, all on one shared rupee axis (one axis only — dual axes hinder
@@ -152,7 +156,7 @@ chart_title("Allocation today",
 by_category = contrib.groupby("category")["amount"].sum()
 by_category = by_category[by_category > 0].sort_values()
 if by_category.empty:
-    st.caption("Record a contribution on Actuals to see how it's split.")
+    st.caption("Record an investment on Investments to see how it's split.")
 else:
     total = by_category.sum()
     # The share lives in the category label itself — bar-end text traces kept
@@ -230,7 +234,7 @@ with st.expander("Adjustments"):
     if st.button("Save", key=f"save_adjustments_{profile.key}", type="primary"):
         try:
             # Fresh read so the emergency-fund row (same file, different field)
-            # saved from Actuals isn't reverted by this opening-corpus save.
+            # saved from Investments isn't reverted by this opening-corpus save.
             fresh = storage.load_adjustments(d.root, d.profiles)
             others = fresh[
                 ~((fresh["profile"] == profile.key) & (fresh["field"] == "opening_corpus"))

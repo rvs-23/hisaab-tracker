@@ -20,6 +20,6 @@ else:
         dashboard,
         st.Page("views/income.py", title="Income", icon=":material/payments:"),
         st.Page("views/budget_projection.py", title="Budget", icon=":material/call_split:"),
-        st.Page("views/actuals.py", title="Actuals", icon=":material/track_changes:"),
+        st.Page("views/actuals.py", title="Investments", icon=":material/savings:", url_path="investments"),
     ]
 st.navigation(pages).run()

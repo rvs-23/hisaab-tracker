@@ -1,33 +1,85 @@
+import datetime as dt
+
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
 import compute
 import storage
+from audit import row_last_changed
 from config import EMERGENCY_FUND_MONTHS
 from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
-    html_table, inr_axis, inr_short, load_all, metric_tile, page_header,
+    inr_axis, inr_short, load_all, metric_tile, page_header,
     pretty_category, save_failed, saved, section, seed_slice_sig, slice_sig,
     stale_since_open, style_fig,
 )
 
 d = load_all()
-active = page_header("Actuals", d.profiles, d.root)
+active = page_header("Investments", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
-st.caption("What actually went in, against the plan, per category; negative shortfall = under-invested.")
+st.caption("Record what you invested, then see it against the plan.")
 
 if d.income[d.income["profile"] == active.key].empty:
     st.info("No data yet. Add income first.")
     st.stop()
 years = compute.selectable_years(d.income, d.contributions, active.key)
 
-contrib_years = sorted(
-    d.contributions.loc[d.contributions["profile"] == active.key, "year"].dropna().astype(int).unique()
-)
-default = contrib_years[-1] if contrib_years else years[-1]
+default = dt.date.today().year if dt.date.today().year in years else years[-1]
 yc, _ = st.columns([1, 5])
 year = int(yc.selectbox("Year", years, index=years.index(default)))
+
+def contrib_slice(df):
+    """This person's rows for the picked year, from ``df``."""
+    return df[(df["profile"] == active.key) & (df["year"] == year)]
+
+
+with edit_card(f"Record what you invested in {year}"):
+    st.caption("One row per instrument with the year's total so far. Add a row with the "
+               "+ under the table, or change an amount when you invest more. Then Save.")
+    # Scoped like the rest of the page: this person, this year. The key carries
+    # both, so pending edits can never leak across a profile or year switch.
+    sig_cols = ["category", "amount", "notes"]
+    seed_key = f"contrib_{active.key}_{year}_seed"
+    mine = contrib_slice(d.contributions).drop(columns=["profile", "year"])
+    seed_slice_sig(seed_key, slice_sig(mine, sig_cols))  # what disk held when this grid opened
+    # Read-only, from the audit log; never saved (the save keeps CONTRIB_COLUMNS only).
+    stamps = row_last_changed(d.root, "contributions.csv", ["profile", "year", "category"])
+    mine["updated"] = [
+        f"{stamps[(active.key, year, c)]:%-d %b %Y}" if (active.key, year, c) in stamps else ""
+        for c in mine["category"]
+    ]
+    edited = st.data_editor(
+        mine.sort_values("category").reset_index(drop=True),
+        num_rows="dynamic", hide_index=True, width="stretch",
+        key=f"contrib_{active.key}_{year}",
+        column_config={
+            "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
+            "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
+            "notes": "Notes",
+            "updated": st.column_config.TextColumn(
+                "Last updated", disabled=True,
+                help="When this row was last saved, from the audit log. Blank for rows "
+                     "entered before the log existed."),
+        },
+    )
+    if st.button("Save contributions", type="primary"):
+        try:
+            # Re-read fresh so another tab's edit to a *different* slice survives,
+            # and bail if *this* slice changed under us (a real conflict).
+            fresh = storage.load_contributions(d.root, d.config, d.profiles)
+            fresh_mine = contrib_slice(fresh).drop(columns=["profile", "year"])
+            if stale_since_open(seed_key, slice_sig(fresh_mine, sig_cols), f"{year}'s contributions"):
+                st.stop()
+            others = fresh[~((fresh["profile"] == active.key) & (fresh["year"] == year))]
+            mine_now = edited.assign(profile=active.key, year=year)
+            combined = pd.concat([others, mine_now], ignore_index=True)[storage.CONTRIB_COLUMNS]
+            storage.validate_contributions(combined, d.config, d.profiles)
+            storage.save_contributions(d.root, combined)
+            st.session_state.pop(seed_key, None)
+            saved()
+        except Exception as exc:
+            save_failed(exc)
 
 pva = compute.plan_vs_actual(active, d.income, d.targets, d.contributions, year)
 emergency_fund = compute.emergency_fund_target(active, d.income, year)
@@ -36,16 +88,20 @@ if pva.empty:
     st.info("No plan for this selection/year yet.")
     st.stop()
 
-# Graph first: planned vs actual per bucket.
 chart_title(f"Planned vs actual, by bucket · {year}")
 asc = pva.sort_values("expected")
 f = go.Figure()
-f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["expected"], name="Planned",
-          orientation="h", marker_color=SECONDARY)
-f.add_bar(y=[pretty_category(x) for x in asc["category"]], x=asc["actual"], name="Actual",
-          orientation="h", marker_color=PRIMARY)
+labels = [pretty_category(x) for x in asc["category"]]
+gap = [f"{'over' if v >= 0 else 'short'} by {inr_short(abs(v))}" for v in asc["shortfall"]]
+f.add_bar(y=labels, x=asc["expected"], name="Planned", orientation="h", marker_color=SECONDARY,
+          text=[inr_short(v) for v in asc["expected"]], textposition="outside")
+f.add_bar(y=labels, x=asc["actual"], name="Actual", orientation="h", marker_color=PRIMARY,
+          text=[inr_short(v) for v in asc["actual"]], textposition="outside",
+          customdata=gap, hovertemplate="%{y}: %{text} (%{customdata})<extra></extra>")
+f.update_traces(cliponaxis=False)
 f.update_layout(barmode="group")
-inr_axis(f, max(asc["expected"].max(), asc["actual"].max()), axis="x")
+# Headroom so the outside labels on the longest bar stay inside the plot.
+inr_axis(f, 1.15 * max(asc["expected"].max(), asc["actual"].max()), axis="x")
 style_fig(f)
 f.update_xaxes(showgrid=True, gridcolor=GRID)
 f.update_yaxes(showgrid=False)
@@ -94,56 +150,5 @@ with st.expander("Update emergency fund"):
         except Exception as exc:
             save_failed(exc)
 st.write("")
-
-ordered = pva.sort_values("expected", ascending=False)
-html_table(
-    ordered,
-    {"category": "Category", "expected": "Planned", "actual": "Actual", "shortfall": "Shortfall / surplus"},
-    formats={"category": pretty_category, "expected": inr_short, "actual": inr_short, "shortfall": inr_short},
-)
-
-
-section("Fill in")
-
-def contrib_slice(df):
-    """This person's rows for the picked year, from ``df``."""
-    return df[(df["profile"] == active.key) & (df["year"] == year)]
-
-
-with edit_card(f"Record what you actually invested in {year}"):
-    st.caption("One row per instrument. Add rows as you invest; other years are untouched.")
-    # Scoped like the rest of the page: this person, this year. The key carries
-    # both, so pending edits can never leak across a profile or year switch.
-    sig_cols = ["category", "amount", "notes"]
-    seed_key = f"contrib_{active.key}_{year}_seed"
-    mine = contrib_slice(d.contributions).drop(columns=["profile", "year"])
-    seed_slice_sig(seed_key, slice_sig(mine, sig_cols))  # what disk held when this grid opened
-    edited = st.data_editor(
-        mine.sort_values("category").reset_index(drop=True),
-        num_rows="dynamic", hide_index=True, width="stretch",
-        key=f"contrib_{active.key}_{year}",
-        column_config={
-            "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
-            "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
-            "notes": "Notes",
-        },
-    )
-    if st.button("Save contributions", type="primary"):
-        try:
-            # Re-read fresh so another tab's edit to a *different* slice survives,
-            # and bail if *this* slice changed under us (a real conflict).
-            fresh = storage.load_contributions(d.root, d.config, d.profiles)
-            fresh_mine = contrib_slice(fresh).drop(columns=["profile", "year"])
-            if stale_since_open(seed_key, slice_sig(fresh_mine, sig_cols), f"{year}'s contributions"):
-                st.stop()
-            others = fresh[~((fresh["profile"] == active.key) & (fresh["year"] == year))]
-            mine_now = edited.assign(profile=active.key, year=year)
-            combined = pd.concat([others, mine_now], ignore_index=True)[storage.CONTRIB_COLUMNS]
-            storage.validate_contributions(combined, d.config, d.profiles)
-            storage.save_contributions(d.root, combined)
-            st.session_state.pop(seed_key, None)
-            saved()
-        except Exception as exc:
-            save_failed(exc)
 
 st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your salary. What you actually hold goes in the expander above.")

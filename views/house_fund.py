@@ -34,7 +34,7 @@ rate = c[0].number_input("Return (% a year)", 0.0, 30.0, float(default_rate), 0.
 pace = c[1].number_input("Invest per year (₹)", 0, None, int(round(default_pace, -3)), 10_000,
                          key="hf_pace",
                          help=f"Default: liquid investments recorded for {today.year} so far, "
-                              "scaled up to a full year. If Actuals are behind, this reads low, "
+                              "scaled up to a full year. If Investments are behind, this reads low, "
                               "so set your real number.")
 c[1].caption(f"= {inr_short(pace)} a year")
 growth = c[2].number_input("Pace grows (% a year)", 0.0, 50.0, float(default_growth), 1.0,
