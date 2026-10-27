@@ -16,8 +16,10 @@ Usage::
     uv run python scripts/import_tradebook.py <csv-path> --profile rv --year 2024 --dry-run
 
 The category is auto-detected from the tradebook's ``segment`` column (``EQ``
-→ ``indian_stocks``, ``MF`` → ``mfs``); pass ``--category`` to override (it
-must be one of ``config.yaml``'s categories). NET = gross buys − gross sells,
+→ ``indian_stocks``, ``MF`` → ``mfs``), except that gold and silver funds go to
+``gold_metals`` as their own row. Pass ``--category`` to put everything in one
+category (it must be one of ``config.yaml``'s categories). Each row's notes
+list what's in it, fund by fund. NET = gross buys − gross sells,
 rounded to the rupee, for rows whose ``trade_date`` falls in ``--year`` only —
 rows from any other year in the file are counted and reported, never
 imported. A negative NET (net sells) is refused. Importing a
@@ -29,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import re
 import sys
 from pathlib import Path
 
@@ -45,6 +48,8 @@ REQUIRED_COLUMNS = ["symbol", "isin", "trade_date", "exchange", "segment", "seri
 
 # Zerodha's tradebook segment → this tracker's asset-class category.
 SEGMENT_CATEGORY = {"EQ": "indian_stocks", "MF": "mfs"}
+# Mutual funds that hold gold or silver are tracked as gold, not as MFs.
+GOLD_FUND = re.compile(r"\b(GOLD|SILVER)\b", re.IGNORECASE)
 
 
 def read_tradebook(csv_path: Path) -> pd.DataFrame:
@@ -108,11 +113,47 @@ def detect_category(df_in_year: pd.DataFrame, override: str | None,
     )
 
 
-def build_notes(gross_buys: float, gross_sells: float, today: dt.date | None = None) -> str:
-    """Returns the provenance note recorded in the contribution row."""
+def split_by_category(in_year: pd.DataFrame, override: str | None,
+                      known_categories: list[str]) -> dict[str, pd.DataFrame]:
+    """Groups a year's fills by the category each one is recorded under.
+
+    With ``override`` everything goes to that one category. Otherwise gold and
+    silver mutual funds go to ``gold_metals`` and the rest is auto-detected by
+    ``detect_category``.
+    """
+    if override is not None:
+        return {detect_category(in_year, override, known_categories): in_year}
+    segment = in_year["segment"].astype(str).str.strip().str.upper()
+    gold = (segment == "MF") & in_year["symbol"].astype(str).str.contains(GOLD_FUND)
+    parts = {}
+    if gold.any():
+        parts["gold_metals"] = in_year[gold]
+    if (~gold).any():
+        parts[detect_category(in_year[~gold], None, known_categories)] = in_year[~gold]
+    return parts
+
+
+def short_name(symbol: str) -> str:
+    """Trims a fund name's plan suffix: ``UTI NIFTY 50 INDEX FUND-DIRECT GROWTH`` → ``Uti Nifty 50 Index Fund``."""
+    name = re.split(r"\s*-?\s*DIRECT\b", str(symbol), flags=re.IGNORECASE)[0].strip(" -")
+    return name.title() if name.isupper() and " " in name else name
+
+
+def holdings(fills: pd.DataFrame) -> str:
+    """Net rupees per fund or stock, biggest first: ``Parag Parikh Flexi Cap Fund 86,995; …``."""
+    value = fills["quantity"].astype(float) * fills["price"].astype(float)
+    sign = fills["trade_type"].astype(str).str.strip().str.lower().map({"buy": 1, "sell": -1}).fillna(0)
+    net = (value * sign).groupby(fills["symbol"].map(short_name)).sum().round()
+    return "; ".join(f"{name} {amount:,.0f}" for name, amount in net.sort_values(ascending=False).items())
+
+
+def build_notes(gross_buys: float, gross_sells: float, today: dt.date | None = None,
+                contents: str = "") -> str:
+    """Returns the note recorded in the contribution row: totals, then what's in it."""
     today = today or dt.date.today()
-    return (f"Zerodha tradebook net (buys {gross_buys:,.0f} − sells {gross_sells:,.0f}), "
+    note = (f"Zerodha tradebook net (buys {gross_buys:,.0f} − sells {gross_sells:,.0f}), "
             f"imported {today.isoformat()}")
+    return f"{note}: {contents}" if contents else note
 
 
 def existing_row(contributions: pd.DataFrame, profile: str, year: int,
@@ -158,47 +199,48 @@ def run(csv_path: Path, profile_key: str, year: int, category_override: str | No
     df = read_tradebook(csv_path)
     trade_year = pd.to_datetime(df["trade_date"]).dt.year
     in_year = df[trade_year == year]
+    other_years = {int(y): int(n) for y, n in trade_year[trade_year != year].value_counts().sort_index().items()}
+    if other_years:
+        print(f"Other years found in the file (ignored): {other_years}")
 
     try:
-        category = detect_category(in_year, category_override, config.categories)
+        parts = split_by_category(in_year, category_override, config.categories)
     except ValueError as exc:
         print(f"Refusing: {exc}")
         return 1
 
-    gross_buys, gross_sells, net, other_years = year_totals(df, year)
-    if other_years:
-        print(f"Other years found in the file (ignored): {other_years}")
-    print(f"{profile_key} {year} {category}: gross buys ₹{gross_buys:,.0f}, "
-          f"gross sells ₹{gross_sells:,.0f}, NET ₹{net:,.0f}")
-
-    if net < 0:
-        print(f"Refusing: NET is negative (₹{net:,.0f}) — sells exceeded buys in {year}.")
-        return 1
-
     contributions = storage.load_contributions(root, config, profiles)
-    existing = existing_row(contributions, profile_key, year, category)
-    if existing is not None and not replace:
-        print(
-            f"Refusing: a contribution row already exists for "
-            f"(profile={profile_key}, year={year}, category={category}): ₹{existing['amount']:,.0f}. "
-            "Pass --replace to overwrite it."
-        )
-        return 1
+    rows = []
+    for category, fills in parts.items():
+        gross_buys, gross_sells, net, _ = year_totals(fills, year)
+        print(f"{profile_key} {year} {category}: gross buys ₹{gross_buys:,.0f}, "
+              f"gross sells ₹{gross_sells:,.0f}, NET ₹{net:,.0f}")
+        if net < 0:
+            print(f"Refusing: {category} NET is negative (₹{net:,.0f}): sells exceeded buys in {year}.")
+            return 1
+        existing = existing_row(contributions, profile_key, year, category)
+        if existing is not None and not replace:
+            print(
+                f"Refusing: a contribution row already exists for "
+                f"(profile={profile_key}, year={year}, category={category}): ₹{existing['amount']:,.0f}. "
+                "Pass --replace to overwrite it."
+            )
+            return 1
+        rows.append((category, net, build_notes(gross_buys, gross_sells, contents=holdings(fills)),
+                     "replace" if existing is not None else "add"))
 
-    notes = build_notes(gross_buys, gross_sells)
-    combined = merged_contributions(contributions, profile_key, year, category, net, notes)
-
-    action = "replace" if existing is not None else "add"
-    if dry_run:
-        print(f"DRY RUN — would {action} row: year={year} profile={profile_key} "
+    combined = contributions
+    for category, net, notes, action in rows:
+        combined = merged_contributions(combined, profile_key, year, category, net, notes)
+        print(f"{'DRY RUN, would ' if dry_run else ''}{action}: year={year} profile={profile_key} "
               f"category={category} amount={net} notes={notes!r}")
-        print("DRY RUN — nothing written.")
+    if dry_run:
+        print("DRY RUN: nothing written.")
         return 0
 
     storage.validate_contributions(combined, config, profiles)
     storage.save_contributions(root, combined)
-    print(f"Wrote ({action}): year={year} profile={profile_key} category={category} "
-          f"amount={net} notes={notes!r}")
+    print("Written.")
     return 0
 
 

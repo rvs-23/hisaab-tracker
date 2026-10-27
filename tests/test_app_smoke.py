@@ -172,3 +172,21 @@ def test_audit_failure_reads_as_saved_but_unaudited(fake_data_dir, monkeypatch):
     assert not at.error, [e.value for e in at.error]
     assert "Saved, but the audit log" in " ".join(w.value for w in at.warning)
     assert "emergency_fund" in (fake_data_dir / "adjustments.csv").read_text()
+
+
+def test_investments_save_keeps_hidden_details(fake_data_dir):
+    """`details` isn't shown in the table, so a save must carry it through.
+    The file starts without `last_change`; finding that header afterwards
+    proves the save really rewrote it."""
+    (fake_data_dir / "contributions.csv").write_text(
+        "year,profile,category,amount,notes,details\n"
+        "2024,rv,mfs,169766,,Q: which funds? A: PPFAS\n")
+    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at.query_params["profile"] = "rv"
+    at.run()
+    at.selectbox[0].set_value(2024).run()
+    at.button(key="save_contrib_rv_2024").click().run()
+    assert not at.exception, at.exception
+    saved_csv = (fake_data_dir / "contributions.csv").read_text()
+    assert "last_change" in saved_csv.splitlines()[0]
+    assert "Q: which funds? A: PPFAS" in saved_csv

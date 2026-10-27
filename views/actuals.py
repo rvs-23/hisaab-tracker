@@ -42,9 +42,15 @@ with edit_card(f"Record what you invested in {year}"):
     sig_cols = ["category", "amount", "notes", "last_change"]
     seed_key = f"contrib_{active.key}_{year}_seed"
     mine = contrib_slice(d.contributions).drop(columns=["profile", "year"])
-    # An all-blank text column reads back as float; the editor needs text.
-    mine[["notes", "last_change"]] = mine[["notes", "last_change"]].astype("string")
+    # Same instrument order as the Budget allocation table.
+    order = {c: i for i, c in enumerate(d.config.categories)}
+    mine = mine.sort_values("category", key=lambda s: s.map(order))
     seed_slice_sig(seed_key, slice_sig(mine, sig_cols))  # what disk held when this grid opened
+    # An all-blank text column reads back as float, and the editor needs text.
+    # Cast after the fingerprint: blanks become <NA>, which would never match
+    # the fresh read at save time.
+    text_cols = ["notes", "last_change", "details"]
+    mine[text_cols] = mine[text_cols].astype("string")
     # Read-only, from the audit log; never saved (the save keeps CONTRIB_COLUMNS only).
     stamps = row_last_changed(d.root, "contributions.csv", ["profile", "year", "category"])
     mine["updated"] = [
@@ -52,12 +58,14 @@ with edit_card(f"Record what you invested in {year}"):
         for c in mine["category"]
     ]
     edited = st.data_editor(
-        mine.sort_values("category").reset_index(drop=True),
+        mine.reset_index(drop=True),
         num_rows="dynamic", hide_index=True, width="stretch",
         key=f"contrib_{active.key}_{year}",
+        # `details` (the Q&A record) rides along unseen, so a save keeps it.
         column_order=["category", "amount", "updated", "last_change", "notes"],
         column_config={
-            "category": st.column_config.SelectboxColumn("Category", options=d.config.categories, required=True),
+            "category": st.column_config.SelectboxColumn(
+                "Category", options=d.config.categories, format_func=pretty_category, required=True),
             "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
             "updated": st.column_config.TextColumn(
                 "Last updated", disabled=True,
@@ -67,11 +75,10 @@ with edit_card(f"Record what you invested in {year}"):
                 "What changed", help="The latest update, e.g. '+60k SIP in Oct'. "
                                      "Overwrite it each time you change the amount."),
             "notes": st.column_config.TextColumn(
-                "Details", help="Anything lasting about this row: accounts, sources, how "
-                                "the number was worked out."),
+                "Notes", help="What this amount holds: funds, stocks, accounts."),
         },
     )
-    if st.button("Save contributions", type="primary"):
+    if st.button("Save contributions", key=f"save_contrib_{active.key}_{year}", type="primary"):
         try:
             # Re-read fresh so another tab's edit to a *different* slice survives,
             # and bail if *this* slice changed under us (a real conflict).

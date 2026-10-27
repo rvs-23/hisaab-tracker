@@ -177,3 +177,19 @@ def test_unknown_profile_refused(tmp_path, data_root):
     csv = write_tradebook(tmp_path, "INFY,INE1,2024-03-01,NSE,EQ,EQ,buy,10,1500\n")
     code = imp.run(csv, "not_a_person", 2024, None, replace=False, dry_run=False, root=data_root)
     assert code == 1
+
+
+def test_gold_funds_get_their_own_row_with_holdings_in_notes(tmp_path, data_root):
+    (data_root / "config.yaml").write_text(
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]\n")
+    csv = write_tradebook(
+        tmp_path,
+        "UTI NIFTY 50 INDEX FUND-DIRECT GROWTH PLAN-GROWTH,INF1,2026-06-01,BSE,MF,,buy,10,100\n"
+        "NIPPON INDIA GOLD SAVINGS FUND DIRECT PLAN GROWTH,INF2,2026-06-01,BSE,MF,,buy,5,40\n",
+    )
+    assert imp.run(csv, "rv", 2026, None, replace=False, dry_run=False, root=data_root) == 0
+    df = pd.read_csv(data_root / "contributions.csv").set_index("category")
+    assert df.loc["mfs", "amount"] == 1000
+    assert df.loc["gold_metals", "amount"] == 200
+    assert "Uti Nifty 50 Index Fund 1,000" in df.loc["mfs", "notes"]
+    assert "Nippon India Gold Savings Fund 200" in df.loc["gold_metals", "notes"]

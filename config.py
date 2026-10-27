@@ -79,6 +79,7 @@ BASELINE_YEAR = 2022
 EXPECTED_RETURNS = {
     "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
     "epf": 8.25, "ppf": 7.1, "nps": 10.0,  # EPF and PPF at their declared rates
+    "aif": 12.0,
     "fixed_deposit": 7.0,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
@@ -101,5 +102,6 @@ CATEGORY_LABELS = {
     "epf": "EPF",
     "ppf": "PPF",
     "nps": "NPS",
+    "aif": "AIF",
     "gold_metals": "Gold / metals",
 }
