@@ -149,31 +149,35 @@ metric_tile(cols[0], "Goal achieved", f"{goal_pct:.0f}%", f"of {year}'s plan",
             color=PRIMARY if goal_pct >= ON_TRACK_PCT else SECONDARY, big=True)
 metric_tile(cols[1], "Invested", inr_short(pva["actual"].sum()),
             f"of {inr_short(pva['expected'].sum())} planned", big=True)
+# What's held is today's figure, so it only means something on the current year.
+is_current = year == dt.date.today().year
 metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund),
-            f"held: {inr_short(ef_actual)}<br>{ef_status}",
+            f"held: {inr_short(ef_actual)}<br>{ef_status}" if is_current else f"as of Dec {year}",
             color=SECONDARY, big=True,
-            help=f"The target ({ef_sub}). The sub-line is the buffer you actually "
-                 "hold, entered below.")
+            help=f"The target ({ef_sub})."
+                 + (" The sub-line is the buffer you actually hold, entered below." if is_current else ""))
 
-with st.expander("Update emergency fund"):
-    st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
-    new_ef = st.number_input("Emergency fund held (₹)", min_value=0, value=int(ef_actual),
-                             step=10000, key=f"ef_{active.key}")
-    st.caption(f"= {inr_short(new_ef)}")
-    if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
-        try:
-            fresh = storage.load_adjustments(d.root, d.profiles)
-            others = fresh[
-                ~((fresh["profile"] == active.key) & (fresh["field"] == "emergency_fund"))
-            ]
-            rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
-            rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
-            merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
-            storage.validate_adjustments(merged, d.profiles)
-            storage.save_adjustments(d.root, merged)
-            saved()
-        except Exception as exc:
-            save_failed(exc)
+if is_current:
+    with st.expander("Update emergency fund"):
+        st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
+        new_ef = st.number_input("Emergency fund held (₹)", min_value=0, value=int(ef_actual),
+                                 step=10000, key=f"ef_{active.key}")
+        st.caption(f"= {inr_short(new_ef)}")
+        if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
+            try:
+                fresh = storage.load_adjustments(d.root, d.profiles)
+                others = fresh[
+                    ~((fresh["profile"] == active.key) & (fresh["field"] == "emergency_fund"))
+                ]
+                rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
+                rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
+                merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
+                storage.validate_adjustments(merged, d.profiles)
+                storage.save_adjustments(d.root, merged)
+                saved()
+            except Exception as exc:
+                save_failed(exc)
 st.write("")
 
-st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your budgeted needs plus investment. What you actually hold goes in the expander above.")
+st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your budgeted needs plus investment."
+           + (" What you actually hold goes in the expander above." if is_current else ""))
