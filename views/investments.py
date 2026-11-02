@@ -12,7 +12,7 @@ from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
     inr_axis, inr_short, load_all, metric_tile, page_header,
     pretty_category, save_failed, saved, section, seed_slice_sig, slice_sig,
-    stale_since_open, style_fig,
+    stale_since_open, style_fig, year_picker,
 )
 
 d = load_all()
@@ -23,11 +23,7 @@ st.caption("Record what you invested, then see it against the plan.")
 if d.income[d.income["profile"] == active.key].empty:
     st.info("No data yet. Add income first.")
     st.stop()
-years = compute.selectable_years(d.income, d.contributions, active.key)
-
-default = dt.date.today().year if dt.date.today().year in years else years[-1]
-yc, _ = st.columns([1, 5])
-year = int(yc.selectbox("Year", years, index=years.index(default)))
+year = year_picker(compute.selectable_years(d.income, d.contributions, active.key))
 
 def contrib_slice(df):
     """This person's rows for the picked year, from ``df``."""

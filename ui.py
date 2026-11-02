@@ -551,6 +551,36 @@ def active_profile_key() -> str | None:
     return st.query_params.get("profile") or st.session_state.get("active_profile")
 
 
+def _keep_year() -> None:
+    """Copies the picker's choice to the shared year before the page reruns."""
+    st.session_state["year"] = st.session_state["year_pick"]
+
+
+def year_picker(years: list[int]) -> int:
+    """The one year filter, top right of the page header.
+
+    The choice lives in session state (and the URL's ``?year=``), so picking a
+    year on one page carries to every other page. Call after ``page_header``.
+
+    Args:
+        years: The years this page can show.
+
+    Returns:
+        The selected year.
+    """
+    year = st.session_state.get("year")
+    if year is None and str(st.query_params.get("year", "")).isdigit():
+        year = int(st.query_params["year"])
+    if year not in years:
+        this_year = dt.date.today().year
+        year = this_year if this_year in years else years[-1]
+    st.session_state["year"] = st.session_state["year_pick"] = year
+    slot = st.session_state.get("_year_slot") or st
+    slot.selectbox("Year", years, key="year_pick", on_change=_keep_year)
+    st.query_params["year"] = str(year)
+    return int(year)
+
+
 def page_header(title: str, profiles, root=None, allow_household: bool = False):
     """Renders the page title and resolves the active person from the URL.
 
@@ -601,7 +631,9 @@ def page_header(title: str, profiles, root=None, allow_household: bool = False):
     else:
         profile = next(p for p in profiles if p.key == active)
         people = [active]
-    st.title(title)
+    left, right = st.columns([5, 1], vertical_alignment="bottom")
+    left.title(title)
+    st.session_state["_year_slot"] = right  # year_picker draws here, top right
     st.markdown(
         f"<div style='margin:-.6rem 0 .9rem'>"
         f"<span style='display:inline-block;width:34px;height:5px;border-radius:3px;"
