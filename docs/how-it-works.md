@@ -88,20 +88,22 @@ this, what will our corpus be at the end of each year, 2024 to 2034?** 2024 and
 It counts everything you've invested except EPF, PPF and NPS, which are
 retirement money and can't go toward a house. The opening corpus is included.
 
-Four inputs, all live (nothing is saved):
+Five inputs, all live (nothing is saved):
 
-- **Combined monthly investment:** defaults to this year's recorded investments
-  (without EPF, PPF and NPS), scaled to a full year, divided by 12. If
-  Investments are behind, it reads low, so put in your real number.
+- **Combined monthly investment:** defaults to the plan's investment goal for
+  this year for both of you (without EPF, PPF and NPS), divided by 12. The
+  caption under it shows what you actually invest.
 - **It grows:** how much more you invest each year as income rises (5%).
-- **Return:** growth on everything (the household rate).
-- **Inflation** (6%): the dashed line and the "today's money" figures show what
+- **Return:** growth on everything (10%).
+- **Inflation** (7%): the dashed line and the "today's money" figures show what
   each year's corpus would buy at today's prices.
+- **Keep invested** (30%): the **realistic down payment** is the corpus minus
+  this share, so buying the house doesn't empty every account.
 
 At the bottom, **Plan a down payment** works backwards: enter a down payment in
 today's crores and how many years away, and it shows the monthly investment
-needed, how that compares with what you invest now, and how far your current
-pace gets you. The amount is grown by inflation to the buying year, since
+needed (keeping the same share invested), how that compares with what you
+invest now, and the realistic down payment your current pace gets you. The amount is grown by inflation to the buying year, since
 house prices rise too. Registration and stamp duty aren't included.
 
 ## What to do, and when

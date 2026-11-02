@@ -53,7 +53,10 @@ HOUSE_FUND_GROWTH_PCT = 5.0  # yearly growth of the monthly investment
 # Retirement money is left out of the House fund corpus: provident funds and
 # NPS can't be drawn for a down payment.
 HOUSE_FUND_EXCLUDED = ["epf", "ppf", "nps"]
-HOUSE_FUND_INFLATION_PCT = 6.0  # default for showing future rupees in today's money
+HOUSE_FUND_INFLATION_PCT = 7.0  # default for showing future rupees in today's money
+# The realistic down payment leaves this share of the corpus invested, so buying
+# the house doesn't empty every account (2026-11-02).
+HOUSE_FUND_KEEP_PCT = 30.0
 DEFAULT_ACCENTS = (GRAPHITE, STEEL)
 
 # Budget model. The anchor year (first earning year) splits income 50/30/20

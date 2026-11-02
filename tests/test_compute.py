@@ -746,3 +746,11 @@ def test_corpus_at_can_leave_out_retirement_money(rv):
     ])
     adj = pd.DataFrame(columns=storage.ADJUSTMENTS_COLUMNS)
     assert compute.corpus_at([rv], income, contrib, adj, 2026, 10, exclude=["ppf"]) == 100
+
+
+def test_monthly_goal_sums_the_plan_without_retirement(rv, income, targets):
+    """The House fund default: both people's goal per category, retirement left out, / 12."""
+    goal = compute.expected_contributions(rv, income, targets, 2025)
+    expected = sum(v for c, v in goal.items() if c not in ("epf", "ppf", "nps")) / 12
+    assert compute.monthly_goal([rv], income, targets, 2025, ["epf", "ppf", "nps"]) == pytest.approx(expected)
+    assert compute.monthly_goal([rv], income, targets, 2025) == pytest.approx(sum(goal.values()) / 12)

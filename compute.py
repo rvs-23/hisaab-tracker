@@ -574,6 +574,16 @@ def corpus_at(profiles: list[Profile], income: pd.DataFrame, contributions: pd.D
     return total
 
 
+def monthly_goal(profiles: list[Profile], income: pd.DataFrame, targets: pd.DataFrame,
+                 year: int, exclude: list[str] | None = None) -> float:
+    """The plan's combined monthly investment for ``year``: each person's goal
+    per category, summed, without the ``exclude`` categories, divided by 12."""
+    exclude = set(exclude or [])
+    return sum(v for p in profiles
+               for c, v in expected_contributions(p, income, targets, year).items()
+               if c not in exclude) / 12
+
+
 def monthly_pace(profiles: list[Profile], contributions: pd.DataFrame,
                  today: dt.date | None = None, exclude: list[str] | None = None) -> float:
     """The combined monthly investment this year: recorded so far, scaled to a
