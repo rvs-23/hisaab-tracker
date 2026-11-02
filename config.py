@@ -98,7 +98,7 @@ EXPECTED_RETURNS = {
     "epf": 8.25, "ppf": 7.1, "nps": 10.0,  # EPF and PPF at their declared rates
     "aif": 12.0,
     "fixed_deposit": 7.0,
-    "house_equity": 10.0, "house_arbitrage": 6.5,
+    "debt_funds": 6.5,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 
@@ -115,24 +115,17 @@ INCOME_COMPONENTS = ["salary", "bonus", "other"]
 CATEGORY_LABELS = {
     "us_market": "US market",
     "indian_stocks": "Indian stocks",
-    "mfs": "Mutual funds",
+    "mfs": "Mutual funds (equity)",
     "fixed_deposit": "Fixed deposit",
     "epf": "EPF",
     "ppf": "PPF",
     "nps": "NPS",
     "aif": "AIF",
     "gold_metals": "Gold",
-    "house_equity": "House pot: equity",
-    "house_arbitrage": "House pot: arbitrage",
+    "debt_funds": "Mutual funds (arbitrage / debt)",
 }
 
-# The house pot (2026-11-02): from 2027, new money for the down payment goes to
-# its own two categories, so it never mixes with what was already held. The
-# tradebook importer routes these funds there; everything else keeps its usual
-# category.
-HOUSE_POT_START_YEAR = 2027
-HOUSE_POT_ARBITRAGE = r"\bARBITRAGE\b"
-HOUSE_POT_EQUITY_FUNDS = {
-    "rv": [r"\bPARAG PARIKH FLEXI CAP\b", r"\bNIFTY ?500 MULTICAP\b"],
-    "cheeni": [r"\bPARAG PARIKH FLEXI CAP\b", r"\bUTI NIFTY 50 INDEX\b"],
-}
+# Mutual funds that hold safe money rather than shares (2026-11-02). The
+# tradebook importer files these under debt_funds instead of mfs.
+DEBT_FUND = (r"\b(?:ARBITRAGE|LIQUID|OVERNIGHT|MONEY MARKET|ULTRA SHORT|SHORT DURATION|"
+             r"LOW DURATION|CORPORATE BOND|BANKING (?:AND|&) PSU|GILT|DYNAMIC BOND)\b")
