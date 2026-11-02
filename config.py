@@ -88,10 +88,10 @@ EXPECTED_RETURNS = {
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 
-# Emergency-fund *target* = this many months of current monthly salary
-# (2026-10-27). The *actual* fund held is entered by hand (see
-# storage.ALLOWED_ADJUSTMENTS).
-EMERGENCY_FUND_MONTHS = 3
+# Emergency-fund *target* = budgeted needs + investment over this many months,
+# the latest ones up to today (2026-11-02). The *actual* fund held is entered by
+# hand (see storage.ALLOWED_ADJUSTMENTS).
+EMERGENCY_FUND_MONTHS = 4
 
 # The components that sum to a year's total income. "other" catches anything
 # beyond salary and bonus (RSU vesting, an FD/RD maturing, and so on).

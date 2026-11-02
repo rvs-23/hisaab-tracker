@@ -102,8 +102,9 @@ anyone) last saved data, from `changes.jsonl`.
 - **One rate everywhere:** `expected_return_pct` in `config.yaml` is the single
   growth rate for estimated value, corpus, and catch-up. Remove it to fall back
   to per-category `EXPECTED_RETURNS` in `config.py`.
-- **Emergency fund target** = `EMERGENCY_FUND_MONTHS` (3) × current monthly
-  salary (the latest month entered up to today; bonus and other left out).
+- **Emergency fund target** = budgeted needs + investment over the last
+  `EMERGENCY_FUND_MONTHS` (4) months, up to today. Each month uses its own
+  year's monthly budget.
 - **Opening corpus** is money invested before tracking began. It's assumed
   invested at the start of your first tracked year and counts toward invested
   and estimated value. It never touches the budget, goal, or catch-up.

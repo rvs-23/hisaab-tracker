@@ -119,8 +119,8 @@ house prices rise too. Registration and stamp duty aren't included.
 
 ## Things that surprise people
 
-- **The emergency-fund *target* is automatic:** 3 months
-  (`EMERGENCY_FUND_MONTHS`) of your current monthly salary, so it grows with
+- **The emergency-fund *target* is automatic:** your budgeted needs plus
+  investment for the last 4 months (`EMERGENCY_FUND_MONTHS`), so it grows with
   your pay. What you *actually* hold is entered by hand on
   Investments and counts toward your estimated value.
 - **Saving is safe.** Every save is checked first (sums, duplicates, blanks,

@@ -268,24 +268,22 @@ def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
 
 def emergency_fund_target(profile: Profile, income: pd.DataFrame, year: int | None = None,
                           today: dt.date | None = None) -> float:
-    """The emergency-fund *target*: ``EMERGENCY_FUND_MONTHS`` months of current salary.
+    """The emergency-fund *target*: budgeted needs + investment over the last
+    ``EMERGENCY_FUND_MONTHS`` months.
 
-    "Current" is the latest month with a salary, up to ``year`` (default: now).
-    In the current year, months after today don't count, so a salary pre-filled
-    for December doesn't move today's target. Bonus and *other* are left out.
+    The months end at today's month in the current year, and at December for
+    any other ``year`` (default: now). Each month takes its own year's monthly
+    budget, so a window reaching back into last year uses last year's budget.
     The *actual* fund held is hand-entered (see ``emergency_fund_actual``).
-    Zero when no salary has been entered.
+    Zero when no income has been entered.
     """
     today = today or dt.date.today()
     year = today.year if year is None else year
-    rows = income[(income["profile"] == profile.key) & (income["salary"] > 0)
-                  & (income["year"] <= year)]
-    if year == today.year:
-        rows = rows[(rows["year"] < year) | (rows["month"] <= today.month)]
-    if rows.empty:
-        return 0.0
-    latest = rows.sort_values(["year", "month"]).iloc[-1]
-    return float(latest["salary"]) * EMERGENCY_FUND_MONTHS
+    budget = budget_series(profile, income, today).set_index("year")
+    monthly = budget["monthly_needs"] + budget["monthly_investment"] if not budget.empty else {}
+    end = year * 12 + (today.month if year == today.year else 12) - 1
+    years = [m // 12 for m in range(end - EMERGENCY_FUND_MONTHS + 1, end + 1)]
+    return float(sum(monthly.get(y, 0) for y in years))
 
 
 def corpus_vintage_year(income: pd.DataFrame, contributions: pd.DataFrame,

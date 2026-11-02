@@ -125,7 +125,7 @@ f.update_xaxes(showgrid=True, gridcolor=GRID)
 f.update_yaxes(showgrid=False)
 st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
-ef_sub = f"{EMERGENCY_FUND_MONTHS} months of your latest salary up to {year}"
+ef_sub = f"Needs + investment budget for the last {EMERGENCY_FUND_MONTHS} months"
 ef_actual = compute.emergency_fund_actual(d.adjustments, active.key)
 
 goal_pct = compute.pct_goal_achieved(pva)
@@ -169,4 +169,4 @@ with st.expander("Update emergency fund"):
             save_failed(exc)
 st.write("")
 
-st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your salary. What you actually hold goes in the expander above.")
+st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your budgeted needs plus investment. What you actually hold goes in the expander above.")

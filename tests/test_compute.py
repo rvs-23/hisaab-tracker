@@ -246,17 +246,20 @@ def test_selectable_years_locked_from_baseline(income, contributions):
     assert yrs == list(range(2022, 2027))  # 2022 floor, 2026 current
 
 
-def test_emergency_fund_target_is_three_months_of_current_salary(rv):
+def test_emergency_fund_target_is_four_months_of_needs_plus_investment(rv):
     income = pd.DataFrame([
-        {"profile": "rv", "year": 2025, "month": 12, "salary": 300_000, "bonus": 0, "other": 0, "job_change": 0},
-        {"profile": "rv", "year": 2026, "month": 9, "salary": 400_000, "bonus": 900_000, "other": 0, "job_change": 0},
-        {"profile": "rv", "year": 2026, "month": 12, "salary": 500_000, "bonus": 0, "other": 0, "job_change": 0},
+        {"profile": "rv", "year": 2025, "month": 12, "salary": 1_200_000, "bonus": 0, "other": 0, "job_change": 0},
+        {"profile": "rv", "year": 2026, "month": 6, "salary": 2_400_000, "bonus": 0, "other": 0, "job_change": 0},
     ])
-    today = dt.date(2026, 10, 27)
-    # September is the latest month up to today; December is pre-filled, so it waits.
-    assert compute.emergency_fund_target(rv, income, today=today) == 1_200_000
-    assert compute.emergency_fund_target(rv, income, 2025, today=today) == 900_000
-    assert compute.emergency_fund_target(rv, income, 2027, today=today) == 1_500_000
+    b = compute.budget_series(rv, income, dt.date(2026, 11, 2)).set_index("year")
+    per_month = b["monthly_needs"] + b["monthly_investment"]
+    # November 2026: Aug–Nov, all on the 2026 budget.
+    assert compute.emergency_fund_target(rv, income, today=dt.date(2026, 11, 2)) == 4 * per_month[2026]
+    # February 2026: Nov–Dec 2025 on last year's budget, Jan–Feb on this year's.
+    assert compute.emergency_fund_target(rv, income, today=dt.date(2026, 2, 10)) == (
+        2 * per_month[2025] + 2 * per_month[2026])
+    # A past year looks at its last four months.
+    assert compute.emergency_fund_target(rv, income, 2025, today=dt.date(2026, 11, 2)) == 4 * per_month[2025]
     assert compute.emergency_fund_target(rv, pd.DataFrame(columns=storage.INCOME_COLUMNS)) == 0.0
 
 
