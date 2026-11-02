@@ -177,3 +177,33 @@ st.write("")
 
 st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your budgeted needs plus investment."
            + (" What you actually hold goes in the expander above." if is_current else ""))
+
+# The opening corpus is set once, so it sits at the very bottom, out of the way.
+opening = compute.opening_corpus(d.adjustments, active.key)
+with st.expander("Invested before tracking"):
+    st.caption(
+        "Money you'd already invested before you started tracking here. It's added to "
+        "Invested till date on the Dashboard at face value. The House fund also counts "
+        "it, grown from the start of your first earning year."
+    )
+    new_opening = st.number_input(
+        "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,
+        key=f"opening_corpus_{active.key}",
+    )
+    st.caption(f"= {inr_short(new_opening)}")
+    if st.button("Save", key=f"save_opening_{active.key}", type="primary"):
+        try:
+            # Fresh read so the emergency-fund row (same file, different field)
+            # isn't reverted by this save.
+            fresh = storage.load_adjustments(d.root, d.profiles)
+            others = fresh[
+                ~((fresh["profile"] == active.key) & (fresh["field"] == "opening_corpus"))
+            ]
+            rows = pd.DataFrame([{"profile": active.key, "field": "opening_corpus", "value": new_opening}])
+            rows = rows[rows["value"] > 0]  # a zero corpus is just "nothing recorded"
+            merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
+            storage.validate_adjustments(merged, d.profiles)
+            storage.save_adjustments(d.root, merged)
+            saved()
+        except Exception as exc:
+            save_failed(exc)

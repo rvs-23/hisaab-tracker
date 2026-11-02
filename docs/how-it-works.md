@@ -53,28 +53,28 @@ which page, so you can tell at a glance whether Investments are up to date.
 
 Top to bottom:
 
-1. **Three lifetime tiles:** earned to date, invested to date, and the year's
-   **total goal** (this year's plan plus any shortfall carried over from past
-   years).
-2. **The journey, year on year:** bars show total income and the planned
-   goal side by side, and a line shows what you actually invested.
-3. **Allocation today:** everything you've contributed so far, split across
-   instruments and stacked by the year each rupee went in (lightest is oldest).
-4. **To be on plan by December:** what's left of this year's goal plus any
+1. **To be on plan by December:** what's left of this year's goal plus any
    shortfall from past years, and what that comes to per remaining month.
    Investing *more* than planned is always fine.
+2. **Three lifetime tiles:** earned to date, invested to date, and the year's
+   **total goal** (this year's plan plus any shortfall carried over from past
+   years).
+3. **The journey, year on year:** bars show total income and the planned
+   goal side by side, and a line shows what you actually invested.
+4. **Your mix vs the plan:** each instrument's share of everything you've
+   invested, beside its share of what the plan asked for over the same years.
 5. **Health:** short nudges that appear only when something needs a look: no
    income entered yet this year, investing badly behind pace, no emergency
    fund recorded, or this year's mix drifting from target.
-6. **Adjustments:** a small expander at the bottom for your **opening
-   corpus**, the money you'd already invested before you started tracking
-   (say, ₹20L before 2024). Set it once. It's assumed invested at the start of
-   your first earning year. It counts toward "Invested till date" at face value
-   and is grown in the House fund. It stays out of the budget,
-   the goal, catch-up and plan-vs-actual, which only cover what you've tracked.
+
+Your **opening corpus**, the money you'd already invested before you started
+tracking (say, ₹20L before 2024), is set once at the bottom of Investments. It's
+assumed invested at the start of your first earning year, counts toward
+"Invested till date" at face value, and is grown in the House fund. It stays out
+of the budget, the goal, catch-up and plan-vs-actual.
 
 On the household page, the tiles and charts add both of you together. Health
-nudges and Adjustments stay on each person's own page.
+nudges stay on each person's own page.
 
 Everywhere in the app, the **primary accent means "what actually happened"**
 and the **secondary accent means "what was planned"**.
