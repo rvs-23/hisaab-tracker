@@ -86,8 +86,7 @@ PROFILE_INCREMENT_SPLIT_PERIODS = {
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 
-# The earliest year any selector offers. Tracking starts in 2023 (2026-11-02:
-# the lone 2022 row was dropped so everything begins there).
+# The earliest year any selector offers: tracking starts in 2023.
 BASELINE_YEAR = 2023
 
 # Emergency-fund *target* = budgeted needs + investment over this many months,

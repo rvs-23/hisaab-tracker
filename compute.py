@@ -82,8 +82,8 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     other increment. Projected rows carry is_projected=True.
 
     Zero-income years get no budget row: the anchor is the first *earning* year
-    (an all-zero 2022 baseline must not steal the anchor split from the
-    real first year), and a mid-series zero year is skipped like a missing one.
+    (an all-zero earlier year must not steal the anchor split from the real
+    first year), and a mid-series zero year is skipped like a missing one.
     A year earning *less* than the last scales the previous buckets down
     proportionally — the split still sums to the new total and never goes
     negative."""
