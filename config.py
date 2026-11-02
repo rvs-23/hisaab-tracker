@@ -70,8 +70,15 @@ DEFAULT_INCREMENT_SPLIT = {"needs": 30, "wants": 20, "investment": 50}
 # per-person, unchanged.
 PROFILE_BASE_SPLITS = {}
 PROFILE_INCREMENT_SPLITS = {
-    "rv": {"needs": 25, "wants": 30, "investment": 45},  # was 25/25/50 until 2026-11-02
     "cheeni": {"needs": 30, "wants": 20, "investment": 50},
+}
+# A person whose increment split changes over time lists it by period: each
+# period's first year maps to its split, which applies until the next period
+# starts. Past periods stay locked, so a new split never rewrites past goals.
+# Takes priority over PROFILE_INCREMENT_SPLITS.
+PROFILE_INCREMENT_SPLIT_PERIODS = {
+    # 2023–2026 locked on 2026-11-02. Add the next period (e.g. 2027) when it's decided.
+    "rv": {2023: {"needs": 25, "wants": 30, "investment": 45}},
 }
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
 ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal

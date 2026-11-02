@@ -90,7 +90,9 @@ anyone) last saved data, from `changes.jsonl`.
   scales every bucket down proportionally. A zero-income year gets no row.
   Projects to the current year + 3 at `forward_increment_pct`. The splits live
   in `config.py` (`DEFAULT_BASE_SPLIT`, `PROFILE_INCREMENT_SPLITS`), and the
-  Budget page prints the active person's.
+  Budget page prints the active person's. A person can instead have a split
+  per period (`PROFILE_INCREMENT_SPLIT_PERIODS`, keyed by each period's first
+  year), so a new split applies from a chosen year and never rewrites past goals.
 - **Goal** for a year = its investment amount × target % per category. A
   saved allocation carries forward until a newer year replaces it.
 - **Catch-up** = the lump sum that, invested today, erases every *past* year's

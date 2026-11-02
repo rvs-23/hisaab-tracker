@@ -6,8 +6,7 @@ import streamlit as st
 import compute
 import storage
 from config import (
-    DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT, PROFILE_BASE_SPLITS,
-    PROFILE_INCREMENT_SPLITS,
+    DEFAULT_BASE_SPLIT, PROFILE_BASE_SPLITS,
 )
 from ui import (
     FS_BODY, NEEDS, accent_primary, accent_secondary,
@@ -22,7 +21,7 @@ d = load_all()
 active = page_header("Budget", d.profiles, d.root)
 PRIMARY, SECONDARY = accent_primary(), accent_secondary()  # per-person colours
 base_split = PROFILE_BASE_SPLITS.get(active.key, DEFAULT_BASE_SPLIT)
-increment_split = PROFILE_INCREMENT_SPLITS.get(active.key, DEFAULT_INCREMENT_SPLIT)
+increment_split = compute.increment_split_for(active.key, CURRENT_YEAR)
 
 
 def _split_text(split):
