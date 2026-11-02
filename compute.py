@@ -273,7 +273,7 @@ def available_years(income: pd.DataFrame, contributions: pd.DataFrame,
 def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
                      profile: str | None = None, today: dt.date | None = None) -> list[int]:
     """The locked year range every page selector offers: a contiguous span from
-    ``BASELINE_YEAR`` (2022, the zero floor) up to the current year — or the
+    ``BASELINE_YEAR`` (2023, where tracking starts) up to the current year — or the
     latest year that has data, if somehow later. Profile-scoped when a key is
     given. Always non-empty, so a selector never collapses."""
     cur = (today or dt.date.today()).year

@@ -229,9 +229,9 @@ def test_available_years_scopes_to_profile(income, contributions):
 
 
 def test_selectable_years_locked_from_baseline(income, contributions):
-    """Every selector offers a locked range from 2022 up to the current year."""
+    """Every selector offers a locked range from 2023 up to the current year."""
     yrs = compute.selectable_years(income, contributions, "rv", today=dt.date(2026, 6, 1))
-    assert yrs == list(range(2022, 2027))  # 2022 floor, 2026 current
+    assert yrs == list(range(2023, 2027))  # 2023 floor, 2026 current
 
 
 def test_emergency_fund_target_is_four_months_of_needs_plus_investment(rv):

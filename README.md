@@ -62,7 +62,7 @@ de-duplicated) and prints buys, sells and net per year, `--by month` or
 
 One person at a time, chosen by URL: `?profile=rv` or `?profile=cheeni`. It
 sticks across pages. There's no switcher and no name on screen; each person
-has their own accent colours. Year pickers run from 2022 to the current year.
+has their own accent colours. Year pickers run from 2023 to the current year.
 
 `?profile=household` (teal) is both people combined. It isn't a profile file;
 it sums the real people. It only reads, so its nav is just Dashboard and
