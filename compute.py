@@ -82,8 +82,8 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     other increment. Projected rows carry is_projected=True.
 
     Zero-income years get no budget row: the anchor is the first *earning* year
-    (an all-zero 2022 baseline must not steal the anchor split from the
-    real first year), and a mid-series zero year is skipped like a missing one.
+    (an all-zero earlier year must not steal the anchor split from the real
+    first year), and a mid-series zero year is skipped like a missing one.
     A year earning *less* than the last scales the previous buckets down
     proportionally — the split still sums to the new total and never goes
     negative."""
@@ -273,7 +273,7 @@ def available_years(income: pd.DataFrame, contributions: pd.DataFrame,
 def selectable_years(income: pd.DataFrame, contributions: pd.DataFrame,
                      profile: str | None = None, today: dt.date | None = None) -> list[int]:
     """The locked year range every page selector offers: a contiguous span from
-    ``BASELINE_YEAR`` (2022, the zero floor) up to the current year — or the
+    ``BASELINE_YEAR`` (2023, where tracking starts) up to the current year — or the
     latest year that has data, if somehow later. Profile-scoped when a key is
     given. Always non-empty, so a selector never collapses."""
     cur = (today or dt.date.today()).year
