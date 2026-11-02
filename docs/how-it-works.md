@@ -53,9 +53,9 @@ which page, so you can tell at a glance whether Investments are up to date.
 
 Top to bottom:
 
-1. **Four lifetime tiles:** earned to date, invested to date, what it could
-   be worth today at conservative growth, and the year's **total goal** (this
-   year's plan plus any shortfall carried over from past years).
+1. **Three lifetime tiles:** earned to date, invested to date, and the year's
+   **total goal** (this year's plan plus any shortfall carried over from past
+   years).
 2. **The journey, year on year:** bars show total income and the planned
    goal side by side, and a line shows what you actually invested.
 3. **Allocation today:** everything you've contributed so far, split across

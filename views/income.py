@@ -124,7 +124,7 @@ with edit_card(f"Enter {year}"):
 
     job_change = st.checkbox("Job change this year?", value=saved_job_change(year),
                              key=f"{base}_jc")
-    filled = int((edited[COMPONENTS].sum(axis=1) > 0).sum())
+    filled = int((edited[COMPONENTS].fillna(0) != 0).any(axis=1).sum())
     total = edited[COMPONENTS].sum().sum()
     prev_total = annual(year - 1)
     delta = f"{100 * (total - prev_total) / prev_total:+.0f}% vs {year - 1}" if prev_total else "first year"

@@ -50,13 +50,6 @@ catch_up = sum(compute.catch_up_amount(p, d.income, d.targets, d.contributions, 
 earned = float(trend["total_income"].sum())
 opening = sum(compute.opening_corpus(d.adjustments, p.key) for p in people)
 invested = float(contrib["amount"].sum()) + opening
-# The actual emergency fund (entered on Investments) beats the derived target in
-# net worth; None falls back to the target until one is recorded.
-nw_potential = sum(compute.net_worth_to_date(
-    p, d.income, d.contributions, d.targets, today_year,
-    opening=compute.opening_corpus(d.adjustments, p.key),
-    emergency_fund=compute.emergency_fund_actual(d.adjustments, p.key) or None,
-    flat_return=flat_return)[1] for p in people)
 
 
 def year_goal_for(year: int) -> float:
@@ -65,7 +58,7 @@ def year_goal_for(year: int) -> float:
                for p in people)
 
 section("Lifetime")
-c = st.columns(4)
+c = st.columns(3)
 metric_tile(c[0], "Earned till date", inr_short(earned), year_range, big=True,
             help=f"Total income across the years you've entered ({year_range}).")
 invested_help = f"Total you've actually put in across {year_range} (cost basis, no growth)."
@@ -73,12 +66,6 @@ if opening > 0:
     invested_help += f" Includes {inr_short(opening)} invested before tracking."
 metric_tile(c[1], "Invested till date", inr_short(invested), year_range, big=True,
             help=invested_help)
-metric_tile(c[2], "Est. value today", inr_short(nw_potential), f"as of {today_year}",
-            color=PRIMARY, big=True,
-            help=f"What your contributions across {year_range} could be worth today, "
-                 f"compounded at {growth_basis}, plus your emergency fund."
-                 + (f" Includes {inr_short(opening)} invested before tracking, grown from "
-                    "its assumed vintage." if opening > 0 else ""))
 # The plan tile headlines the TOTAL to invest to be fully on track: this
 # year's goal plus the catch-up from past years. The sub-lines split it.
 year_goal = year_goal_for(today_year)
@@ -89,7 +76,7 @@ plan_sub = (
     + "<br>"
     + (f"{today_year} left: {inr_short(to_go)}" if to_go > 0 else f"{today_year} goal met")
 )
-metric_tile(c[3], f"{today_year} total goal", inr_short(year_goal + catch_up), plan_sub,
+metric_tile(c[2], f"{today_year} total goal", inr_short(year_goal + catch_up), plan_sub,
             color=SECONDARY, big=True,
             help=f"{today_year}'s goal ({inr_short(year_goal)}) plus the shortfall from "
                  f"past years grown at expected returns ({inr_short(catch_up)}). "
