@@ -25,11 +25,6 @@ left_out = ", ".join(CATEGORY_LABELS.get(c, c) for c in HOUSE_FUND_EXCLUDED)
 corpus_help = (f"Everything invested except {left_out}: retirement money that can't go "
                "toward a house. Includes the opening corpus. Grown at the return below; a "
                "projection from what was put in, not a market value.")
-st.caption(
-    "If we keep investing at this pace, what will our corpus be at the end of each year? "
-    f"{first_year}–{today.year - 1} are what we actually built; {today.year} on is the projection. "
-    "Nothing here is saved; change the inputs and everything redraws."
-)
 
 default_monthly = compute.monthly_pace(people, d.contributions, today, HOUSE_FUND_EXCLUDED)
 default_rate = d.config.expected_return_pct or 10.0
