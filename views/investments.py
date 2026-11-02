@@ -52,6 +52,9 @@ with edit_card(f"Record what you invested in {year}"):
     text_cols = ["notes", "last_change", "details"]
     mine[text_cols] = mine[text_cols].astype("string")
     # Read-only, from the audit log; never saved (the save keeps CONTRIB_COLUMNS only).
+    # Read-only, from the plan: this year's goal for each instrument.
+    goal = compute.expected_contributions(active, d.income, d.targets, year)
+    mine["target"] = [round(goal.get(c, 0.0)) for c in mine["category"]]
     stamps = row_last_changed(d.root, "contributions.csv", ["profile", "year", "category"])
     mine["updated"] = [
         f"{stamps[(active.key, year, c)]:%-d %b %Y}" if (active.key, year, c) in stamps else ""
@@ -62,11 +65,15 @@ with edit_card(f"Record what you invested in {year}"):
         num_rows="dynamic", hide_index=True, width="stretch",
         key=f"contrib_{active.key}_{year}",
         # `details` (the Q&A record) rides along unseen, so a save keeps it.
-        column_order=["category", "amount", "updated", "last_change", "notes"],
+        column_order=["category", "amount", "target", "updated", "last_change", "notes"],
         column_config={
             "category": st.column_config.SelectboxColumn(
                 "Category", options=d.config.categories, format_func=pretty_category, required=True),
             "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
+            "target": st.column_config.NumberColumn(
+                "Target (₹)", disabled=True, format="localized",
+                help=f"This instrument's goal for {year}: the year's investment × its target % "
+                     "on Budget. Rows added since the page loaded show it after saving."),
             "updated": st.column_config.TextColumn(
                 "Last updated", disabled=True,
                 help="When this row's amount last changed, from the audit log. Blank "
