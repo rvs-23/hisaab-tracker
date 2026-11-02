@@ -1,7 +1,6 @@
 import datetime as dt
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
 import compute
@@ -11,10 +10,10 @@ from config import (
     PROFILE_INCREMENT_SPLITS,
 )
 from ui import (
-    FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
+    FS_BODY, NEEDS, accent_primary, accent_secondary,
     html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
     resync, save_failed, saved, section, seed_slice_sig, slice_sig,
-    stale_since_open, style_fig,
+    stale_since_open,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -75,28 +74,8 @@ if bs.empty:  # income rows can exist yet all be zero — no earning year, no bu
     st.info("No earning year yet. Add income on the Income page.")
     st.stop()
 
-# Budget over time, on top (as Income has): the slice shifting over the actual
-# years (100% stacked), then the same split as % and ₹ per year.
+# Budget over time, on top (as Income has): each bucket as % and ₹ per year.
 section("Budget over time")
-actual = bs[~bs["is_projected"]]
-yr = actual["year"].astype(int).astype(str)
-tot = actual["total_income"]
-needs_p = (100 * actual["needs"] / tot).round(0)
-wants_p = (100 * actual["wants"] / tot).round(0)
-inv_p = (100 * actual["investment"] / tot).round(0)
-inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
-# Colour roles: the derived investment slice is *planned* money, so it wears
-# the secondary accent; needs/wants are neutral grays (a category is not a role).
-f = go.Figure()
-f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
-f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SAND)
-f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=SECONDARY,
-          text=inv_label, textposition="inside",
-          textfont=dict(color="white", size=11), insidetextanchor="middle")
-f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
-style_fig(f, height=300)
-chart_title("Share of income per bucket (investment label shows % and ₹/yr)")
-st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 
 def _share(bucket):
