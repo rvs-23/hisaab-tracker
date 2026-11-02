@@ -117,7 +117,7 @@ if not row.empty:
 
 # Target allocation lives here (moved from Actuals, 2026-07-20): right under
 # the monthly split, so how each monthly goal is consumed per instrument reads
-# top-down. The active mix is read-only; the editor sits in the expander.
+# top-down. The active mix is read-only; the year-by-year plan below edits it.
 budget_row = bs[bs["year"] == year]
 investment = float(budget_row.iloc[0]["investment"]) if not budget_row.empty else 0.0
 target = compute.resolve_target(active, d.targets, year)
@@ -136,64 +136,60 @@ html_table(
              "per_year": inr_short, "per_month": inr_short},
 )
 
-with st.expander("Edit allocation"):
-    st.caption("Set the % per instrument (must sum to 100). The ₹/year and ₹/month follow from that year's investment.")
+section("Allocation plan, year by year")
+st.caption("Each row is one year's target mix and must add up to 100%. A year left the same "
+           "as the one before simply carries it forward. Edit any year, then Save.")
+cats = d.config.categories
+plan_years = list(range(int(bs["year"].min()), CURRENT_YEAR + 5))
+plan = compute.allocation_plan(active, d.targets, plan_years, cats)
+labels = {c: pretty_category(c) for c in cats}
 
-    def derive_alloc(df):  # recompute the ₹ columns from the % column
-        out = df.copy()
-        out["per_year"] = out["pct"] / 100 * investment
-        out["per_month"] = out["per_year"] / 12
-        return out
 
-    abase = f"alloc_{active.key}_{year}"
-    agkey, avkey = f"{abase}__grid", f"{abase}__ver"
-    if agkey not in st.session_state:
-        g = pd.DataFrame({"category": d.config.categories})
-        g["label"] = g["category"].map(pretty_category)
-        g["pct"] = [target.get(c, 0.0) for c in d.config.categories]
-        st.session_state[agkey] = derive_alloc(g[["label", "pct"]].assign(per_year=0.0, per_month=0.0))
-        st.session_state[avkey] = 0
+def with_total(df):  # the live Total column, recomputed from the % columns
+    return df.assign(Total=df[cats].sum(axis=1))
 
-    alloc_edited = st.data_editor(
-        st.session_state[agkey], hide_index=True, width="stretch",
-        key=f"{abase}__{st.session_state[avkey]}",
-        column_config={
-            "label": st.column_config.TextColumn("Instrument", disabled=True),
-            "pct": st.column_config.NumberColumn("Target %", min_value=0, max_value=100, required=True),
-            "per_year": st.column_config.NumberColumn("₹ / year", disabled=True, format="localized"),
-            "per_month": st.column_config.NumberColumn("₹ / month", disabled=True, format="localized"),
-        },
-    )
-    resync(agkey, avkey, derive_alloc(alloc_edited), ["per_year", "per_month"])
-    total_pct = alloc_edited["pct"].sum()
-    ok = abs(total_pct - 100) < 0.01
-    msg = f"Total <b>{total_pct:.0f}%</b>" + ("  ·  ready to save" if ok else "  ·  must sum to 100")
-    st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
-                unsafe_allow_html=True)
 
-    seed_key = f"{abase}_seed"
-    tmask = lambda df: (df["profile"] == active.key) & (df["year"] == year)
-    seed_slice_sig(seed_key, slice_sig(d.targets[tmask(d.targets)], ["category", "pct"]))
+pbase = f"plan_{active.key}"
+pgkey, pvkey = f"{pbase}__grid", f"{pbase}__ver"
+if pgkey not in st.session_state:
+    st.session_state[pgkey] = with_total(plan[["year", *cats]])
+    st.session_state[pvkey] = 0
+plan_edited = st.data_editor(
+    st.session_state[pgkey], hide_index=True, width="stretch",
+    key=f"{pbase}__{st.session_state[pvkey]}",
+    column_config={
+        "year": st.column_config.NumberColumn("Year", disabled=True, format="%d"),
+        **{c: st.column_config.NumberColumn(labels[c], min_value=0, max_value=100, format="%g%%")
+           for c in cats},
+        "Total": st.column_config.NumberColumn("Total", disabled=True, format="%g%%"),
+    },
+)
+resync(pgkey, pvkey, with_total(plan_edited), ["Total"])
+off = plan_edited[(plan_edited[cats].sum(axis=1) - 100).abs() >= 0.01]["year"].astype(int).tolist()
+ok = not off
+msg = ("Every year adds up to 100%  ·  ready to save" if ok
+       else f"Must add up to 100%: {', '.join(map(str, off))}")
+st.markdown(f"<span style='color:{PRIMARY if ok else SECONDARY};font-weight:600'>{msg}</span>",
+            unsafe_allow_html=True)
 
-    if st.button(f"Save {year}", key=f"save_alloc_{active.key}_{year}",
-                 type="primary", disabled=not ok):
-        try:
-            # Fresh read so another year/person's targets aren't reverted, and a
-            # stale guard for this exact profile+year.
-            fresh = storage.load_targets(d.root, d.config, d.profiles)
-            if stale_since_open(seed_key, slice_sig(fresh[tmask(fresh)], ["category", "pct"]),
-                                f"{year}'s target allocation"):
-                st.stop()
-            rows = pd.DataFrame({"profile": active.key, "year": year,
-                                 "category": d.config.categories, "pct": alloc_edited["pct"].values})
-            rows = rows[rows["pct"] > 0]
-            others = fresh[~tmask(fresh)]
-            merged = pd.concat([others, rows], ignore_index=True)
-            storage.validate_targets(merged, d.config, d.profiles)
-            storage.save_targets(d.root, merged)
-            st.session_state.pop(seed_key, None)
-            del st.session_state[agkey]
-            saved()
-        except Exception as exc:
-            save_failed(exc)
-    st.caption("A saved year carries forward until you set a newer one.")
+seed_key = f"{pbase}_seed"
+pmask = lambda df: df["profile"] == active.key
+seed_slice_sig(seed_key, slice_sig(d.targets[pmask(d.targets)], ["year", "category", "pct"]))
+
+if st.button("Save allocation plan", key=f"save_plan_{active.key}", type="primary", disabled=not ok):
+    try:
+        # Fresh read so the other person's targets aren't reverted, and a stale
+        # guard on this person's whole plan.
+        fresh = storage.load_targets(d.root, d.config, d.profiles)
+        if stale_since_open(seed_key, slice_sig(fresh[pmask(fresh)], ["year", "category", "pct"]),
+                            "the allocation plan"):
+            st.stop()
+        rows = compute.target_rows_from_plan(active, plan_edited, cats)
+        merged = pd.concat([fresh[~pmask(fresh)], rows], ignore_index=True)
+        storage.validate_targets(merged, d.config, d.profiles)
+        storage.save_targets(d.root, merged)
+        st.session_state.pop(seed_key, None)
+        del st.session_state[pgkey]
+        saved()
+    except Exception as exc:
+        save_failed(exc)

@@ -769,3 +769,18 @@ def test_a_new_split_period_leaves_earlier_years_alone(rv, monkeypatch):
     assert after.loc[2026, "investment"] == before.loc[2026, "investment"]
     assert after.loc[2027, "investment"] == before.loc[2026, "investment"] + 600_000  # 60% of the 1M raise
     assert compute.increment_split_for("rv", 2020) == old  # before any period: the earliest
+
+
+def test_allocation_plan_round_trips_through_target_rows(rv):
+    """A year-by-year plan saves only the years that change, and reads back the same."""
+    cats = ["mfs", "gold_metals", "indian_stocks", "us_market", "ppf", "fixed_deposit", "debt_funds"]
+    targets = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 60},
+                            {"profile": "rv", "year": 2024, "category": "gold_metals", "pct": 40}])
+    plan = compute.allocation_plan(rv, targets, [2023, 2024, 2025, 2026], cats)
+    assert plan.set_index("year").loc[2025, "mfs"] == 60  # carried forward from 2024
+    assert list(plan["is_set"]) == [False, True, False, False]
+    plan.loc[plan["year"] == 2026, cats] = [50, 0, 0, 0, 0, 0, 50]
+    rows = compute.target_rows_from_plan(rv, plan, cats)
+    assert sorted(rows["year"].unique()) == [2024, 2026]  # 2023 = default, 2025 = same as 2024
+    again = compute.allocation_plan(rv, rows, [2023, 2024, 2025, 2026], cats)
+    pd.testing.assert_frame_equal(again[["year", *cats]], plan[["year", *cats]])

@@ -181,6 +181,38 @@ def split_pct(row) -> dict[str, float]:
     return {k: 100 * row[k] / total for k in ("needs", "wants", "investment")}
 
 
+def allocation_plan(profile: Profile, targets: pd.DataFrame, years: list[int],
+                    categories: list[str]) -> pd.DataFrame:
+    """The target allocation in force for each year, one row per year.
+
+    Columns are ``year``, one % column per category, and ``is_set`` (the year
+    has its own saved rows rather than carrying an earlier year forward).
+    """
+    mine = targets[targets["profile"] == profile.key] if not targets.empty else targets
+    set_years = set(mine["year"].astype(int)) if not mine.empty else set()
+    rows = []
+    for y in years:
+        mix = resolve_target(profile, targets, y)
+        rows.append({"year": y, **{c: float(mix.get(c, 0.0)) for c in categories},
+                     "is_set": y in set_years})
+    return pd.DataFrame(rows)
+
+
+def target_rows_from_plan(profile: Profile, plan: pd.DataFrame,
+                          categories: list[str]) -> pd.DataFrame:
+    """Turns a year-by-year plan back into targets rows, saving a year only
+    when its mix differs from the one before it (or, for the first year, from
+    the person's default), since a saved year carries forward anyway."""
+    rows, previous = [], dict(profile.default_target)
+    for _, r in plan.sort_values("year").iterrows():
+        mix = {c: float(r[c]) for c in categories if float(r[c]) > 0}
+        if mix != {c: float(v) for c, v in previous.items() if float(v) > 0}:
+            rows += [{"profile": profile.key, "year": int(r["year"]), "category": c, "pct": v}
+                     for c, v in mix.items()]
+        previous = mix
+    return pd.DataFrame(rows, columns=["profile", "year", "category", "pct"])
+
+
 def resolve_target(profile: Profile, targets: pd.DataFrame, year: int) -> dict[str, float]:
     """Returns the target allocation in force for a person/year.
 
