@@ -307,8 +307,9 @@ def html_table(df: pd.DataFrame, headers: dict, formats: dict | None = None,
         cls = row_class(row) if row_class else ""
         cells = "".join(f"<td>{formats.get(c, str)(row[c])}</td>" for c in headers)
         body += f"<tr class='{cls}'>{cells}</tr>"
-    st.markdown(f"<table class='ht'><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>",
-                unsafe_allow_html=True)
+    # Wide tables scroll inside their own box instead of spilling past the page.
+    st.markdown(f"<div style='overflow-x:auto'><table class='ht'><thead><tr>{head}</tr></thead>"
+                f"<tbody>{body}</tbody></table></div>", unsafe_allow_html=True)
 
 
 def style_fig(fig, height: int = 320):

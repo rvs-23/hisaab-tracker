@@ -56,7 +56,7 @@ HEADERS = {
 }
 MONEY = ["total_income", "needs", "wants", "investment", "monthly_needs",
          "monthly_wants", "monthly_investment", "cumulative_invested"]
-FMT = {c: (lambda v: f"{v:,.0f}") for c in MONEY}
+FMT = {c: inr_short for c in MONEY}  # short ₹ keeps the 12 columns in bounds
 FMT["year"] = lambda v: f"{int(v)}"
 FMT["age"] = lambda v: f"{int(v)}"
 FMT["yoy"] = lambda v: "—" if v is None or pd.isna(v) else f"{v:+.0f}%"
@@ -74,23 +74,9 @@ if bs.empty:  # income rows can exist yet all be zero — no earning year, no bu
     st.info("No earning year yet. Add income on the Income page.")
     st.stop()
 
-# Budget over time, on top (as Income has): each bucket as % and ₹ per year.
+# Budget over time, on top (as Income has): every year, actual and projected.
 section("Budget over time")
-
-
-def _share(bucket):
-    """Formats one bucket as ``29% · ₹18.4L`` of that row's income."""
-    return lambda r: f"{100 * r[bucket] / r['total_income']:.0f}% · {inr_short(r[bucket])}"
-
-
-over_time = bs.assign(**{f"{b}_share": bs.apply(_share(b), axis=1) for b in ("needs", "wants", "investment")})
-html_table(
-    over_time,
-    {"year": "Year", "total_income": "Income", "needs_share": "Needs", "wants_share": "Wants",
-     "investment_share": "Investment", "monthly_investment": "Invest /mo"},
-    formats={"year": lambda v: f"{int(v)}", "total_income": inr_short, "monthly_investment": inr_short},
-    row_class=row_class,
-)
+html_table(bs, HEADERS, formats=FMT, row_class=row_class)
 st.caption("Current year highlighted; projected years in muted italics.")
 
 income_years = compute.selectable_years(d.income, d.contributions, active.key)
@@ -213,7 +199,3 @@ with st.expander("Edit allocation"):
         except Exception as exc:
             save_failed(exc)
     st.caption("A saved year carries forward until you set a newer one.")
-
-with st.expander("Full detail (all years + projections)"):
-    st.caption("Current year highlighted; projected years in muted italics.")
-    html_table(bs, HEADERS, formats=FMT, row_class=row_class)
