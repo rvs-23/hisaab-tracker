@@ -18,9 +18,8 @@ Usage::
 The category is auto-detected from the tradebook's ``segment`` column (``EQ``
 → ``indian_stocks``, ``MF`` → ``mfs``), except that gold and silver funds and ETFs
 go to ``gold_metals`` as their own row (it replaces any gold row for that
-year, so add physical gold back by hand). From 2027, arbitrage funds and each
-person's house funds go to ``house_arbitrage`` and ``house_equity`` (see
-``config.HOUSE_POT_*``). Pass ``--category`` to put everything in one
+year, so add physical gold back by hand), and arbitrage, liquid and debt funds
+go to ``debt_funds`` (``config.DEBT_FUND``). Pass ``--category`` to put everything in one
 category (it must be one of ``config.yaml``'s categories). Each row's notes
 list what's in it, fund by fund. NET = gross buys − gross sells,
 rounded to the rupee, for rows whose ``trade_date`` falls in ``--year`` only —
@@ -45,7 +44,7 @@ if str(REPO_ROOT) not in sys.path:  # so `python scripts/import_tradebook.py` fi
 import pandas as pd
 
 import storage
-from config import HOUSE_POT_ARBITRAGE, HOUSE_POT_EQUITY_FUNDS, HOUSE_POT_START_YEAR
+from config import DEBT_FUND
 
 REQUIRED_COLUMNS = ["symbol", "isin", "trade_date", "exchange", "segment", "series",
                     "trade_type", "quantity", "price"]
@@ -122,15 +121,13 @@ def detect_category(df_in_year: pd.DataFrame, override: str | None,
 
 
 def split_by_category(in_year: pd.DataFrame, override: str | None,
-                      known_categories: list[str], profile: str | None = None,
-                      year: int | None = None) -> dict[str, pd.DataFrame]:
+                      known_categories: list[str]) -> dict[str, pd.DataFrame]:
     """Groups a year's fills by the category each one is recorded under.
 
     With ``override`` everything goes to that one category. Otherwise gold and
-    silver funds and ETFs go to ``gold_metals``. From ``HOUSE_POT_START_YEAR``,
-    arbitrage funds go to ``house_arbitrage`` and the person's house funds
-    (``HOUSE_POT_EQUITY_FUNDS``) to ``house_equity``, when those categories
-    exist. The rest is auto-detected by ``detect_category``.
+    silver funds and ETFs go to ``gold_metals``, arbitrage, liquid and debt
+    funds to ``debt_funds`` (when it's a known category), and the rest is
+    auto-detected by ``detect_category``.
     """
     if override is not None:
         return {detect_category(in_year, override, known_categories): in_year}
@@ -148,11 +145,7 @@ def split_by_category(in_year: pd.DataFrame, override: str | None,
 
     take("gold_metals", ((segment == "MF") & symbol.str.contains(GOLD_FUND))
          | ((segment == "EQ") & symbol.str.match(GOLD_ETF)))
-    if year is not None and year >= HOUSE_POT_START_YEAR:
-        take("house_arbitrage", (segment == "MF") & symbol.str.contains(HOUSE_POT_ARBITRAGE))
-        funds = HOUSE_POT_EQUITY_FUNDS.get(profile, [])
-        if funds:
-            take("house_equity", (segment == "MF") & symbol.str.contains("|".join(funds)))
+    take("debt_funds", (segment == "MF") & symbol.str.contains(DEBT_FUND))
     if rest.any():
         parts[detect_category(in_year[rest], None, known_categories)] = in_year[rest]
     return parts
@@ -229,7 +222,7 @@ def run(csv_path: Path, profile_key: str, year: int, category_override: str | No
         print(f"Other years found in the file (ignored): {other_years}")
 
     try:
-        parts = split_by_category(in_year, category_override, config.categories, profile_key, year)
+        parts = split_by_category(in_year, category_override, config.categories)
     except ValueError as exc:
         print(f"Refusing: {exc}")
         return 1
