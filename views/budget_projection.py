@@ -47,10 +47,6 @@ st.markdown(
 if d.income[d.income["profile"] == active.key].empty:
     st.info("No income entered yet. Add it on the Income page.")
     st.stop()
-income_years = compute.selectable_years(d.income, d.contributions, active.key)
-default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
-yc, _ = st.columns([1, 5])
-year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
 
 HEADERS = {
     "year": "Year", "age": "Age", "total_income": "Income", "yoy": "YoY",
@@ -78,6 +74,50 @@ bs = compute.budget_series(active, d.income)
 if bs.empty:  # income rows can exist yet all be zero — no earning year, no budget
     st.info("No earning year yet. Add income on the Income page.")
     st.stop()
+
+# Budget over time, on top (as Income has): the slice shifting over the actual
+# years (100% stacked), then the same split as % and ₹ per year.
+section("Budget over time")
+actual = bs[~bs["is_projected"]]
+yr = actual["year"].astype(int).astype(str)
+tot = actual["total_income"]
+needs_p = (100 * actual["needs"] / tot).round(0)
+wants_p = (100 * actual["wants"] / tot).round(0)
+inv_p = (100 * actual["investment"] / tot).round(0)
+inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
+# Colour roles: the derived investment slice is *planned* money, so it wears
+# the secondary accent; needs/wants are neutral grays (a category is not a role).
+f = go.Figure()
+f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
+f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SAND)
+f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=SECONDARY,
+          text=inv_label, textposition="inside",
+          textfont=dict(color="white", size=11), insidetextanchor="middle")
+f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
+style_fig(f, height=300)
+chart_title("Share of income per bucket (investment label shows % and ₹/yr)")
+st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
+
+
+def _share(bucket):
+    """Formats one bucket as ``29% · ₹18.4L`` of that row's income."""
+    return lambda r: f"{100 * r[bucket] / r['total_income']:.0f}% · {inr_short(r[bucket])}"
+
+
+over_time = bs.assign(**{f"{b}_share": bs.apply(_share(b), axis=1) for b in ("needs", "wants", "investment")})
+html_table(
+    over_time,
+    {"year": "Year", "total_income": "Income", "needs_share": "Needs", "wants_share": "Wants",
+     "investment_share": "Investment", "monthly_investment": "Invest /mo"},
+    formats={"year": lambda v: f"{int(v)}", "total_income": inr_short, "monthly_investment": inr_short},
+    row_class=row_class,
+)
+st.caption("Current year highlighted; projected years in muted italics.")
+
+income_years = compute.selectable_years(d.income, d.contributions, active.key)
+default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
+yc, _ = st.columns([1, 5])
+year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
 
 # This year's monthly split first — the headline numbers.
 row = bs[bs["year"] == year]
@@ -194,28 +234,6 @@ with st.expander("Edit allocation"):
         except Exception as exc:
             save_failed(exc)
     st.caption("A saved year carries forward until you set a newer one.")
-
-# Then the slice shifting over the actual years (100% stacked), with the
-# investment segment labelled with both its % and the raw yearly rupees.
-actual = bs[~bs["is_projected"]]
-yr = actual["year"].astype(int).astype(str)
-tot = actual["total_income"]
-needs_p = (100 * actual["needs"] / tot).round(0)
-wants_p = (100 * actual["wants"] / tot).round(0)
-inv_p = (100 * actual["investment"] / tot).round(0)
-inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
-# Colour roles: the derived investment slice is *planned* money, so it wears
-# the secondary accent; needs/wants are neutral grays (a category is not a role).
-f = go.Figure()
-f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
-f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SAND)
-f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=SECONDARY,
-          text=inv_label, textposition="inside",
-          textfont=dict(color="white", size=11), insidetextanchor="middle")
-f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
-style_fig(f, height=300)
-chart_title("The investment slice, year by year (label shows % and ₹/yr invested)")
-st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
 
 with st.expander("Full detail (all years + projections)"):
     st.caption("Current year highlighted; projected years in muted italics.")
