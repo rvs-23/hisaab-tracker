@@ -94,7 +94,7 @@ with edit_card(f"Record what you invested in {year}"):
             st.session_state.pop(seed_key, None)
             saved()
         except Exception as exc:
-            save_failed(exc)
+            save_failed(exc, reset_keys=(seed_key,))
 
 pva = compute.plan_vs_actual(active, d.income, d.targets, d.contributions, year)
 emergency_fund = compute.emergency_fund_target(active, d.income, year)
@@ -146,7 +146,7 @@ metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund),
             f"held: {inr_short(ef_actual)}<br>{ef_status}",
             color=SECONDARY, big=True,
             help=f"The target ({ef_sub}). The sub-line is the buffer you actually "
-                 "hold, entered below and counted in your estimated value as cash.")
+                 "hold, entered below.")
 
 with st.expander("Update emergency fund"):
     st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")

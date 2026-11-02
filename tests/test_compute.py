@@ -216,18 +216,6 @@ def test_job_change_and_yoy_surface_in_budget(rv, income):
     assert bs.loc[2025, "yoy"] == pytest.approx(150.55, abs=0.1)
 
 
-def test_household_sums_actuals_across_people(rv, income, targets, contributions):
-    bob = Profile(
-        key="bob", name="Bob", birth_year=1990, forward_increment_pct=5,
-        default_target=rv.default_target,
-    )
-    income2 = pd.concat([income, income.assign(profile="bob")], ignore_index=True)
-    contrib2 = pd.concat([contributions, contributions.assign(profile="bob")], ignore_index=True)
-    house = compute.household_plan_vs_actual([rv, bob], income2, targets, contrib2, 2024)
-    solo = compute.plan_vs_actual(rv, income, targets, contributions, 2024)
-    assert house["actual"].sum() == pytest.approx(2 * solo["actual"].sum())
-
-
 def test_available_years(income, contributions):
     assert compute.available_years(income, contributions) == [2023, 2024, 2025, 2026]
 
@@ -263,43 +251,11 @@ def test_emergency_fund_target_is_four_months_of_needs_plus_investment(rv):
     assert compute.emergency_fund_target(rv, pd.DataFrame(columns=storage.INCOME_COLUMNS)) == 0.0
 
 
-def test_actual_emergency_fund_overrides_target_in_net_worth(rv, income, targets, contributions):
-    """An entered fund replaces the derived target in both net-worth figures."""
-    with_target = compute.net_worth_to_date(rv, income, contributions, targets, 2025)
-    with_actual = compute.net_worth_to_date(rv, income, contributions, targets, 2025, emergency_fund=100000)
-    ef_target = compute.emergency_fund_target(rv, income, 2025)
-    assert with_actual[0] == pytest.approx(with_target[0] - ef_target + 100000, abs=1)
-    assert with_actual[1] == pytest.approx(with_target[1] - ef_target + 100000, abs=1)
-
-
 def test_emergency_fund_adjustment_field_accepted(rv):
     df = pd.DataFrame([{"profile": "rv", "field": "emergency_fund", "value": 500000}])
     storage.validate_adjustments(df, [rv])
     assert compute.emergency_fund_actual(df, "rv") == 500000
     assert compute.emergency_fund_actual(df, "cheeni") == 0.0
-
-
-def test_net_worth_compounds_at_category_return(rv, targets):
-    contrib = pd.DataFrame([{"year": 2020, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None}])
-    no_income = pd.DataFrame(columns=storage.INCOME_COLUMNS)  # → emergency fund 0
-    actual, potential = compute.net_worth_to_date(rv, no_income, contrib, targets, today_year=2025)
-    assert actual == 100000  # cost basis, no emergency fund
-    assert potential == round(100000 * 1.115 ** 5)  # mfs at 11.5% for 5 years
-
-
-def test_net_worth_adds_derived_emergency_fund(rv, income, targets):
-    contrib = pd.DataFrame([{"year": 2026, "profile": "rv", "category": "mfs", "amount": 50000, "notes": None}])
-    ef = compute.emergency_fund_target(rv, income, 2026)
-    actual, potential = compute.net_worth_to_date(rv, income, contrib, targets, today_year=2026)
-    assert actual == round(50000 + ef)   # 50k invested + EF, no growth yet (same year)
-    assert potential == round(50000 + ef)
-
-
-def test_net_worth_series_projects_ahead(rv, income, targets, contributions):
-    s = compute.net_worth_series(rv, income, contributions, targets, today_year=2025, ahead=5)
-    assert int(s["year"].max()) == 2030  # 2025 + 5
-    assert s["is_projected"].sum() == 5
-    assert (s["potential"] >= s["cost_basis"]).all()  # growth never below cost
 
 
 # Opening corpus (pre-tracking investments).
@@ -329,73 +285,6 @@ def test_opening_corpus_reads_the_named_profile_field():
     assert compute.opening_corpus(adjustments, "rv") == 2000000
     assert compute.opening_corpus(adjustments, "cheeni") == 0
     assert compute.opening_corpus(pd.DataFrame(columns=storage.ADJUSTMENTS_COLUMNS), "rv") == 0.0
-
-
-def test_net_worth_to_date_grows_corpus_from_vintage(rv, targets):
-    """A zero-salary income row anchors the vintage at 2023 without pulling in
-    an emergency fund, isolating the corpus's own growth to 2025."""
-    zero_income = pd.DataFrame([
-        {"profile": "rv", "year": 2023, "month": 1, "salary": 0, "bonus": 0, "other": 0, "job_change": 0}
-    ])
-    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
-    actual, potential = compute.net_worth_to_date(
-        rv, zero_income, no_contrib, targets, today_year=2025, opening=100000)
-    rate = sum(pct / 100 * compute.EXPECTED_RETURNS.get(cat, 0) for cat, pct in rv.default_target.items())
-    assert actual == 100000  # face value; zero income → no budget row → no EF
-    assert potential == round(100000 * (1 + rate / 100) ** (2025 - 2023))
-
-
-def test_net_worth_to_date_excludes_corpus_before_vintage(rv, targets):
-    """today_year before the vintage year: corpus contributes nothing."""
-    zero_income = pd.DataFrame([
-        {"profile": "rv", "year": 2024, "month": 1, "salary": 0, "bonus": 0, "other": 0, "job_change": 0}
-    ])
-    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
-    actual, potential = compute.net_worth_to_date(
-        rv, zero_income, no_contrib, targets, today_year=2023, opening=100000)
-    assert actual == 0  # today_year (2023) < vintage (2024) → nothing counted
-    assert potential == 0
-
-
-def test_net_worth_to_date_no_data_ignores_corpus(rv):
-    """No income or contributions at all → no vintage to anchor to → the
-    corpus contributes nothing even though a value was entered."""
-    no_income = pd.DataFrame(columns=storage.INCOME_COLUMNS)
-    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
-    targets = pd.DataFrame(columns=storage.TARGETS_COLUMNS)
-    actual, potential = compute.net_worth_to_date(
-        rv, no_income, no_contrib, targets, today_year=2025, opening=100000)
-    assert actual == 0
-    assert potential == 0
-
-
-def test_net_worth_series_extends_to_vintage_when_corpus_present(rv, income, targets, contributions):
-    """rv's contributions start 2024, but income (and so the corpus's
-    vintage) starts 2023. With no corpus, the series starts at the first
-    contribution year; with one, it must reach back to the vintage."""
-    without = compute.net_worth_series(rv, income, contributions, targets, today_year=2025, ahead=1)
-    assert without["year"].min() == 2024
-
-    with_corpus = compute.net_worth_series(
-        rv, income, contributions, targets, today_year=2025, ahead=1, opening=100000
-    ).set_index("year")
-    assert with_corpus.index.min() == 2023
-
-    ef = compute.emergency_fund_target(rv, income, 2025)
-    assert with_corpus.loc[2023, "cost_basis"] == round(ef + 100000)  # EF + corpus face value only
-    assert with_corpus.loc[2023, "potential"] == pytest.approx(ef + 100000, abs=1)  # vintage year, no growth yet
-
-    rate = sum(pct / 100 * compute.EXPECTED_RETURNS.get(cat, 0) for cat, pct in rv.default_target.items())
-    grown = 100000 * (1 + rate / 100) ** (2025 - 2023)
-    without_2025 = without.set_index("year").loc[2025, "potential"]
-    assert with_corpus.loc[2025, "potential"] == pytest.approx(without_2025 + grown, abs=1)
-
-
-def test_net_worth_series_zero_opening_is_a_no_op(rv, income, targets, contributions):
-    """opening=0.0 (the default) must reproduce the pre-corpus behaviour exactly."""
-    with_zero = compute.net_worth_series(rv, income, contributions, targets, today_year=2025, ahead=2, opening=0.0)
-    without = compute.net_worth_series(rv, income, contributions, targets, today_year=2025, ahead=2)
-    pd.testing.assert_frame_equal(with_zero, without)
 
 
 def test_catch_up_unaffected_by_opening_corpus(rv):
@@ -641,27 +530,6 @@ def test_save_adjustments_appends_audit_log(tmp_path, rv):
     assert len(rec["added"]) == 1 and rec["added"][0]["value"] == 2000000
     assert rec["removed"] == []
 
-def test_flat_return_overrides_per_category(rv):
-    """config.yaml expected_return_pct: one household rate wins everywhere."""
-    contrib = pd.DataFrame([{"year": 2020, "profile": "rv", "category": "mfs", "amount": 100000, "notes": None}])
-    no_income = pd.DataFrame(columns=storage.INCOME_COLUMNS)
-    targets = pd.DataFrame(columns=storage.TARGETS_COLUMNS)
-    actual, potential = compute.net_worth_to_date(rv, no_income, contrib, targets, 2025, flat_return=10.0)
-    assert potential == round(100000 * 1.10 ** 5)  # flat 10%, not mfs's 11.5%
-    assert compute.expected_return_for_target({"mfs": 100}, flat_return=9.0) == 9.0
-    assert compute.category_return("mfs") == 11.5
-    assert compute.category_return("mfs", 10.0) == 10.0
-
-
-def test_corpus_growth_honours_flat_return(rv):
-    """Regression (Codex 2026-07-20): _corpus_growth_rate dropped flat_return,
-    so a configured single rate silently used per-category rates for the corpus."""
-    targets = pd.DataFrame(columns=storage.TARGETS_COLUMNS)
-    weighted = compute._corpus_growth_rate(rv, targets, 2024)
-    assert weighted != 10.0  # rv's weighted rate isn't coincidentally 10
-    assert compute._corpus_growth_rate(rv, targets, 2024, flat_return=10.0) == 10.0
-
-
 def test_house_fund_compounds_corpus_and_growing_pace():
     """Jan 1 2026 → almost the whole year's pace is still to come."""
     df = compute.house_fund(corpus_today=1_000_000, pace=100_000, pace_growth_pct=10,
@@ -769,3 +637,40 @@ def test_a_new_split_period_leaves_earlier_years_alone(rv, monkeypatch):
     assert after.loc[2026, "investment"] == before.loc[2026, "investment"]
     assert after.loc[2027, "investment"] == before.loc[2026, "investment"] + 600_000  # 60% of the 1M raise
     assert compute.increment_split_for("rv", 2020) == old  # before any period: the earliest
+
+
+def test_allocation_plan_round_trips_through_target_rows(rv):
+    """A year-by-year plan saves only the years that change, and reads back the same."""
+    cats = ["mfs", "gold_metals", "indian_stocks", "us_market", "ppf", "fixed_deposit", "debt_funds"]
+    targets = pd.DataFrame([{"profile": "rv", "year": 2024, "category": "mfs", "pct": 60},
+                            {"profile": "rv", "year": 2024, "category": "gold_metals", "pct": 40}])
+    plan = compute.allocation_plan(rv, targets, [2023, 2024, 2025, 2026], cats)
+    assert plan.set_index("year").loc[2025, "mfs"] == 60  # carried forward from 2024
+    plan.loc[plan["year"] == 2026, cats] = [50, 0, 0, 0, 0, 0, 50]
+    rows = compute.target_rows_from_plan(rv, plan, cats)
+    assert sorted(rows["year"].unique()) == [2024, 2026]  # 2023 = default, 2025 = same as 2024
+    again = compute.allocation_plan(rv, rows, [2023, 2024, 2025, 2026], cats)
+    pd.testing.assert_frame_equal(again[["year", *cats]], plan[["year", *cats]])
+
+
+def test_trailing_zero_income_year_is_still_projected(rv):
+    """A saved all-zero current year mustn't leave that year without a budget row."""
+    rows = [{"profile": "rv", "year": 2025, "month": 1, "salary": 1_200_000, "bonus": 0, "other": 0, "job_change": 0}]
+    rows += [{"profile": "rv", "year": 2026, "month": m, "salary": 0, "bonus": 0, "other": 0, "job_change": 0}
+             for m in range(1, 13)]
+    bs = compute.budget_series(rv, pd.DataFrame(rows), today=dt.date(2026, 6, 1)).set_index("year")
+    assert list(bs.index) == [2025, 2026, 2027, 2028, 2029]
+    assert bs.loc[2026, "is_projected"]
+
+
+def test_corpus_vintage_ignores_zero_income_years():
+    income = pd.DataFrame([
+        {"profile": "rv", "year": 2022, "month": 1, "salary": 0, "bonus": 0, "other": 0, "job_change": 0},
+        {"profile": "rv", "year": 2025, "month": 1, "salary": 100, "bonus": 0, "other": 0, "job_change": 0},
+    ])
+    assert compute.corpus_vintage_year(income, pd.DataFrame(columns=storage.CONTRIB_COLUMNS), "rv") == 2025
+
+
+def test_monthly_pace_is_not_inflated_in_early_january(rv):
+    contrib = pd.DataFrame([{"year": 2027, "profile": "rv", "category": "mfs", "amount": 60_000, "notes": None}])
+    assert compute.monthly_pace([rv], contrib, dt.date(2027, 1, 2)) == pytest.approx(60_000)

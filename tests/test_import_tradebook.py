@@ -220,3 +220,21 @@ def test_arbitrage_and_debt_funds_get_their_own_row(tmp_path):
     assert list(parts["mfs"]["symbol"]) == ["PARAG PARIKH FLEXI CAP FUND - DIRECT PLAN"]
     assert sorted(parts["debt_funds"]["symbol"]) == ["KOTAK EQUITY ARBITRAGE FUND - DIRECT PLAN",
                                                      "PARAG PARIKH LIQUID FUND - DIRECT PLAN"]
+
+
+def test_no_fills_in_the_year_is_refused(tmp_path, data_root):
+    existing = pd.DataFrame([{"year": 2025, "profile": "rv", "category": "mfs", "amount": 500000,
+                              "notes": "kept", "details": "Q&A"}])
+    storage.save_contributions(data_root, existing)
+    csv = write_tradebook(tmp_path, "PARAG,INF1,2026-03-01,NSE,MF,MF,buy,100,50\n")
+    assert imp.run(csv, "rv", 2025, "mfs", replace=True, dry_run=False, root=data_root) == 1
+    assert pd.read_csv(data_root / "contributions.csv").iloc[0]["amount"] == 500000
+
+
+def test_replace_keeps_details(tmp_path, data_root):
+    existing = pd.DataFrame([{"year": 2024, "profile": "rv", "category": "indian_stocks",
+                              "amount": 5000, "notes": "manual", "details": "Q&A kept"}])
+    storage.save_contributions(data_root, existing)
+    csv = write_tradebook(tmp_path, "INFY,INE1,2024-03-01,NSE,EQ,EQ,buy,10,1500\n")
+    assert imp.run(csv, "rv", 2024, None, replace=True, dry_run=False, root=data_root) == 0
+    assert pd.read_csv(data_root / "contributions.csv").iloc[0]["details"] == "Q&A kept"

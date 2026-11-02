@@ -1,10 +1,10 @@
-"""Import a Zerodha equity/MF tradebook CSV as one contribution row.
+"""Import a Zerodha equity/MF tradebook CSV as contribution rows, one per category.
 
 Zerodha's tradebook export (Console → Reports → Tradebook) has one row per
 fill, with (at least) these columns: ``symbol, isin, trade_date, exchange,
 segment, series, trade_type, quantity, price``. This script collapses a
-year's worth of fills into the single number the tracker wants — the net
-rupees actually put in — and writes it as one ``contributions.csv`` row via
+year's worth of fills into the number the tracker wants — the net rupees
+actually put in, per category — and writes it as ``contributions.csv`` rows via
 the normal storage loaders/validators/savers, so it rides the audit log like
 any hand-entered save.
 
@@ -187,14 +187,15 @@ def existing_row(contributions: pd.DataFrame, profile: str, year: int,
 def merged_contributions(contributions: pd.DataFrame, profile: str, year: int,
                          category: str, amount: float, notes: str) -> pd.DataFrame:
     """Returns contributions.csv with the (profile, year, category) row set to
-    ``amount``/``notes`` — replacing it if present, else appending it."""
-    others = contributions[
-        ~((contributions["profile"] == profile) & (contributions["year"] == year)
-          & (contributions["category"] == category))
-    ]
+    ``amount``/``notes`` — replacing it if present, else appending it. A
+    replaced row keeps its ``details`` (the hand-kept Q&A record)."""
+    match = ((contributions["profile"] == profile) & (contributions["year"] == year)
+             & (contributions["category"] == category))
+    details = contributions.loc[match, "details"].iloc[0] if match.any() else None
+    others = contributions[~match]
     new_row = pd.DataFrame([{"year": year, "profile": profile, "category": category,
                              "amount": amount, "notes": notes,
-                             "last_change": "Zerodha tradebook import"}])
+                             "last_change": "Zerodha tradebook import", "details": details}])
     return pd.concat([others, new_row], ignore_index=True)[storage.CONTRIB_COLUMNS]
 
 
@@ -220,6 +221,9 @@ def run(csv_path: Path, profile_key: str, year: int, category_override: str | No
     other_years = {int(y): int(n) for y, n in trade_year[trade_year != year].value_counts().sort_index().items()}
     if other_years:
         print(f"Other years found in the file (ignored): {other_years}")
+    if in_year.empty:
+        print(f"Refusing: no fills dated {year} in the file, so there's nothing to import.")
+        return 1
 
     try:
         parts = split_by_category(in_year, category_override, config.categories)
@@ -264,7 +268,7 @@ def run(csv_path: Path, profile_key: str, year: int, category_override: str | No
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
-        description="Import a Zerodha tradebook CSV as one contribution row (net buys − sells).",
+        description="Import a Zerodha tradebook CSV as contribution rows, one per category (net buys − sells).",
     )
     parser.add_argument("csv_path", type=Path, help="Path to the Zerodha tradebook CSV export.")
     parser.add_argument("--profile", required=True, help="Profile key (matches profiles/<key>.yaml).")

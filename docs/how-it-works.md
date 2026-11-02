@@ -60,17 +60,17 @@ Top to bottom:
    goal side by side, and a line shows what you actually invested.
 3. **Allocation today:** everything you've contributed so far, split across
    instruments and stacked by the year each rupee went in (lightest is oldest).
-4. **Catch up:** if past years fell short of the plan, this is the lump sum
-   that, invested today, pulls you level. Zero means you're on plan. Investing
-   *more* than planned is always fine.
+4. **To be on plan by December:** what's left of this year's goal plus any
+   shortfall from past years, and what that comes to per remaining month.
+   Investing *more* than planned is always fine.
 5. **Health:** short nudges that appear only when something needs a look: no
    income entered yet this year, investing badly behind pace, no emergency
    fund recorded, or this year's mix drifting from target.
 6. **Adjustments:** a small expander at the bottom for your **opening
    corpus**, the money you'd already invested before you started tracking
    (say, ₹20L before 2024). Set it once. It's assumed invested at the start of
-   your first tracked year and grown at the household rate. It counts toward
-   "Invested till date" and the estimated value. It stays out of the budget,
+   your first earning year. It counts toward "Invested till date" at face value
+   and is grown in the House fund. It stays out of the budget,
    the goal, catch-up and plan-vs-actual, which only cover what you've tracked.
 
 On the household page, the tiles and charts add both of you together. Health
@@ -117,22 +117,21 @@ house prices rise too. Registration and stamp duty aren't included.
   where you want money to go.
 - **Zerodha for equities/MFs?** `scripts/zerodha_summary.py` shows what went in
   from any tradebook export, and `scripts/import_tradebook.py` turns a year of
-  it into one contribution row. The README has the commands.
+  it into contribution rows, one per category. The README has the commands.
 
 ## Things that surprise people
 
 - **The emergency-fund *target* is automatic:** your budgeted needs plus
   investment for the last 4 months (`EMERGENCY_FUND_MONTHS`), so it grows with
-  your pay. What you *actually* hold is entered by hand on
-  Investments and counts toward your estimated value.
+  your pay. What you *actually* hold is entered by hand on Investments.
 - **Saving is safe.** Every save is checked first (sums, duplicates, blanks,
   negative numbers except income's *other*) and refused with a message if
   something's off. Every change is also appended to an audit log
   (`changes.jsonl`).
 - **A year you earned nothing** has no budget, so it doesn't distort other
   years.
-- **Catch-up covers past years only.** This year's remaining goal shows as
-  "left to go". On the journey chart, the current year's goal bar covers only
+- **Catch-up is past years' shortfall** in plain rupees, with no growth added.
+  The "To be on plan" banner adds this year's remaining goal to it. On the journey chart, the current year's goal bar covers only
   the part of the year that has passed.
 - The ₹ figures use Indian grouping and short forms: `₹55.8L` is 55.8 lakh,
   `₹3.40Cr` is 3.40 crore.

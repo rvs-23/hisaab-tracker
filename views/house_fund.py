@@ -28,7 +28,7 @@ corpus_help = (f"Everything invested except {left_out}: retirement money that ca
 
 default_monthly = compute.monthly_goal(people, d.income, d.targets, today.year, HOUSE_FUND_EXCLUDED)
 actual_monthly = compute.monthly_pace(people, d.contributions, today, HOUSE_FUND_EXCLUDED)
-default_rate = d.config.expected_return_pct or 10.0
+default_rate = 10.0 if d.config.expected_return_pct is None else d.config.expected_return_pct
 
 section("Assumptions")
 c = st.columns(5)

@@ -422,7 +422,8 @@ def seed_slice_sig(seed_key: str, sig: tuple) -> None:
         st.session_state[seed_key] = sig
 
 
-def stale_since_open(seed_key: str, current_sig: tuple, label: str) -> bool:
+def stale_since_open(seed_key: str, current_sig: tuple, label: str,
+                     reset_keys: tuple[str, ...] = ()) -> bool:
     """Returns True if the on-disk slice changed since the editor opened.
 
     The guard every multi-tab save needs: two tabs (or two people) editing the
@@ -434,12 +435,15 @@ def stale_since_open(seed_key: str, current_sig: tuple, label: str) -> bool:
         seed_key: The key ``seed_slice_sig`` stored the opening fingerprint under.
         current_sig: ``slice_sig`` of the same slice read fresh from disk now.
         label: Human name of what changed, for the warning ("2025's contributions").
+        reset_keys: Session keys holding the editor's own copy of the data, dropped
+            too so the editor really does reload from disk.
     """
     seeded = st.session_state.get(seed_key)
     if seeded is not None and seeded != current_sig:
         flash("warning", f"{label} changed on disk since you opened this. Reloaded with "
                          "the newer data, so please redo your edit.")
-        st.session_state.pop(seed_key, None)
+        for key in (seed_key, *reset_keys):
+            st.session_state.pop(key, None)
         st.rerun()
         return True
     return False
@@ -465,14 +469,18 @@ def saved(message: str = "Saved.") -> None:
     st.rerun()
 
 
-def save_failed(exc: Exception) -> None:
+def save_failed(exc: Exception, reset_keys: tuple[str, ...] = ()) -> None:
     """Reports a failed save honestly.
 
     ``storage.AuditLogError`` means the CSV *was* written and only its audit
     record failed, so it must not read as "Not saved" — the page reloads with
-    the new data and says the change went through unaudited.
+    the new data and says the change went through unaudited. ``reset_keys``
+    (the editor's seed and grid) are dropped in that case, as after any save,
+    so the next save doesn't see a false conflict.
     """
     if isinstance(exc, storage.AuditLogError):
+        for key in reset_keys:
+            st.session_state.pop(key, None)
         flash("warning", f"Saved, but the audit log (changes.jsonl) could not be written: {exc}")
         st.rerun()
     st.error(f"Not saved: {exc}")

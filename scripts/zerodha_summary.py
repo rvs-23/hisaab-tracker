@@ -60,7 +60,10 @@ def load_tradebooks(paths: list[Path]) -> tuple[pd.DataFrame, int]:
     df = pd.concat([read_one(p) for p in paths], ignore_index=True)
     before = len(df)
     if "trade_id" in df.columns:
-        df = df.drop_duplicates(subset=["trade_id", "segment", "symbol", "trade_type"])
+        # Only fills with a trade_id can be matched across files; blank ids
+        # would otherwise all count as one fill.
+        dup = df.duplicated(subset=["trade_id", "segment", "symbol", "trade_type"])
+        df = df[~(df["trade_id"].notna() & dup)]
     dropped = before - len(df)
     df["date"] = pd.to_datetime(df["trade_date"]).dt.date
     df["segment"] = df["segment"].astype(str).str.strip().str.upper()
