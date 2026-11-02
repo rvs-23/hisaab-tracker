@@ -54,7 +54,7 @@ def contributions():
 
 
 def test_budget_derives_from_income_philosophy(rv, income):
-    """Anchor 50/30/20 (2026-07-25), increment unchanged (rv 25/25/50) — the
+    """Anchor 50/30/20 (2026-07-25), increment rv 25/25/50 (pinned in conftest) — the
     anchor investment share moved to 20%, everything else in the calc is as
     before, so the investment targets stay in the same ballpark."""
     bs = compute.budget_series(rv, income, today=TODAY).set_index("year")

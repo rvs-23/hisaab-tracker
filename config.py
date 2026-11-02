@@ -67,7 +67,7 @@ DEFAULT_INCREMENT_SPLIT = {"needs": 30, "wants": 20, "investment": 50}
 # per-person, unchanged.
 PROFILE_BASE_SPLITS = {}
 PROFILE_INCREMENT_SPLITS = {
-    "rv": {"needs": 25, "wants": 25, "investment": 50},
+    "rv": {"needs": 25, "wants": 35, "investment": 40},  # was 25/25/50 until 2026-11-02
     "cheeni": {"needs": 30, "wants": 20, "investment": 50},
 }
 PROJECTION_YEARS_AHEAD = 3  # budget projects to the current year plus this many
