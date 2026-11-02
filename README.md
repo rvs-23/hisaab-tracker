@@ -62,7 +62,7 @@ de-duplicated) and prints buys, sells and net per year, `--by month` or
 
 One person at a time, chosen by URL: `?profile=rv` or `?profile=cheeni`. It
 sticks across pages. There's no switcher and no name on screen; each person
-has their own accent colours. Year pickers run from 2022 to the current year.
+has their own accent colours. Year pickers run from 2023 to the current year.
 
 `?profile=household` (teal) is both people combined. It isn't a profile file;
 it sums the real people. It only reads, so its nav is just Dashboard and
@@ -75,10 +75,10 @@ anyone) last saved data, from `changes.jsonl`.
 
 | Page | Question it answers | Writes |
 |---|---|---|
-| **Dashboard** | Where am I overall? Tiles, the year-on-year journey chart, allocation to date, catch-up, health nudges | opening corpus (Adjustments expander) |
+| **Dashboard** | Where am I overall? What's needed to be on plan by December, tiles, the year-on-year journey, your mix vs the plan, health nudges | nothing |
 | **Income** | What did I earn? 12-month grid per year; a new year pre-fills last year's salary | `income.csv` |
 | **Budget** | How does income split, and where should the investment go? | `targets.csv` (allocation editor) |
-| **Investments** | Record what went in; how does it compare with the plan? | `contributions.csv`, emergency fund held |
+| **Investments** | Record what went in; how does it compare with the plan? | `contributions.csv`, emergency fund held, opening corpus |
 | **House fund** (household) | At this pace, what's our corpus each year (2024–2034)? What must we invest monthly for a down payment of ₹X Cr in Y years? | nothing (live inputs) |
 
 ## The model

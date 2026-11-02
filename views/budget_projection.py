@@ -12,7 +12,7 @@ from ui import (
     FS_BODY, NEEDS, accent_primary, accent_secondary,
     html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
     resync, save_failed, saved, section, seed_slice_sig, slice_sig,
-    stale_since_open,
+    stale_since_open, year_picker,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -78,10 +78,7 @@ section("Budget over time")
 html_table(bs, HEADERS, formats=FMT, row_class=row_class)
 st.caption("Current year highlighted; projected years in muted italics.")
 
-income_years = compute.selectable_years(d.income, d.contributions, active.key)
-default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
-yc, _ = st.columns([1, 5])
-year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
+year = year_picker(compute.selectable_years(d.income, d.contributions, active.key))
 
 # This year's monthly split first — the headline numbers.
 row = bs[bs["year"] == year]

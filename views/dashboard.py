@@ -5,11 +5,10 @@ import plotly.graph_objects as go
 import streamlit as st
 
 import compute
-import storage
 from ui import (
     CHART_TEXT, FS_BODY, FS_HERO, FS_LABEL, SAND, accent_primary,
     accent_secondary, chart_title, inr_axis, inr_short, is_household, load_all, metric_tile,
-    page_header, pretty_category, save_failed, saved, section, style_fig, tint,
+    page_header, pretty_category, section, style_fig,
 )
 
 d = load_all()
@@ -54,6 +53,38 @@ def year_goal_for(year: int) -> float:
     return sum(sum(compute.expected_contributions(p, d.income, d.targets, year).values())
                for p in people)
 
+
+year_goal = year_goal_for(today_year)
+invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
+to_go = max(0.0, year_goal - invested_ty)
+
+# The one number to act on, first: everything still needed to be on plan by
+# December (this year's remainder plus past years' shortfall), and what that is
+# per remaining month.
+needed = to_go + catch_up
+if needed > 0:
+    n = compute.months_left()
+    parts = [f"{inr_short(to_go)} left of {today_year}'s goal"] if to_go > 0 else []
+    if catch_up > 0:
+        parts.append(f"{inr_short(catch_up)} past years' shortfall")
+    st.markdown(
+        f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
+        f"padding:14px 18px;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
+        f"<span style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
+        f"To be on plan by Dec {today_year}</span>"
+        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(needed)}</span>"
+        f"<span style='font-size:{FS_BODY};color:var(--muted)'>{' + '.join(parts)}. That's about "
+        f"<b>{inr_short(needed / n)} a month</b> for {compute.month_span()}.</span></div>",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
+        f"padding:12px 18px;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
+        f"You're on plan for {today_year} and every past year. Anything extra overshoots the goal.</div>",
+        unsafe_allow_html=True,
+    )
+
 section("Lifetime")
 c = st.columns(3)
 metric_tile(c[0], "Earned till date", inr_short(earned), year_range, big=True,
@@ -65,9 +96,6 @@ metric_tile(c[1], "Invested till date", inr_short(invested), year_range, big=Tru
             help=invested_help)
 # The plan tile headlines the TOTAL to invest to be fully on track: this
 # year's goal plus the catch-up from past years. The sub-lines split it.
-year_goal = year_goal_for(today_year)
-invested_ty = float(contrib.loc[contrib["year"] == today_year, "amount"].sum())
-to_go = max(0.0, year_goal - invested_ty)
 plan_sub = (
     ("no past shortfall" if catch_up == 0 else f"past years' shortfall: {inr_short(catch_up)}")
     + "<br>"
@@ -79,10 +107,6 @@ metric_tile(c[2], f"{today_year} total goal", inr_short(year_goal + catch_up), p
                  f"past years ({inr_short(catch_up)}). "
                  f"'{today_year} left' is the year's goal minus the {inr_short(invested_ty)} "
                  "you've already put in. Overshooting is fine.")
-
-if not household:
-    if st.button("Record an investment", icon=":material/add_circle:"):
-        st.switch_page("views/investments.py")
 
 # The journey: income and the goal as bars, actual investment riding along as
 # a line, all on one shared rupee axis (one axis only — dual axes hinder
@@ -130,68 +154,36 @@ else:
     st.caption("Bars: income and the planned goal (the small % is the share of income the plan targets to invest). Line: what you actually invested.")
 
 
-# Allocation today: cumulative contributions to date, by category — still
-# cumulative across all years, but stacked by the year each rupee went in.
-# Segments tint from the primary accent (oldest year lightest, newest year
-# the accent itself), so the mix's build-up over time reads at a glance.
-chart_title("Allocation today",
-            help="How everything you've contributed so far splits across instruments, "
-                 "stacked by the year it went in.")
-by_category = contrib.groupby("category")["amount"].sum()
-by_category = by_category[by_category > 0].sort_values()
-if by_category.empty:
+# Your mix against the plan, all years so far: each instrument's share of what
+# you actually put in beside its share of what the plan asked for. Actual wears
+# the primary accent, plan the secondary, as everywhere.
+chart_title("Your mix vs the plan, all years so far",
+            help="Each instrument's share of everything you've invested, beside its share "
+                 "of everything the plan asked for over the same years.")
+plan_total: dict[str, float] = {}
+for y in sorted(int(v) for v in contrib["year"].dropna().unique()):
+    for p in people:
+        for cat, amt in compute.expected_contributions(p, d.income, d.targets, y).items():
+            plan_total[cat] = plan_total.get(cat, 0.0) + amt
+actual_total = contrib.groupby("category")["amount"].sum().to_dict()
+cats = [c for c in d.config.categories if actual_total.get(c, 0) > 0 or plan_total.get(c, 0) > 0]
+if not cats:
     st.caption("Record an investment on Investments to see how it's split.")
 else:
-    total = by_category.sum()
-    # The share lives in the category label itself — bar-end text traces kept
-    # colliding with segment edges.
-    labels = [f"{pretty_category(cat)} · {100 * v / total:.0f}%"
-              for cat, v in by_category.items()]
-    years = sorted(int(y) for y in contrib["year"].dropna().unique())
-    n_years = len(years)
-
+    a_sum, p_sum = sum(actual_total.values()) or 1, sum(plan_total.values()) or 1
+    a_pct = [100 * actual_total.get(c, 0) / a_sum for c in cats]
+    p_pct = [100 * plan_total.get(c, 0) / p_sum for c in cats]
+    labels = [pretty_category(c) for c in cats][::-1]
     f = go.Figure()
-    for i, yr in enumerate(years):
-        # Oldest (i=0) lightest, newest (i=n-1) the accent itself (fraction 0).
-        fraction = 0.0 if n_years <= 1 else 0.65 * (n_years - 1 - i) / (n_years - 1)
-        amounts = [
-            float(contrib.loc[(contrib["category"] == cat) & (contrib["year"] == yr), "amount"].sum())
-            for cat in by_category.index
-        ]
-        f.add_bar(y=labels, x=amounts, orientation="h", name=str(yr),
-                  marker_color=tint(PRIMARY, fraction))
-    f.update_layout(barmode="stack")
-    inr_axis(f, by_category.max(), axis="x")
-    style_fig(f, height=max(220, 40 * len(labels)))
+    f.add_bar(y=labels, x=p_pct[::-1], name="Plan", orientation="h", marker_color=SECONDARY,
+              text=[f"{v:.0f}%" for v in p_pct[::-1]], textposition="outside")
+    f.add_bar(y=labels, x=a_pct[::-1], name="Actual", orientation="h", marker_color=PRIMARY,
+              text=[f"{v:.0f}%" for v in a_pct[::-1]], textposition="outside")
+    f.update_traces(cliponaxis=False)
+    f.update_layout(barmode="group", xaxis=dict(ticksuffix="%", range=[0, 1.15 * max(a_pct + p_pct)]))
+    style_fig(f, height=max(240, 46 * len(cats)))
     f.update_yaxes(showgrid=False)
     st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-
-# The one number to act on, last, once you've seen the journey: everything
-# still needed to be on plan by December, this year's remainder plus the past
-# years' shortfall, and what that is per remaining month.
-needed = to_go + catch_up
-if needed > 0:
-    n = compute.months_left()
-    parts = [f"{inr_short(to_go)} left of {today_year}'s goal"] if to_go > 0 else []
-    if catch_up > 0:
-        parts.append(f"{inr_short(catch_up)} past years' shortfall")
-    st.markdown(
-        f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
-        f"padding:14px 18px;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"
-        f"<span style='font-size:{FS_LABEL};color:var(--muted);text-transform:uppercase;letter-spacing:.05em'>"
-        f"To be on plan by Dec {today_year}</span>"
-        f"<span style='font-size:{FS_HERO};font-weight:700;color:{SECONDARY}'>{inr_short(needed)}</span>"
-        f"<span style='font-size:{FS_BODY};color:var(--muted)'>{' + '.join(parts)}. That's about "
-        f"<b>{inr_short(needed / n)} a month</b> for {compute.month_span()}.</span></div>",
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        f"<div style='border:1px solid {PRIMARY}33;background:{PRIMARY}0d;border-radius:12px;"
-        f"padding:12px 18px;color:{PRIMARY};font-weight:600;font-size:{FS_BODY}'>"
-        f"You're on plan for {today_year} and every past year. Anything extra overshoots the goal.</div>",
-        unsafe_allow_html=True,
-    )
 
 # Health nudges: quiet, plain-language findings — nothing renders when healthy.
 # Per person only: with no names on screen, a combined list couldn't say whose
@@ -203,36 +195,3 @@ if findings:
     section("Health")
     for finding in findings:
         st.caption(finding)
-
-# Adjustments live in a quiet expander at the very bottom — the dashboard stays
-# summary-first, and this is a one-off setting, not something read every visit.
-if household:
-    st.stop()  # the opening corpus is set per person
-with st.expander("Adjustments"):
-    st.caption(
-        "One-off figures that don't fit the year-by-year history. Opening corpus is "
-        "money you'd already invested before you started tracking here. It's added "
-        "to Invested till date at face value. The House fund also counts it, "
-        "grown from the start of your first tracked year."
-    )
-    new_opening = st.number_input(
-        "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,
-        key=f"opening_corpus_{profile.key}",
-    )
-    st.caption(f"= {inr_short(new_opening)}")
-    if st.button("Save", key=f"save_adjustments_{profile.key}", type="primary"):
-        try:
-            # Fresh read so the emergency-fund row (same file, different field)
-            # saved from Investments isn't reverted by this opening-corpus save.
-            fresh = storage.load_adjustments(d.root, d.profiles)
-            others = fresh[
-                ~((fresh["profile"] == profile.key) & (fresh["field"] == "opening_corpus"))
-            ]
-            rows = pd.DataFrame([{"profile": profile.key, "field": "opening_corpus", "value": new_opening}])
-            rows = rows[rows["value"] > 0]  # a zero corpus is just "nothing recorded"
-            merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
-            storage.validate_adjustments(merged, d.profiles)
-            storage.save_adjustments(d.root, merged)
-            saved()
-        except Exception as exc:
-            save_failed(exc)

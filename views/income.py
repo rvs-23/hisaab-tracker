@@ -1,5 +1,3 @@
-import datetime as dt
-
 import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
@@ -10,7 +8,7 @@ from config import INCOME_COMPONENTS as COMPONENTS
 from ui import (
     CHART_TEXT, MARKER, accent_primary, accent_secondary, edit_card, flash,
     inr_axis, inr_short, load_all, page_header, resync, save_failed, saved,
-    section, style_fig,
+    section, style_fig, year_picker,
 )
 
 d = load_all()
@@ -51,11 +49,7 @@ if not visible.empty:
 section("Enter income")
 st.caption("Pick a year and fill the 12 months. Salary, bonus, and anything else (RSU vesting, an FD or RD maturing) under Other.")
 
-this_year = dt.date.today().year
-year_options = compute.selectable_years(d.income, d.contributions, active.key)
-default_year = this_year if this_year in year_options else year_options[-1]
-c1, _ = st.columns([1, 3])
-year = int(c1.selectbox("Year", year_options, index=year_options.index(default_year)))
+year = year_picker(compute.selectable_years(d.income, d.contributions, active.key))
 
 
 def annual(yr):

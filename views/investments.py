@@ -12,7 +12,7 @@ from ui import (
     GRID, ON_TRACK_PCT, accent_primary, accent_secondary, chart_title, edit_card,
     inr_axis, inr_short, load_all, metric_tile, page_header,
     pretty_category, save_failed, saved, section, seed_slice_sig, slice_sig,
-    stale_since_open, style_fig,
+    stale_since_open, style_fig, year_picker,
 )
 
 d = load_all()
@@ -23,11 +23,7 @@ st.caption("Record what you invested, then see it against the plan.")
 if d.income[d.income["profile"] == active.key].empty:
     st.info("No data yet. Add income first.")
     st.stop()
-years = compute.selectable_years(d.income, d.contributions, active.key)
-
-default = dt.date.today().year if dt.date.today().year in years else years[-1]
-yc, _ = st.columns([1, 5])
-year = int(yc.selectbox("Year", years, index=years.index(default)))
+year = year_picker(compute.selectable_years(d.income, d.contributions, active.key))
 
 def contrib_slice(df):
     """This person's rows for the picked year, from ``df``."""
@@ -52,6 +48,9 @@ with edit_card(f"Record what you invested in {year}"):
     text_cols = ["notes", "last_change", "details"]
     mine[text_cols] = mine[text_cols].astype("string")
     # Read-only, from the audit log; never saved (the save keeps CONTRIB_COLUMNS only).
+    # Read-only, from the plan: this year's goal for each instrument.
+    goal = compute.expected_contributions(active, d.income, d.targets, year)
+    mine["target"] = [round(goal.get(c, 0.0)) for c in mine["category"]]
     stamps = row_last_changed(d.root, "contributions.csv", ["profile", "year", "category"])
     mine["updated"] = [
         f"{stamps[(active.key, year, c)]:%-d %b %Y}" if (active.key, year, c) in stamps else ""
@@ -62,11 +61,15 @@ with edit_card(f"Record what you invested in {year}"):
         num_rows="dynamic", hide_index=True, width="stretch",
         key=f"contrib_{active.key}_{year}",
         # `details` (the Q&A record) rides along unseen, so a save keeps it.
-        column_order=["category", "amount", "updated", "last_change", "notes"],
+        column_order=["category", "amount", "target", "updated", "last_change", "notes"],
         column_config={
             "category": st.column_config.SelectboxColumn(
                 "Category", options=d.config.categories, format_func=pretty_category, required=True),
             "amount": st.column_config.NumberColumn("Amount (₹)", required=True, format="localized"),
+            "target": st.column_config.NumberColumn(
+                "Target (₹)", disabled=True, format="localized",
+                help=f"This instrument's goal for {year}: the year's investment × its target % "
+                     "on Budget. Rows added since the page loaded show it after saving."),
             "updated": st.column_config.TextColumn(
                 "Last updated", disabled=True,
                 help="When this row's amount last changed, from the audit log. Blank "
@@ -142,31 +145,65 @@ metric_tile(cols[0], "Goal achieved", f"{goal_pct:.0f}%", f"of {year}'s plan",
             color=PRIMARY if goal_pct >= ON_TRACK_PCT else SECONDARY, big=True)
 metric_tile(cols[1], "Invested", inr_short(pva["actual"].sum()),
             f"of {inr_short(pva['expected'].sum())} planned", big=True)
+# What's held is today's figure, so it only means something on the current year.
+is_current = year == dt.date.today().year
 metric_tile(cols[2], "Emergency-fund goal", inr_short(emergency_fund),
-            f"held: {inr_short(ef_actual)}<br>{ef_status}",
+            f"held: {inr_short(ef_actual)}<br>{ef_status}" if is_current else f"as of Dec {year}",
             color=SECONDARY, big=True,
-            help=f"The target ({ef_sub}). The sub-line is the buffer you actually "
-                 "hold, entered below.")
+            help=f"The target ({ef_sub})."
+                 + (" The sub-line is the buffer you actually hold, entered below." if is_current else ""))
 
-with st.expander("Update emergency fund"):
-    st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
-    new_ef = st.number_input("Emergency fund held (₹)", min_value=0, value=int(ef_actual),
-                             step=10000, key=f"ef_{active.key}")
-    st.caption(f"= {inr_short(new_ef)}")
-    if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
+if is_current:
+    with st.expander("Update emergency fund"):
+        st.caption("The cash/liquid buffer you actually hold. Audited like any other save.")
+        new_ef = st.number_input("Emergency fund held (₹)", min_value=0, value=int(ef_actual),
+                                 step=10000, key=f"ef_{active.key}")
+        st.caption(f"= {inr_short(new_ef)}")
+        if st.button("Save", key=f"save_ef_{active.key}", type="primary"):
+            try:
+                fresh = storage.load_adjustments(d.root, d.profiles)
+                others = fresh[
+                    ~((fresh["profile"] == active.key) & (fresh["field"] == "emergency_fund"))
+                ]
+                rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
+                rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
+                merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
+                storage.validate_adjustments(merged, d.profiles)
+                storage.save_adjustments(d.root, merged)
+                saved()
+            except Exception as exc:
+                save_failed(exc)
+st.write("")
+
+st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your budgeted needs plus investment."
+           + (" What you actually hold goes in the expander above." if is_current else ""))
+
+# The opening corpus is set once, so it sits at the very bottom, out of the way.
+opening = compute.opening_corpus(d.adjustments, active.key)
+with st.expander("Invested before tracking"):
+    st.caption(
+        "Money you'd already invested before you started tracking here. It's added to "
+        "Invested till date on the Dashboard at face value. The House fund also counts "
+        "it, grown from the start of your first earning year."
+    )
+    new_opening = st.number_input(
+        "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,
+        key=f"opening_corpus_{active.key}",
+    )
+    st.caption(f"= {inr_short(new_opening)}")
+    if st.button("Save", key=f"save_opening_{active.key}", type="primary"):
         try:
+            # Fresh read so the emergency-fund row (same file, different field)
+            # isn't reverted by this save.
             fresh = storage.load_adjustments(d.root, d.profiles)
             others = fresh[
-                ~((fresh["profile"] == active.key) & (fresh["field"] == "emergency_fund"))
+                ~((fresh["profile"] == active.key) & (fresh["field"] == "opening_corpus"))
             ]
-            rows = pd.DataFrame([{"profile": active.key, "field": "emergency_fund", "value": new_ef}])
-            rows = rows[rows["value"] > 0]  # zero means "nothing recorded"
+            rows = pd.DataFrame([{"profile": active.key, "field": "opening_corpus", "value": new_opening}])
+            rows = rows[rows["value"] > 0]  # a zero corpus is just "nothing recorded"
             merged = pd.concat([others, rows], ignore_index=True)[storage.ADJUSTMENTS_COLUMNS]
             storage.validate_adjustments(merged, d.profiles)
             storage.save_adjustments(d.root, merged)
             saved()
         except Exception as exc:
             save_failed(exc)
-st.write("")
-
-st.caption(f"The emergency-fund goal above is {EMERGENCY_FUND_MONTHS} months of your budgeted needs plus investment. What you actually hold goes in the expander above.")
