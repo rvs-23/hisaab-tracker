@@ -182,14 +182,16 @@ if st.button("Save allocation plan", key=f"save_plan_{active.key}", type="primar
         # guard on this person's whole plan.
         fresh = storage.load_targets(d.root, d.config, d.profiles)
         if stale_since_open(seed_key, slice_sig(fresh[pmask(fresh)], ["year", "category", "pct"]),
-                            "the allocation plan"):
+                            "the allocation plan", reset_keys=(pgkey, pvkey)):
             st.stop()
         rows = compute.target_rows_from_plan(active, plan_edited, cats)
-        merged = pd.concat([fresh[~pmask(fresh)], rows], ignore_index=True)
+        # Saved years outside the grid's window aren't shown, so keep them.
+        outside = pmask(fresh) & ~fresh["year"].isin(plan_years)
+        merged = pd.concat([fresh[~pmask(fresh) | outside], rows], ignore_index=True)
         storage.validate_targets(merged, d.config, d.profiles)
         storage.save_targets(d.root, merged)
         st.session_state.pop(seed_key, None)
         del st.session_state[pgkey]
         saved()
     except Exception as exc:
-        save_failed(exc)
+        save_failed(exc, reset_keys=(seed_key, pgkey, pvkey))

@@ -4,8 +4,8 @@ A local Streamlit app for two people that replaced a finance-tracking Excel.
 It answers one question: **did we invest what the plan said this year?** So it
 tracks **contributions vs goal**. You enter income; the budget, the goal, and
 the plan-vs-actual comparison are derived from it. Balances are never entered.
-Where a portfolio value appears, it is an *estimate* from contributions and an
-expected return, and is labelled that way.
+The one place money is grown at an assumed return is the House fund
+projection, and it's labelled as a projection.
 
 New here? **[docs/how-it-works.md](docs/how-it-works.md)** is the 5-minute,
 no-jargon guide.
@@ -98,18 +98,15 @@ anyone) last saved data, from `changes.jsonl`.
 - **Catch-up** = the lump sum that, invested today, erases every *past* year's
   shortfall in plain rupees (no growth). The current year's gap is "left to
   go", not catch-up. Overshooting is fine.
-- **Estimated value** = contributions compounded at the expected return, plus
-  the emergency fund (the amount held, or the derived target until one is
-  entered), plus any opening corpus. It's a projection, not a valuation.
-- **One rate everywhere:** `expected_return_pct` in `config.yaml` is the single
-  growth rate for estimated value and corpus. Remove it to fall back
-  to per-category `EXPECTED_RETURNS` in `config.py`.
+- **Expected return:** `expected_return_pct` in `config.yaml` is the House
+  fund's default return. Without it, the House fund uses 10%.
 - **Emergency fund target** = budgeted needs + investment over the last
   `EMERGENCY_FUND_MONTHS` (4) months, up to today. Each month uses its own
   year's monthly budget.
 - **Opening corpus** is money invested before tracking began. It's assumed
-  invested at the start of your first tracked year and counts toward invested
-  and estimated value. It never touches the budget, goal, or catch-up.
+  invested at the start of your first earning year, counts toward Invested
+  till date, and is grown in the House fund. It never touches the budget,
+  goal, or catch-up.
 - **Health nudges** appear only when something needs a look: no income this
   year, investing under half the elapsed-year pace, no emergency fund recorded,
   or this year's mix ≥ 15 points off target.

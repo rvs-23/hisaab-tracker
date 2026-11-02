@@ -79,7 +79,7 @@ def rows_sig(rows):
     if rows.empty:
         return ()
     return tuple(sorted(
-        tuple(int(round(float(v))) for v in r) for r in rows[cols].to_numpy()
+        tuple(round(float(v), 2) for v in r) for r in rows[cols].to_numpy()
     ))
 
 
@@ -134,7 +134,9 @@ with edit_card(f"Enter {year}"):
     # yet, it isn't here, and this reads "in sync" — telling you the edit hasn't
     # registered before you hit Save.
     preview = edited[COMPONENTS].assign(month=range(1, 13), job_change=int(job_change))
-    pending = rows_sig(preview) != rows_sig(disk_rows(year))
+    # An untouched, all-zero grid for a year with nothing saved isn't a change.
+    blank_new = disk_rows(year).empty and not edited[COMPONENTS].fillna(0).to_numpy().any()
+    pending = not blank_new and rows_sig(preview) != rows_sig(disk_rows(year))
     if pending:
         st.markdown(f"<div style='color:{PRIMARY};font-weight:600;font-size:.82rem'>"
                     "● Unsaved changes. Press Enter to commit the cell, then Save.</div>",
@@ -158,8 +160,9 @@ with edit_card(f"Enter {year}"):
                              "Reloaded. Re-enter your change so nothing is overwritten.")
             ss.pop(gkey, None)
             ss.pop(skey, None)
+            ss.pop(f"{base}_jc", None)
             st.rerun()
-        elif rows_sig(new) == current:
+        elif blank_new or rows_sig(new) == current:
             # Nothing to write. Most often the last-typed cell never committed:
             # Streamlit's editor only captures a cell once it loses focus.
             st.toast("Nothing saved: your last edit hasn't committed.", icon=":material/warning:")
@@ -176,7 +179,7 @@ with edit_card(f"Enter {year}"):
                 ss.pop(skey, None)
                 saved(f"Saved: {inr_short(total)} across {filled} month{'s' if filled != 1 else ''} of {year}.")
             except Exception as exc:
-                save_failed(exc)
+                save_failed(exc, reset_keys=(gkey, skey))
     b3.markdown(
         f"<div style='padding-top:.4rem;color:var(--muted)'>{filled} of 12 months entered &nbsp;·&nbsp; "
         f"<b style='color:var(--text)'>{inr_short(total)}</b> for {year} ({delta})</div>",

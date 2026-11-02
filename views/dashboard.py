@@ -42,9 +42,6 @@ year_range = (
     else "no years yet"
 )
 
-flat_return = d.config.expected_return_pct  # "we only use one" — config.yaml override
-growth_basis = (f"a flat {flat_return:g}% a year (expected_return_pct in config.yaml)"
-                if flat_return is not None else "conservative per-category returns")
 catch_up = sum(compute.catch_up_amount(p, d.income, d.targets, d.contributions, today_year)
                for p in people)
 earned = float(trend["total_income"].sum())
@@ -215,10 +212,8 @@ with st.expander("Adjustments"):
     st.caption(
         "One-off figures that don't fit the year-by-year history. Opening corpus is "
         "money you'd already invested before you started tracking here. It's added "
-        "to your totals and audited like any other save, assumed invested at the "
-        "start of your first tracked year and grown at "
-        + (growth_basis if flat_return is not None
-           else "your allocation-weighted expected return") + "."
+        "to Invested till date at face value. The House fund also counts it, "
+        "grown from the start of your first tracked year."
     )
     new_opening = st.number_input(
         "Invested before tracking (₹)", min_value=0, value=int(opening), step=10000,

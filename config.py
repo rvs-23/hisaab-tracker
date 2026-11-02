@@ -90,18 +90,6 @@ ON_TRACK_PCT = 75  # a year is "on track" at or above this share of its goal
 # starts 2023, so 2022 sits below it as an empty floor.
 BASELINE_YEAR = 2022
 
-# Conservative expected annual returns per category, for the net-worth
-# projection (base estimates + 0.5%). Tune here. The emergency fund is treated
-# as held cash (no growth).
-EXPECTED_RETURNS = {
-    "indian_stocks": 11.5, "mfs": 11.5, "us_market": 9.5, "gold_metals": 7.5,
-    "epf": 8.25, "ppf": 7.1, "nps": 10.0,  # EPF and PPF at their declared rates
-    "aif": 12.0,
-    "fixed_deposit": 7.0,
-    "debt_funds": 6.5,
-}
-NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
-
 # Emergency-fund *target* = budgeted needs + investment over this many months,
 # the latest ones up to today (2026-11-02). The *actual* fund held is entered by
 # hand (see storage.ALLOWED_ADJUSTMENTS).

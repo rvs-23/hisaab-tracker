@@ -54,10 +54,8 @@ class Config(BaseModel):
 
     Attributes:
         categories: The shared asset-class vocabulary.
-        expected_return_pct: Optional single expected annual return (% p.a.).
-            When set, it is THE growth rate everywhere — net worth and corpus
-            — replacing the per-category
-            ``config.EXPECTED_RETURNS``. Absent, per-category rates apply.
+        expected_return_pct: Optional expected annual return (% p.a.), the
+            House fund's default return. Absent, the House fund uses 10%.
     """
 
     categories: list[str]
