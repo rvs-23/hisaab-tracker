@@ -754,3 +754,18 @@ def test_monthly_goal_sums_the_plan_without_retirement(rv, income, targets):
     expected = sum(v for c, v in goal.items() if c not in ("epf", "ppf", "nps")) / 12
     assert compute.monthly_goal([rv], income, targets, 2025, ["epf", "ppf", "nps"]) == pytest.approx(expected)
     assert compute.monthly_goal([rv], income, targets, 2025) == pytest.approx(sum(goal.values()) / 12)
+
+
+def test_a_new_split_period_leaves_earlier_years_alone(rv, monkeypatch):
+    """Locking 2023–2026 and starting a new split in 2027 changes only 2027 on."""
+    income = pd.DataFrame([{"profile": "rv", "year": y, "month": 1, "salary": s, "bonus": 0, "other": 0,
+                            "job_change": 0} for y, s in ((2025, 1_000_000), (2026, 2_000_000), (2027, 3_000_000))])
+    old = {"needs": 25, "wants": 30, "investment": 45}
+    monkeypatch.setattr(compute, "PROFILE_INCREMENT_SPLIT_PERIODS", {"rv": {2023: old}})
+    before = compute.budget_series(rv, income, today=dt.date(2027, 6, 1)).set_index("year")
+    monkeypatch.setattr(compute, "PROFILE_INCREMENT_SPLIT_PERIODS",
+                        {"rv": {2023: old, 2027: {"needs": 20, "wants": 20, "investment": 60}}})
+    after = compute.budget_series(rv, income, today=dt.date(2027, 6, 1)).set_index("year")
+    assert after.loc[2026, "investment"] == before.loc[2026, "investment"]
+    assert after.loc[2027, "investment"] == before.loc[2026, "investment"] + 600_000  # 60% of the 1M raise
+    assert compute.increment_split_for("rv", 2020) == old  # before any period: the earliest

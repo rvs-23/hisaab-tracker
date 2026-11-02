@@ -2,7 +2,8 @@
 
 Budget is *derived from income*, not entered. The philosophy is fixed; the
 split percentages come from config (DEFAULT_BASE_SPLIT / _INCREMENT_SPLIT, with
-per-person increment overrides in PROFILE_INCREMENT_SPLITS):
+per-person increment overrides in PROFILE_INCREMENT_SPLITS, or by period in
+PROFILE_INCREMENT_SPLIT_PERIODS):
 
   - In the anchor year (first earning year), total income splits across
     needs / wants / investment per the base split (50/30/20, shared).
@@ -28,7 +29,8 @@ import pandas as pd
 from config import (
     BASELINE_YEAR, CATEGORY_LABELS, DEFAULT_BASE_SPLIT, DEFAULT_INCREMENT_SPLIT,
     EMERGENCY_FUND_MONTHS, EXPECTED_RETURNS, INCOME_COMPONENTS,
-    NETWORTH_PROJECTION_YEARS, PROFILE_BASE_SPLITS, PROFILE_INCREMENT_SPLITS,
+    NETWORTH_PROJECTION_YEARS, PROFILE_BASE_SPLITS, PROFILE_INCREMENT_SPLIT_PERIODS,
+    PROFILE_INCREMENT_SPLITS,
     PROJECTION_YEARS_AHEAD,
 )
 from models import Profile
@@ -58,6 +60,17 @@ def annual_income(income: pd.DataFrame) -> pd.DataFrame:
     return income.groupby(["profile", "year"], as_index=False).agg(agg)
 
 
+def increment_split_for(profile_key: str, year: int) -> dict:
+    """The split a raise in ``year`` uses: the latest period starting on or
+    before ``year`` (the earliest period for years before any), else the
+    person's single split, else the default."""
+    periods = PROFILE_INCREMENT_SPLIT_PERIODS.get(profile_key)
+    if periods:
+        started = [y for y in periods if y <= year]
+        return periods[max(started) if started else min(periods)]
+    return PROFILE_INCREMENT_SPLITS.get(profile_key, DEFAULT_INCREMENT_SPLIT)
+
+
 def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None = None) -> pd.DataFrame:
     """Per-year derived budget for one person: total income split into annual +
     monthly needs/wants/investment via the anchor + increment philosophy, with a
@@ -77,7 +90,6 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
     yearly = annual_income(income)
     rows = yearly[yearly["profile"] == profile.key].sort_values("year")
     base_split = PROFILE_BASE_SPLITS.get(profile.key, DEFAULT_BASE_SPLIT)
-    increment_split = PROFILE_INCREMENT_SPLITS.get(profile.key, DEFAULT_INCREMENT_SPLIT)
 
     out = []
     prev_total = None
@@ -92,7 +104,8 @@ def budget_series(profile: Profile, income: pd.DataFrame, today: dt.date | None 
             amt = {k: prev[k] * total / prev_total for k in prev}
         else:
             delta = total - prev_total
-            amt = {k: prev[k] + delta * increment_split[k] / 100 for k in increment_split}
+            split = increment_split_for(profile.key, year)
+            amt = {k: prev[k] + delta * split[k] / 100 for k in split}
         cumulative += amt["investment"]
         yoy = (total / prev_total - 1) * 100 if prev_total else None
         out.append(
