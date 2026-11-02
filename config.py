@@ -88,6 +88,7 @@ EXPECTED_RETURNS = {
     "epf": 8.25, "ppf": 7.1, "nps": 10.0,  # EPF and PPF at their declared rates
     "aif": 12.0,
     "fixed_deposit": 7.0,
+    "house_equity": 10.0, "house_arbitrage": 6.5,
 }
 NETWORTH_PROJECTION_YEARS = 5  # how far the net-worth projection looks ahead
 
@@ -111,4 +112,17 @@ CATEGORY_LABELS = {
     "nps": "NPS",
     "aif": "AIF",
     "gold_metals": "Gold",
+    "house_equity": "House pot: equity",
+    "house_arbitrage": "House pot: arbitrage",
+}
+
+# The house pot (2026-11-02): from 2027, new money for the down payment goes to
+# its own two categories, so it never mixes with what was already held. The
+# tradebook importer routes these funds there; everything else keeps its usual
+# category.
+HOUSE_POT_START_YEAR = 2027
+HOUSE_POT_ARBITRAGE = r"\bARBITRAGE\b"
+HOUSE_POT_EQUITY_FUNDS = {
+    "rv": [r"\bPARAG PARIKH FLEXI CAP\b", r"\bNIFTY ?500 MULTICAP\b"],
+    "cheeni": [r"\bPARAG PARIKH FLEXI CAP\b", r"\bUTI NIFTY 50 INDEX\b"],
 }

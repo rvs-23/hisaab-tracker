@@ -206,3 +206,20 @@ def test_gold_etfs_on_the_stock_segment_go_to_gold(tmp_path):
     parts = imp.split_by_category(df, None, ["indian_stocks", "mfs", "gold_metals"])
     assert sorted(parts["gold_metals"]["symbol"]) == ["GOLDCASE", "SILVERIETF"]
     assert list(parts["indian_stocks"]["symbol"]) == ["GOLDIAM"]  # a jeweller, not an ETF
+
+
+def test_house_pot_funds_get_their_own_rows_from_2027(tmp_path):
+    csv = write_tradebook(
+        tmp_path,
+        "PARAG PARIKH FLEXI CAP FUND - DIRECT PLAN,INF1,2027-02-01,BSE,MF,,buy,10,100\n"
+        "KOTAK EQUITY ARBITRAGE FUND - DIRECT PLAN,INF2,2027-02-01,BSE,MF,,buy,5,40\n"
+        "EDELWEISS SMALL CAP FUND - DIRECT PLAN,INF3,2027-02-01,BSE,MF,,buy,1,50\n",
+    )
+    df = imp.read_tradebook(csv)
+    known = ["mfs", "gold_metals", "house_equity", "house_arbitrage"]
+    parts = imp.split_by_category(df, None, known, "rv", 2027)
+    assert list(parts["house_equity"]["symbol"]) == ["PARAG PARIKH FLEXI CAP FUND - DIRECT PLAN"]
+    assert list(parts["house_arbitrage"]["symbol"]) == ["KOTAK EQUITY ARBITRAGE FUND - DIRECT PLAN"]
+    assert list(parts["mfs"]["symbol"]) == ["EDELWEISS SMALL CAP FUND - DIRECT PLAN"]
+    # Before 2027 the same funds stay plain mutual funds.
+    assert set(imp.split_by_category(df, None, known, "rv", 2026)) == {"mfs"}

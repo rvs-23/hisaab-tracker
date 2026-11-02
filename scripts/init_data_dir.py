@@ -14,7 +14,8 @@ from pathlib import Path
 
 CONFIG = """\
 # Shared asset-class vocabulary; targets and contributions may only use these.
-categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]
+categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals, aif,
+             house_equity, house_arbitrage]
 """
 
 PROFILE = """\
