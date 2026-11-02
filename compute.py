@@ -394,29 +394,24 @@ def month_span(today: dt.date | None = None) -> str:
 
 
 def catch_up_amount(profile: Profile, income: pd.DataFrame, targets: pd.DataFrame,
-                    contributions: pd.DataFrame, today_year: int,
-                    flat_return: float | None = None) -> float:
+                    contributions: pd.DataFrame, today_year: int) -> float:
     """Lump sum to invest today to erase every *past* year's shortfall.
 
-    For each planned year strictly before ``today_year``, the per-category
-    shortfall (planned − actual) is grown to today at that category's expected
-    return; surpluses in other years/categories net against it. The current
-    year is deliberately excluded — its gap is "still to go this year", not
-    catch-up. Never below zero, and investing more than this (overshooting the
-    goal) is fine.
+    Planned minus actual, summed over the years strictly before ``today_year``,
+    in plain rupees: no growth (2026-11-02, Rv: a shortfall and returns are
+    different things). A surplus in one year nets against a shortfall in
+    another. The current year is deliberately excluded — its gap is "still to
+    go this year", not catch-up. Never below zero, and investing more than this
+    (overshooting the goal) is fine.
     """
     c = contributions[contributions["profile"] == profile.key]
-    planned_fv = actual_fv = 0.0
+    gap = 0.0
     for y in available_years(income, contributions, profile.key):
         if y >= today_year:
             continue
-        exp = expected_contributions(profile, income, targets, y)
-        act = c[c["year"] == y].groupby("category")["amount"].sum().to_dict()
-        for cat in set(exp) | set(act):
-            grow = (1 + category_return(cat, flat_return) / 100) ** (today_year - y)
-            planned_fv += exp.get(cat, 0.0) * grow
-            actual_fv += act.get(cat, 0.0) * grow
-    return max(0.0, planned_fv - actual_fv)
+        gap += sum(expected_contributions(profile, income, targets, y).values())
+        gap -= float(c.loc[c["year"] == y, "amount"].sum())
+    return max(0.0, gap)
 
 
 def net_worth_series(profile: Profile, income: pd.DataFrame, contributions: pd.DataFrame,

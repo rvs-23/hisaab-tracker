@@ -45,8 +45,8 @@ year_range = (
 flat_return = d.config.expected_return_pct  # "we only use one" — config.yaml override
 growth_basis = (f"a flat {flat_return:g}% a year (expected_return_pct in config.yaml)"
                 if flat_return is not None else "conservative per-category returns")
-catch_up = sum(compute.catch_up_amount(p, d.income, d.targets, d.contributions, today_year,
-                                       flat_return=flat_return) for p in people)
+catch_up = sum(compute.catch_up_amount(p, d.income, d.targets, d.contributions, today_year)
+               for p in people)
 earned = float(trend["total_income"].sum())
 opening = sum(compute.opening_corpus(d.adjustments, p.key) for p in people)
 invested = float(contrib["amount"].sum()) + opening
@@ -79,7 +79,7 @@ plan_sub = (
 metric_tile(c[2], f"{today_year} total goal", inr_short(year_goal + catch_up), plan_sub,
             color=SECONDARY, big=True,
             help=f"{today_year}'s goal ({inr_short(year_goal)}) plus the shortfall from "
-                 f"past years grown at expected returns ({inr_short(catch_up)}). "
+                 f"past years ({inr_short(catch_up)}). "
                  f"'{today_year} left' is the year's goal minus the {inr_short(invested_ty)} "
                  "you've already put in. Overshooting is fine.")
 
@@ -177,7 +177,7 @@ if needed > 0:
     n = compute.months_left()
     parts = [f"{inr_short(to_go)} left of {today_year}'s goal"] if to_go > 0 else []
     if catch_up > 0:
-        parts.append(f"{inr_short(catch_up)} past years' shortfall (grown at expected returns)")
+        parts.append(f"{inr_short(catch_up)} past years' shortfall")
     st.markdown(
         f"<div style='border:1px solid {SECONDARY}33;background:{SECONDARY}0d;border-radius:12px;"
         f"padding:14px 18px;display:flex;align-items:baseline;gap:.8rem;flex-wrap:wrap'>"

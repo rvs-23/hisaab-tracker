@@ -94,13 +94,13 @@ anyone) last saved data, from `changes.jsonl`.
 - **Goal** for a year = its investment amount × target % per category. A
   saved allocation carries forward until a newer year replaces it.
 - **Catch-up** = the lump sum that, invested today, erases every *past* year's
-  shortfall (grown at the expected return). The current year's gap is "left to
+  shortfall in plain rupees (no growth). The current year's gap is "left to
   go", not catch-up. Overshooting is fine.
 - **Estimated value** = contributions compounded at the expected return, plus
   the emergency fund (the amount held, or the derived target until one is
   entered), plus any opening corpus. It's a projection, not a valuation.
 - **One rate everywhere:** `expected_return_pct` in `config.yaml` is the single
-  growth rate for estimated value, corpus, and catch-up. Remove it to fall back
+  growth rate for estimated value and corpus. Remove it to fall back
   to per-category `EXPECTED_RETURNS` in `config.py`.
 - **Emergency fund target** = budgeted needs + investment over the last
   `EMERGENCY_FUND_MONTHS` (4) months, up to today. Each month uses its own

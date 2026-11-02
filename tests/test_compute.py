@@ -403,7 +403,7 @@ def test_catch_up_unaffected_by_opening_corpus(rv):
     income, targets = _one_year()
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026)
-    assert cu == pytest.approx(200000 * 1.115 ** 2, rel=1e-6)  # identical to the no-corpus test
+    assert cu == 200000  # identical to the no-corpus test
 
 
 # Catch-up amount.
@@ -415,11 +415,11 @@ def _one_year(salary=1000000):
     return income, targets  # anchor year → investment is 20% of rv's salary, all in mfs
 
 
-def test_catch_up_grows_shortfall_to_today(rv):
-    income, targets = _one_year()  # 2024 investment 250000, all mfs, nothing invested
+def test_catch_up_is_the_plain_shortfall(rv):
+    income, targets = _one_year()  # 2024 investment 200000, all mfs, nothing invested
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026)
-    assert cu == pytest.approx(200000 * 1.115 ** 2, rel=1e-6)  # shortfall grown 2 yrs at 11.5%
+    assert cu == 200000  # no growth on a shortfall, however old
 
 
 def test_catch_up_zero_when_plan_met(rv):
@@ -455,7 +455,7 @@ def test_catch_up_counts_a_year_once_it_is_past(rv):
     income, targets = _one_year()  # shortfall lives in 2024
     no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
     cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2025)
-    assert cu == pytest.approx(200000 * 1.115, rel=1e-6)  # grown one year
+    assert cu == 200000
 
 
 def test_inr_indian_grouping():
@@ -651,13 +651,6 @@ def test_flat_return_overrides_per_category(rv):
     assert compute.expected_return_for_target({"mfs": 100}, flat_return=9.0) == 9.0
     assert compute.category_return("mfs") == 11.5
     assert compute.category_return("mfs", 10.0) == 10.0
-
-
-def test_catch_up_uses_flat_return_when_set(rv):
-    income, targets = _one_year()
-    no_contrib = pd.DataFrame(columns=storage.CONTRIB_COLUMNS)
-    cu = compute.catch_up_amount(rv, income, targets, no_contrib, today_year=2026, flat_return=10.0)
-    assert cu == pytest.approx(200000 * 1.10 ** 2, rel=1e-6)
 
 
 def test_corpus_growth_honours_flat_return(rv):

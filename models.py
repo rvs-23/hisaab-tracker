@@ -55,8 +55,8 @@ class Config(BaseModel):
     Attributes:
         categories: The shared asset-class vocabulary.
         expected_return_pct: Optional single expected annual return (% p.a.).
-            When set, it is THE growth rate everywhere — net worth, corpus,
-            and catch-up — replacing the per-category
+            When set, it is THE growth rate everywhere — net worth and corpus
+            — replacing the per-category
             ``config.EXPECTED_RETURNS``. Absent, per-category rates apply.
     """
 
