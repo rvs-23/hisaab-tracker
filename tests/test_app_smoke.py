@@ -13,19 +13,19 @@ PAGES = [
     "views/dashboard.py",
     "views/income.py",
     "views/budget_projection.py",
-    "views/actuals.py",
-    "views/rent_vs_buy.py",
+    "views/investments.py",
+    "views/house_fund.py",
 ]
 
 TARGET = (
-    "default_target: {mfs: 45, gold_metals: 25, indian_stocks: 5, us_market: 10, ppf_nps: 5, fixed_deposit: 10}\n"
+    "default_target: {mfs: 45, gold_metals: 25, indian_stocks: 5, us_market: 10, ppf: 5, fixed_deposit: 10}\n"
 )
 
 
 @pytest.fixture
 def fake_data_dir(tmp_path, monkeypatch):
     (tmp_path / "config.yaml").write_text(
-        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, gold_metals]\n"
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
     profiles.mkdir()
@@ -54,7 +54,7 @@ def fake_data_dir(tmp_path, monkeypatch):
 def fresh_data_dir(tmp_path, monkeypatch):
     """A brand-new folder: only config.yaml + profiles/, no history CSVs yet."""
     (tmp_path / "config.yaml").write_text(
-        "categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, gold_metals]\n"
+        "categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]\n"
     )
     profiles = tmp_path / "profiles"
     profiles.mkdir()
@@ -78,26 +78,46 @@ def test_page_renders_without_errors(page, profile, fake_data_dir):
     assert not at.error, [e.value for e in at.error]
 
 
+@pytest.mark.parametrize("page", ["views/dashboard.py", "views/house_fund.py"])
+def test_household_pages_render(page, fake_data_dir):
+    at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20)
+    at.query_params["profile"] = "household"
+    at.run()
+    assert not at.exception, at.exception
+    assert not at.error, [e.value for e in at.error]
+
+
+def test_household_dashboard_sums_both_people(fake_data_dir):
+    """The fixture's contributions are all rv's, so household 'Invested' must
+    equal rv's (cheeni adds nothing), not fall back to one default person."""
+    (fake_data_dir / "contributions.csv").write_text(
+        "year,profile,category,amount,notes\n2024,rv,mfs,100000,\n2024,cheeni,mfs,50000,\n")
+
+    def invested(profile):
+        at = AppTest.from_file(str(REPO_ROOT / "views/dashboard.py"), default_timeout=20)
+        at.query_params["profile"] = profile
+        at.run()
+        tile = next(m.value for m in at.markdown if "Invested till date" in m.value)
+        return tile.split("class='val'")[1].split(">")[1].split("<")[0]
+
+    assert invested("rv") == "₹1.0L"
+    assert invested("household") == "₹1.5L"
+
+
+def test_household_falls_back_on_per_person_pages(fake_data_dir):
+    at = AppTest.from_file(str(REPO_ROOT / "views/income.py"), default_timeout=20)
+    at.query_params["profile"] = "household"
+    at.run()
+    assert not at.exception, at.exception
+    assert at.query_params["profile"] != ["household"]
+
+
 @pytest.mark.parametrize("page", PAGES)
 def test_page_renders_on_fresh_data_dir(page, fresh_data_dir):
     """README promises config.yaml + profiles/ is enough to start — no CSVs."""
     at = AppTest.from_file(str(REPO_ROOT / page), default_timeout=20).run()
     assert not at.exception, at.exception
     assert not at.error, [e.value for e in at.error]
-
-
-# Rent vs buy is now a single net-cost chart (no budget/timing sections) — it
-# reads none of the person's own data, so it renders the same for both profiles.
-
-def test_rent_vs_buy_states_the_net_cost_verdict(fake_data_dir):
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    assert not at.exception, at.exception
-    captions = " ".join(c.value for c in at.caption)
-    assert "comes out ahead by" in captions    # the verdict
-    assert "net gain" in captions.lower()       # framed as net gain
-    assert "the two asset piles" in captions    # the equity-vs-gain table caption
 
 
 def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
@@ -115,36 +135,12 @@ def test_income_noop_save_warns_instead_of_confirming(fake_data_dir):
     assert "Saved" not in " ".join(s.value for s in at.success)
 
 
-def test_rent_vs_buy_per_year_view_switches_the_chart(fake_data_dir):
-    """The Cumulative/Per year toggle must recompute without error."""
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    at.radio(key="rvb_view_rv").set_value("Per year").run()
-    assert not at.exception, at.exception
-
-
-
-def test_rent_vs_buy_explains_a_buying_win_as_a_buying_win(fake_data_dir):
-    """The 'it wins because' clause once always credited investing — even when
-    buying won. Strong appreciation vs a weak return must read as buying's win."""
-    at = AppTest.from_file(str(REPO_ROOT / "views/rent_vs_buy.py"), default_timeout=20)
-    at.query_params["profile"] = "rv"
-    at.run()
-    at.number_input(key="rvb_appr_rv").set_value(12.0)
-    at.number_input(key="rvb_return_rv").set_value(4.0).run()
-    assert not at.exception, at.exception
-    captions = " ".join(c.value for c in at.caption)
-    assert "buying comes out ahead" in captions
-    assert "investing outpaces" not in captions
-
-
 def test_flash_shows_on_the_next_run_then_clears(fake_data_dir):
     """Saves queue their confirmation (ui.flash) instead of calling st.success
     right before st.rerun, which the browser wipes. page_header shows a queued
     message once. (AppTest keeps stale elements a browser clears, so the old
     bug itself can't be reproduced here — this pins the mechanism instead.)"""
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.session_state["_flash"] = ("success", "Saved.")
     at.run()
@@ -153,7 +149,7 @@ def test_flash_shows_on_the_next_run_then_clears(fake_data_dir):
 
 
 def test_save_queues_its_confirmation(fake_data_dir):
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     at.number_input(key="ef_rv").set_value(150_000)
@@ -167,7 +163,7 @@ def test_audit_failure_reads_as_saved_but_unaudited(fake_data_dir, monkeypatch):
     """The CSV is written before the audit record; if only the audit fails the
     page must not claim 'Not saved'."""
     monkeypatch.setattr(storage, "log_change", lambda *a, **k: "OSError: disk full")
-    at = AppTest.from_file(str(REPO_ROOT / "views/actuals.py"), default_timeout=20)
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
     at.query_params["profile"] = "rv"
     at.run()
     at.number_input(key="ef_rv").set_value(150_000)
@@ -176,3 +172,35 @@ def test_audit_failure_reads_as_saved_but_unaudited(fake_data_dir, monkeypatch):
     assert not at.error, [e.value for e in at.error]
     assert "Saved, but the audit log" in " ".join(w.value for w in at.warning)
     assert "emergency_fund" in (fake_data_dir / "adjustments.csv").read_text()
+
+
+def test_investments_save_keeps_hidden_details(fake_data_dir):
+    """`details` isn't shown in the table, so a save must carry it through.
+    The file starts without `last_change`; finding that header afterwards
+    proves the save really rewrote it."""
+    (fake_data_dir / "contributions.csv").write_text(
+        "year,profile,category,amount,notes,details\n"
+        "2024,rv,mfs,169766,,Q: which funds? A: PPFAS\n")
+    at = AppTest.from_file(str(REPO_ROOT / "views/investments.py"), default_timeout=20)
+    at.query_params["profile"] = "rv"
+    at.run()
+    at.selectbox[0].set_value(2024).run()
+    at.button(key="save_contrib_rv_2024").click().run()
+    assert not at.exception, at.exception
+    saved_csv = (fake_data_dir / "contributions.csv").read_text()
+    assert "last_change" in saved_csv.splitlines()[0]
+    assert "Q: which funds? A: PPFAS" in saved_csv
+
+
+@pytest.mark.parametrize("page", ["views/income.py", "views/budget_projection.py",
+                                  "views/investments.py", "views/house_fund.py"])
+@pytest.mark.parametrize("profile", ["rv", "household"])
+def test_switching_profile_on_any_page_finds_a_page(page, profile, fake_data_dir):
+    """Editing ?profile= while on any page must never hit 'Page not found':
+    every page is registered for every profile, only hidden from the nav."""
+    at = AppTest.from_file(str(REPO_ROOT / "app.py"), default_timeout=20)
+    at.query_params["profile"] = profile
+    at.run()
+    at.switch_page(page).run()
+    assert not at.exception, at.exception
+    assert not at.error, [e.value for e in at.error]

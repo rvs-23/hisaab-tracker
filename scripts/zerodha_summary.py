@@ -1,7 +1,7 @@
 """Summarise how much went in, from any number of Zerodha tradebook exports.
 
 Read-only: it prints a table and writes nothing. Use it to answer "how much
-did we invest in X" before deciding what to record (by hand on Actuals, or
+did we invest in X" before deciding what to record (by hand on Investments, or
 with ``import_tradebook.py``).
 
 Takes Console → Reports → Tradebook CSV exports. Equity and mutual-fund

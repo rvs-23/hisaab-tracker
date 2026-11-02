@@ -1,7 +1,6 @@
 import datetime as dt
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
 import compute
@@ -11,10 +10,10 @@ from config import (
     PROFILE_INCREMENT_SPLITS,
 )
 from ui import (
-    FS_BODY, NEEDS, SAND, accent_primary, accent_secondary, chart_title,
+    FS_BODY, NEEDS, accent_primary, accent_secondary,
     html_table, inr_short, load_all, metric_tile, page_header, pretty_category,
     resync, save_failed, saved, section, seed_slice_sig, slice_sig,
-    stale_since_open, style_fig,
+    stale_since_open,
 )
 
 CURRENT_YEAR = dt.date.today().year
@@ -39,7 +38,7 @@ st.caption(
 st.markdown(
     f"<div style='border-left:3px solid {NEEDS};background:var(--strip-bg);border-radius:4px;"
     f"padding:.5rem .8rem;color:var(--muted);font-size:{FS_BODY};margin:.2rem 0 .4rem'>"
-    "These figures are <b>derived</b> — to change them, edit <b>Income</b>. The one "
+    "These figures are <b>derived</b>. To change them, edit <b>Income</b>. The one "
     "thing to set here is your <b>target allocation</b> below.</div>",
     unsafe_allow_html=True,
 )
@@ -47,10 +46,6 @@ st.markdown(
 if d.income[d.income["profile"] == active.key].empty:
     st.info("No income entered yet. Add it on the Income page.")
     st.stop()
-income_years = compute.selectable_years(d.income, d.contributions, active.key)
-default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
-yc, _ = st.columns([1, 5])
-year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
 
 HEADERS = {
     "year": "Year", "age": "Age", "total_income": "Income", "yoy": "YoY",
@@ -61,7 +56,7 @@ HEADERS = {
 }
 MONEY = ["total_income", "needs", "wants", "investment", "monthly_needs",
          "monthly_wants", "monthly_investment", "cumulative_invested"]
-FMT = {c: (lambda v: f"{v:,.0f}") for c in MONEY}
+FMT = {c: inr_short for c in MONEY}  # short ₹ keeps the 12 columns in bounds
 FMT["year"] = lambda v: f"{int(v)}"
 FMT["age"] = lambda v: f"{int(v)}"
 FMT["yoy"] = lambda v: "—" if v is None or pd.isna(v) else f"{v:+.0f}%"
@@ -78,6 +73,16 @@ bs = compute.budget_series(active, d.income)
 if bs.empty:  # income rows can exist yet all be zero — no earning year, no budget
     st.info("No earning year yet. Add income on the Income page.")
     st.stop()
+
+# Budget over time, on top (as Income has): every year, actual and projected.
+section("Budget over time")
+html_table(bs, HEADERS, formats=FMT, row_class=row_class)
+st.caption("Current year highlighted; projected years in muted italics.")
+
+income_years = compute.selectable_years(d.income, d.contributions, active.key)
+default_year = CURRENT_YEAR if CURRENT_YEAR in income_years else income_years[-1]
+yc, _ = st.columns([1, 5])
+year = yc.selectbox("Year", income_years, index=income_years.index(default_year))
 
 # This year's monthly split first — the headline numbers.
 row = bs[bs["year"] == year]
@@ -98,16 +103,18 @@ if not row.empty:
         invested_ty = float(d.contributions.loc[
             (d.contributions["profile"] == active.key) & (d.contributions["year"] == year), "amount"
         ].sum())
-        catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year,
-                                           flat_return=d.config.expected_return_pct)
-        months_left = 13 - dt.date.today().month
-        adj_monthly = (catch_up + max(0.0, year_goal - invested_ty)) / months_left
-        inv_sub += f"<br>adjusted: {inr_short(adj_monthly)}/mo to be on track"
+        catch_up = compute.catch_up_amount(active, d.income, d.targets, d.contributions, year)
+        left = max(0.0, year_goal - invested_ty)
+        n = compute.months_left()
+        adj_monthly = (left + catch_up) / n
+        inv_sub += f"<br>to finish {year}: {inr_short(adj_monthly)}/mo, {compute.month_span()}"
+        inv_help = (f"The plan's monthly investment. 'To finish {year}' = {inr_short(left)} left of "
+                    f"{year}'s goal + {inr_short(catch_up)} past years' shortfall, spread over the "
+                    f"{n} month{'s' if n != 1 else ''} left. Following it puts you fully on track by December.")
+    else:
+        inv_help = "The plan's monthly investment for this year."
     metric_tile(cols[2], "Investment", f"{inr_short(r['monthly_investment'])}/mo", inv_sub,
-                color=SECONDARY, big=True,
-                help="The plan's monthly investment. 'Adjusted' spreads the past "
-                     "shortfall plus what's left of this year's goal over the months "
-                     "remaining, so following it makes you fully on track by December.")
+                color=SECONDARY, big=True, help=inv_help)
 
 # Target allocation lives here (moved from Actuals, 2026-07-20): right under
 # the monthly split, so how each monthly goal is consumed per instrument reads
@@ -117,14 +124,16 @@ investment = float(budget_row.iloc[0]["investment"]) if not budget_row.empty els
 target = compute.resolve_target(active, d.targets, year)
 
 section(f"Target allocation · how the monthly goal is consumed")
-active_mix = pd.DataFrame({"category": list(target.keys()), "pct": list(target.values())})
-active_mix = active_mix.sort_values("pct", ascending=False)
+# Every instrument, in the same order as the Investments table, so the two
+# pages line up row for row (0% included).
+active_mix = pd.DataFrame({"category": d.config.categories,
+                           "pct": [target.get(c, 0.0) for c in d.config.categories]})
 active_mix["per_year"] = active_mix["pct"] / 100 * investment
 active_mix["per_month"] = active_mix["per_year"] / 12
 html_table(
     active_mix,
     {"category": "Instrument", "pct": "Target %", "per_month": "₹ / month", "per_year": "₹ / year"},
-    formats={"category": pretty_category, "pct": lambda v: f"{v:.0f}%",
+    formats={"category": pretty_category, "pct": lambda v: f"{v:g}%",
              "per_year": inr_short, "per_month": inr_short},
 )
 
@@ -189,29 +198,3 @@ with st.expander("Edit allocation"):
         except Exception as exc:
             save_failed(exc)
     st.caption("A saved year carries forward until you set a newer one.")
-
-# Then the slice shifting over the actual years (100% stacked), with the
-# investment segment labelled with both its % and the raw yearly rupees.
-actual = bs[~bs["is_projected"]]
-yr = actual["year"].astype(int).astype(str)
-tot = actual["total_income"]
-needs_p = (100 * actual["needs"] / tot).round(0)
-wants_p = (100 * actual["wants"] / tot).round(0)
-inv_p = (100 * actual["investment"] / tot).round(0)
-inv_label = [f"{p:.0f}% · {inr_short(a)}" for p, a in zip(inv_p, actual["investment"])]
-# Colour roles: the derived investment slice is *planned* money, so it wears
-# the secondary accent; needs/wants are neutral grays (a category is not a role).
-f = go.Figure()
-f.add_bar(x=yr, y=needs_p, name="Needs", marker_color=NEEDS)
-f.add_bar(x=yr, y=wants_p, name="Wants", marker_color=SAND)
-f.add_bar(x=yr, y=inv_p, name="Investment", marker_color=SECONDARY,
-          text=inv_label, textposition="inside",
-          textfont=dict(color="white", size=11), insidetextanchor="middle")
-f.update_layout(barmode="stack", xaxis=dict(type="category"), yaxis=dict(ticksuffix="%", range=[0, 100]))
-style_fig(f, height=300)
-chart_title("The investment slice, year by year (label shows % and ₹/yr invested)")
-st.plotly_chart(f, width="stretch", config={"displayModeBar": False})
-
-with st.expander("Full detail (all years + projections)"):
-    st.caption("Current year highlighted; projected years in muted italics.")
-    html_table(bs, HEADERS, formats=FMT, row_class=row_class)

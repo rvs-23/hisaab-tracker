@@ -14,7 +14,7 @@ from pathlib import Path
 
 CONFIG = """\
 # Shared asset-class vocabulary; targets and contributions may only use these.
-categories: [us_market, indian_stocks, mfs, fixed_deposit, ppf_nps, bonds_gsec_aif, gold_metals]
+categories: [us_market, indian_stocks, mfs, fixed_deposit, epf, ppf, nps, gold_metals]
 """
 
 PROFILE = """\
@@ -26,8 +26,8 @@ default_target:             # fallback allocation, must sum to 100
   gold_metals: 25
   indian_stocks: 14
   us_market: 10
-  ppf_nps: 5
-  bonds_gsec_aif: 1
+  ppf: 5
+  fixed_deposit: 1
 """
 
 
